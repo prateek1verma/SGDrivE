@@ -11,6 +11,7 @@ This folder is excluded from the built package (`.Rbuildignore`).
 | `reference_impl/mcallen_1960_1983_filled.csv` | Weather input used for the reference runs (same file as `inst/extdata/mcallen_tx_1960_1983.csv`). |
 | `make_reference.R` | Regenerates `reference/`: `Rscript data-raw/make_reference.R` (about 1 minute). |
 | `reference/*.rds` | Reference outputs on McAllen weather: `discrete`, `ode`, `ode_no_floors`, `ode_match_larvae`, plus the parameter list. |
+| `make_test_fixtures.R` | Builds `tests/testthat/fixtures/`: legacy temperature functions on a grid, legacy McAllen forcing terms, and short raw NOAA extracts around backup-filled and interpolated days (needs the raw NOAA files; see the script). |
 | `reference/PROVENANCE.txt` | Date, R and deSolve versions, md5 of inputs and scripts, run times. |
 
 ## Weather data (`inst/extdata/mcallen_tx_1960_1983.csv`)

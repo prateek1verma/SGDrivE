@@ -123,6 +123,9 @@ sets i0 = 8 directly.
     μ_M(t) = μ_U(t) = μ_F(t) = μ_T(T) + μ_b
 
 μ_b = 0 by default (optional sex-specific background field mortality).
+Moisture index I_W(t) = min(1, annual rainfall / rain_threshold) for the
+calendar year of day t, with incomplete years scaled to a full year; I_W = 1
+when no rainfall is supplied (μ_W = 0 by default, so no effect).
 Genotype does **not** change these hazards (D-002); genotype lifespan effects
 act through q_A,g only.
 

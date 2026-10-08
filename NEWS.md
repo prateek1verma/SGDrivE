@@ -12,6 +12,16 @@
   converts omega to lifespan fractions and precomputes the egg tensor
   s * ih * tau.
 * `sg_omega_to_ell()` inverts `MGDrivE::calcOmega()`.
+* Temperature functions of Gutierrez & Ponti (2014): `sg_degree_days()`,
+  `sg_temp_mortality()`, `sg_egg_viability()`, `sg_ovip_scalar()`
+  (identical to the legacy code under the `"gp2014"` preset).
+* `sg_forcing()` checks daily weather and precomputes the daily forcing
+  terms (degree-days, mortality, egg viability, oviposition scalar, moisture
+  index).
+* Weather tools: `sg_example_weather()` (McAllen, Texas, 1960-1983),
+  `sg_read_ghcn()`, `sg_fill_weather()` (Gutierrez et al. 2019 gap-filling
+  procedure) and `sg_cold_index()`, which reproduces the published McAllen
+  cold-stress index (1971 = 6.67, 1979 = 9.80).
 
 ## Milestone M0: foundations
 
