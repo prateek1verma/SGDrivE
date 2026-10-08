@@ -7,6 +7,11 @@
   state), `"hardy_weinberg"` from allele frequencies, or a full `"state"`
   vector. Adults go only to genotypes of the matching sex and to adult classes
   they reach; mated females are split across mates by random mating (D-020).
+* Internal reference rate function (pure R, model specification S7-S14):
+  all state derivatives and cumulative-counter rates (eggs laid by genotype,
+  egg batches, emergences, matings by female x mate genotype, deaths by
+  block, deaths by old age) for one day's forcing; the test oracle for the
+  C++ kernel.
 
 ## Milestone M1: inputs
 
