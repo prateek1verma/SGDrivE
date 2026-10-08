@@ -38,3 +38,15 @@ sg_test_cube_mendelian <- function() {
     omega = stats::setNames(rep(1, 3), g)
   )
 }
+
+# One genotype only (wild type), the configuration of Gutierrez & Ponti (2014).
+sg_test_cube_wild <- function() {
+  g <- "W"
+  list(
+    genotypesID = g, genotypesN = 1L, wildType = g,
+    ih = array(1, c(1, 1, 1), dimnames = list(g, g, g)),
+    tau = array(1, c(1, 1, 1), dimnames = list(g, g, g)),
+    eta = matrix(1, 1, 1, dimnames = list(g, g)),
+    phi = c(W = 0.5), xiF = c(W = 1), xiM = c(W = 1), s = c(W = 1), omega = c(W = 1)
+  )
+}

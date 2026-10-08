@@ -150,6 +150,42 @@ is defined once, in `R/param-table.R`, and returned by the exported function
 the single source for defaults, validation, `print()` and documentation, and
 changes to it are visible in code review.
 
+## D-018 Segmented adult chains with exact maturity thresholds (Accepted, 2026-10-08)
+
+*Replaces the nearest-class rounding rule for maturity thresholds (former
+MODEL_SPEC S6) and the class overrides `i0`, `i_m`, `i_mM`.*
+
+Each adult chain is split at its maturity thresholds into segments whose mean
+durations are exact:
+
+* females (U and F share one chain because age is kept on mating): boundaries
+  at X_rec (receptivity) and X_ovi (first oviposition); males: boundary at
+  X_mat (maturity). Zero-length segments are dropped; `mating = "instant"`
+  drops X_rec.
+* The total number of adult sub-stages stays n_A for each sex (D-003). It is
+  allocated to segments in proportion to the wild-type segment lengths, at
+  least one each (largest-remainder rounding); `sg_model(adult_substages = )`
+  overrides the allocation per segment.
+* Sub-stage counts are the same for all genotypes. Genotype g has lifespan
+  L_g = ℓ_g X_A (D-002): boundaries stay at the same absolute degree-days and
+  only the segment in which L_g falls is shortened (or the last segment
+  lengthened when ℓ_g > 1). Segments starting at or after L_g are never
+  reached: the chain of that genotype ends there (death), and it never
+  reaches the corresponding threshold (flagged by print()).
+* Each adult sub-stage i of genotype g has its own width w_{g,i} (dd), so the
+  transfer rate is q_{g,i}(t) = Δx(T(t)) / w_{g,i}.
+* New parameter `X_ovi` (age at first oviposition, dd, default 61) separates
+  the egg-laying threshold from X_pre, which keeps its role of scaling the
+  degree-day increment (S1). The "gp2014" preset sets X_ovi = 7/25 × X_A =
+  56.784 dd with n_A = 25, which gives 7 + 18 equal sub-stages, identical to
+  the Gutierrez & Ponti chain (egg laying from class 8).
+
+Reasoning: exact mean threshold ages for every genotype and every n_A, and an
+exact version of D-002 (maturity fixed in degree-days, lifespan cost acting on
+the last segment). The spread of threshold ages is still set by the number of
+sub-stages before the threshold (CV = 1/sqrt(n)); about 25 sub-stages before
+oviposition would match the observed 61 ± 12.2 dd.
+
 ---
 
 ## Open questions

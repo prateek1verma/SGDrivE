@@ -79,10 +79,10 @@
     ),
 
     # ---- development: mean stage durations ---------------------------------
-    .prow("X_pre", 61, "development", "dd", "GP2014", "S1, S6",
+    .prow("X_pre", 61, "development", "dd", "GP2014", "S1",
       paste(
-        "Pre-oviposition period. Scales the degree-day increment and sets",
-        "the age at which females start laying eggs."
+        "Pre-oviposition period of Adams (1979), used to scale the daily",
+        "degree-day increment dx. The egg-laying age itself is X_ovi."
       ),
       lower = 0, bounds = "(]"
     ),
@@ -120,33 +120,28 @@
       type = "integer", lower = 1, upper = 1000
     ),
     .prow("n_A", 10L, "stages", "-", "adapted", "S5, S6",
-      "Number of adult age classes (Erlang sub-stages). D-003.",
+      paste(
+        "Number of adult sub-stages per sex, allocated to the segments of the",
+        "adult chain (S6). D-003, D-018."
+      ),
       type = "integer", lower = 1, upper = 1000
     ),
 
     # ---- thresholds: maturity ages in absolute degree-days (D-002, D-004) --
+    .prow("X_ovi", 61, "thresholds", "dd", "GP2014", "S6, S8",
+      paste(
+        "Age at first oviposition: mated females older than this lay eggs",
+        "and search for wounds (segment boundary of the female chain). D-018."
+      ),
+      lower = 0, bounds = "(]"
+    ),
     .prow("X_rec", 0, "thresholds", "dd", "adapted", "S6, S12",
-      "Female receptivity age: virgins younger than this cannot mate. D-004.",
+      "Female receptivity age: virgins younger than this cannot mate. D-004, D-018.",
       lower = 0
     ),
     .prow("X_mat", 0, "thresholds", "dd", "adapted", "S6, S12",
-      "Male maturity age: younger males are not available as mates. D-004.",
+      "Male maturity age: younger males are not available as mates. D-004, D-018.",
       lower = 0
-    ),
-    .prow("i0", NA_integer_, "thresholds", "-", "adapted", "S6",
-      paste(
-        "Override: first egg-laying adult class for every genotype. NA",
-        "derives it from X_pre per genotype."
-      ),
-      type = "integer", lower = 1, upper = 1000, allow_na = TRUE
-    ),
-    .prow("i_m", NA_integer_, "thresholds", "-", "adapted", "S6",
-      "Override: first receptive female class. NA derives it from X_rec.",
-      type = "integer", lower = 1, upper = 1000, allow_na = TRUE
-    ),
-    .prow("i_mM", NA_integer_, "thresholds", "-", "adapted", "S6",
-      "Override: first mature male class. NA derives it from X_mat.",
-      type = "integer", lower = 1, upper = 1000, allow_na = TRUE
     ),
 
     # ---- mortality ----------------------------------------------------------

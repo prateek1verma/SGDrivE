@@ -50,7 +50,7 @@ flow accounting and outputs.
 | Pupae | 10 | 95 dd (≈ 8 days at 27 °C) | long |
 | Adults | 10 | 202.8 dd (≈ 17 days at 27 °C) | long; carries maturity thresholds |
 
-No default exceeds 10. Setting every n to 25 (with i0 = 8) gives the
+No default exceeds 10. Setting every n to 25 (with X_ovi = 56.784 dd) gives the
 Gutierrez & Ponti configuration used in regression tests.
 
 ## 4. Temperature-driven functions (precomputed per day)
@@ -91,27 +91,46 @@ c_E = 0.00375, p_E0 = 0.3.
                (egg_temperature = "host": q_E = n_E Δx(T_host) / X_E, constant)
     q_L      = n_L / τ_L                  τ_L = 6 d         [GP2014 code]
     q_P(t)   = n_P Δx(T) / X_P            X_P = 95 dd       [GP2014]
-    q_A,g(t) = n_A Δx(T) / (ℓ_g X_A)      X_A = 202.8 dd    [GP2014] + [adapted, D-002]
+    q_{g,i}(t) = Δx(T) / w^F_{g,i}  (females),  Δx(T) / w^M_{g,i}  (males)
+                                          per adult sub-stage, see S6  [adapted, D-018]
 
-**(S6) Maturity thresholds in absolute degree-days** [adapted, D-002, D-004]
+**(S6) Segmented adult chains and maturity thresholds** [adapted, D-002, D-004, D-018]
 
-For a threshold of X_thr dd and genotype g, the first adult class at or past
-the threshold is
-
-    i_thr,g = round(n_A · X_thr / (ℓ_g · X_A)) + 1
-
-If i_thr,g > n_A the threshold is never reached (that genotype never matures).
-Users may instead set class indices directly.
+Maturity thresholds are fixed physiological ages (dd), the same for every
+genotype:
 
 | Threshold | Symbol | Default | Applies to |
 |---|---|---|---|
-| Pre-oviposition | X_pre → i0_g | 61 dd | egg laying (F) |
-| Female receptivity | X_rec → i_m,g | 0 dd (class 1) | mating of U |
-| Male maturity | X_mat → i_mM,g | 0 dd (class 1) | male availability |
+| First oviposition | X_ovi | 61 dd | egg laying and wound search (F) |
+| Female receptivity | X_rec | 0 dd | mating of U (dropped when mating = "instant") |
+| Male maturity | X_mat | 0 dd | male availability as mates |
 
-With n_A = 10 and ℓ_g = 1, i0 = round(3.008) + 1 = 4 (laying after ≈ 61 dd).
-Gutierrez & Ponti used classes 8–25 of 25 (i0 = 8); the regression preset
-sets i0 = 8 directly.
+Each adult chain is split at its thresholds into segments: females at
+{X_rec, X_ovi}, males at {X_mat}; zero-length segments are dropped. With
+wild-type boundaries 0 = b_0 < b_1 < … < b_K = X_A, segment j covers
+[b_{j−1}, b_j) and has n_j sub-stages, with Σ_j n_j = n_A. The n_j are
+allocated in proportion to the segment lengths, at least one each (largest
+remainder), unless given by `sg_model(adult_substages = )`.
+
+Genotype g has lifespan L_g = ℓ_g X_A (D-002). Its segment j covers
+[b_{j−1}, min(b_j, L_g)) for j < K and [b_{K−1}, L_g) for the last segment;
+each of its n_j sub-stages has width
+
+    w_{g,i} = (segment end − segment start) / n_j      (dd)
+
+Segments that start at or after L_g are never reached: the chain of
+genotype g ends with the sub-stage in which L_g falls (its last class
+l_g), and outflow from that class is death. Sub-stage i is *receptive*,
+*laying* or *mature* when its segment starts at or after X_rec, X_ovi or
+X_mat; these flags are the same for all genotypes, and a genotype whose last
+class l_g comes before the first laying (receptive, mature) class never lays
+(mates, counts as a mate).
+
+Default females (n_A = 10, X_rec = 0): segments [0, 61) and [61, 202.8) with
+3 and 7 sub-stages, so the mean age at the first laying class is exactly
+61 dd. Preset "gp2014": X_ovi = 56.784 dd and n_A = 25 give 7 + 18 sub-stages
+of equal width 8.112 dd, identical to the Gutierrez & Ponti chain (egg laying
+from class 8).
 
 ## 6. Mortality hazards
 
@@ -127,13 +146,13 @@ Moisture index I_W(t) = min(1, annual rainfall / rain_threshold) for the
 calendar year of day t, with incomplete years scaled to a full year; I_W = 1
 when no rainfall is supplied (μ_W = 0 by default, so no effect).
 Genotype does **not** change these hazards (D-002); genotype lifespan effects
-act through q_A,g only.
+act through the sub-stage widths w_{g,i} only (S6).
 
 ## 7. Reproduction
 
 **(S8) Egg-laying females and wound search** [GP2014 Eq. 4] + [adapted, D-006]
 
-    W_{g,m} = Σ_{i ≥ i0_g} F_{g,m,i}                (egg-laying mated females)
+    W_{g,m} = Σ_{i laying} F_{g,m,i}                 (egg-laying mated females, S6)
     N_s     = Σ_{g,m} W_{g,m}                        (default: searching mated females, incl. sterile-mated)
     N_s     = Σ M + Σ U + Σ F                        (option "all_adults", [GP2014 code])
     Ψ(t)    = σ₀ [1 − exp(−a_s Δx(T) H / N_s)]       (Ψ = σ₀ when N_s = 0)
@@ -168,28 +187,29 @@ dX_1/dt = inflow − (q + μ) X_1, dX_i/dt = q X_{i−1} − (q + μ) X_i (i ≥
 
 **(S12) Male availability and mating** [MGDrivE2] + [adapted, D-004]
 
-    M̄_m     = Σ_{i ≥ i_mM,m} M_{m,i}              (mature males of genotype m)
+    M̄_m     = Σ_{i mature} M_{m,i}                 (mature males of genotype m, S6)
     M̄       = Σ_m M̄_m
     g_find  = M̄ / (h_M A + M̄)                    (= 1 if h_M = 0 and M̄ > 0; 0 if M̄ = 0)
     π_{g,m} = η[g,m] M̄_m / Σ_h η[g,h] M̄_h        (no mating if the denominator is 0)
-    ν_{g,i} = ν · 1[i ≥ i_m,g] · g_find
+    ν_{g,i} = ν · 1[i receptive] · g_find
 
 h_M is a density (males km⁻²) converted to counts by the node area A.
 
 **(S13) Adults** (for each genotype g, sub-stage i; X_{·,0} terms are the inflows)
 
-    dM_{g,i}/dt   = q_A,g (M_{g,i−1} − M_{g,i}) − μ_M M_{g,i}
-    dU_{g,i}/dt   = q_A,g (U_{g,i−1} − U_{g,i}) − (μ_U + ν_{g,i}) U_{g,i}
-    dF_{g,m,i}/dt = q_A,g (F_{g,m,i−1} − F_{g,m,i}) + ν_{g,i} π_{g,m} U_{g,i} − μ_F F_{g,m,i}
+    dM_{g,i}/dt   = q^M_{g,i−1} M_{g,i−1} − (q^M_{g,i} + μ_M) M_{g,i}
+    dU_{g,i}/dt   = q^F_{g,i−1} U_{g,i−1} − (q^F_{g,i} + μ_U + ν_{g,i}) U_{g,i}
+    dF_{g,m,i}/dt = q^F_{g,i−1} F_{g,m,i−1} − (q^F_{g,i} + μ_F) F_{g,m,i} + ν_{g,i} π_{g,m} U_{g,i}
 
-with M_{g,0} q_A,g ≡ (1 − φ_g) ξ_M,g ε_g, U_{g,0} q_A,g ≡ φ_g ξ_F,g ε_g and
-F_{g,m,0} ≡ 0. Outflow q_A,g X_{n_A} from the last class is death by old age.
+with q^M_{g,0} M_{g,0} ≡ (1 − φ_g) ξ_M,g ε_g, q^F_{g,0} U_{g,0} ≡ φ_g ξ_F,g ε_g and
+F_{g,m,0} ≡ 0. Outflow from the last reached class l_g (S6) is death by old age;
+sub-stages after l_g stay empty.
 A mating female keeps her age class i.
 
 **(S14) Instant-mating switch** `mating = "instant"` [MGDrivE2]: emerging
 females go directly to F_{g,m,1} with weights π_{g,m}, or to U_{g,1} only when
 M̄ = 0; U then mates at rate ν once males appear. Equivalent to the limit
-ν → ∞ with i_m = 1, without stiffness.
+ν → ∞ with X_rec = 0, without stiffness.
 
 ## 9. Releases (D-005)
 
@@ -242,7 +262,7 @@ shows the current values.
 Groups: temperature (T_L, T_U, a_dev, b_dev, dx_floor, T_opt, TU_ovip,
 egg_temperature, T_host); development (X_pre, X_E, tau_L, X_P, X_A); stages
 (n_E = 3, n_L = 6, n_P = 10, n_A = 10); thresholds (X_rec, X_mat and the class
-overrides i0, i_m, i_mM); mortality (c_A, p_A0, c_E, p_E0, s_L, mu_b_F, mu_b_M,
+X_ovi; thresholds define the segmented adult chains, S6); mortality (c_A, p_A0, c_E, p_E0, s_L, mu_b_F, mu_b_M,
 larval_dd, gamma_L, mu_W, rain_threshold, eps_s); reproduction (R, a_s, H,
 sigma0, search_denominator); mating (nu, h_M, mating); numerical
 (ext_threshold).
@@ -251,7 +271,7 @@ Cube-derived quantities (ℓ_g, φ_g, ξ_F,g, ξ_M,g, s_g, η, ih, τ) come from
 `sg_cube()`; the node area A comes from `sg_model()`.
 
 Preset `"gp2014"` (regression configuration of the Gutierrez & Ponti code):
-n_E = n_L = n_P = n_A = 25, i0 = 8, dx_floor = 0.01,
+n_E = n_L = n_P = n_A = 25, X_ovi = 56.784 dd, dx_floor = 0.01,
 search_denominator = "all_adults", mating = "instant".
 
 Values marked "calibrate" in the table (notably H) should be set so the model

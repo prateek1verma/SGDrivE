@@ -25,6 +25,13 @@
 * `sg_releases()` defines release schedules of any genotype as eggs, pupae
   or unmated adults (male, female or both), on day numbers or dates, per
   node or per km2; schedules combine with `c()`.
+* `sg_model()` assembles parameters, cube, forcing and releases into a model:
+  segmented adult chains with exact maturity thresholds for every genotype
+  (D-018), state-vector layout, counts per node, release events mapped to
+  state positions, and an MD5 fingerprint of all inputs. `sg_state_index()`
+  and `sg_state_names()` locate and name states.
+* New parameter `X_ovi` (age at first oviposition); the class overrides
+  `i0`, `i_m` and `i_mM` are removed (D-018).
 
 ## Milestone M0: foundations
 

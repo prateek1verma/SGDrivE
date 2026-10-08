@@ -19,7 +19,7 @@ moisture index.}
 Gaps must be filled before use, e.g. with \code{\link[=sg_fill_weather]{sg_fill_weather()}}.}
 
 \item{p}{An \code{sg_params} object. Only the temperature, development and
-mortality constants are used here; \code{sg_model()} (milestone M1, WP5) checks that the model is
+mortality constants are used here; \code{\link[=sg_model]{sg_model()}} checks that the model is
 assembled with the same values.}
 
 \item{start, end}{Optional first and last date of the simulation (\code{Date} or
@@ -29,7 +29,7 @@ whole series.}
 \value{
 An object of class \code{sg_forcing}: a list with \code{dates}, \code{day}
 (1, 2, ...) and the daily vectors above, plus \code{n_days}, \code{has_rain} and
-\code{param_values} (the parameter values used, so \code{sg_model()} can check
+\code{param_values} (the parameter values used, so \code{\link[=sg_model]{sg_model()}} can check
 consistency).
 }
 \description{

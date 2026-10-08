@@ -14,7 +14,8 @@
 #'       rate `nu`, and searching mated females as competitors for wounds.}
 #'     \item{`"gp2014"`}{The configuration of the Gutierrez & Ponti (2014)
 #'       Pascal code, for regression tests and benchmarking: 25 sub-stages per
-#'       stage, egg laying from adult class 8, the 0.61 dd per day floor on
+#'       stage, egg laying from adult class 8 (`X_ovi` = 7/25 of `X_A`), the
+#'       0.61 dd per day floor on
 #'       development, all adults competing for wounds, and instant mating (the
 #'       2014 model has no mating step).}
 #'   }
@@ -22,9 +23,8 @@
 #'
 #' @details
 #' Each value is checked against its type and allowed range. Cross-checks
-#' then catch combinations that cannot work, for example a pre-oviposition
-#' period `X_pre` longer than the adult lifespan `X_A`, or an egg-laying class
-#' override `i0` larger than the number of adult classes `n_A`. Settings that
+#' then catch combinations that cannot work, for example an age at first
+#' oviposition `X_ovi` longer than the adult lifespan `X_A`. Settings that
 #' are valid but have no effect (such as `gamma_L > 0` without larval density
 #' dependence) give a warning.
 #'
@@ -65,7 +65,8 @@ sg_params <- function(..., preset = c("default", "gp2014")) {
     default = list(),
     gp2014 = list(
       n_E = 25L, n_L = 25L, n_P = 25L, n_A = 25L,
-      i0 = 8L,
+      # laying from class 8 of 25: 7 classes of 202.8 / 25 dd before laying
+      X_ovi = 7 / 25 * 202.8,
       dx_floor = 0.01,
       search_denominator = "all_adults",
       mating = "instant"
@@ -169,7 +170,7 @@ sg_params <- function(..., preset = c("default", "gp2014")) {
   if (v$TU_ovip <= v$T_L) {
     .sg_stop("TU_ovip (", v$TU_ovip, ") must be greater than T_L (", v$T_L, ").")
   }
-  for (nm in c("X_pre", "X_rec", "X_mat")) {
+  for (nm in c("X_ovi", "X_rec", "X_mat")) {
     if (v[[nm]] >= v$X_A) {
       .sg_stop(
         nm, " (", v[[nm]], " dd) must be shorter than the adult lifespan X_A (",
@@ -177,22 +178,11 @@ sg_params <- function(..., preset = c("default", "gp2014")) {
       )
     }
   }
-  for (nm in c("i0", "i_m", "i_mM")) {
-    if (!is.na(v[[nm]]) && v[[nm]] > v$n_A) {
-      .sg_stop(
-        "Class override ", nm, " = ", v[[nm]], " exceeds the number of adult ",
-        "classes n_A = ", v$n_A, ". Use a value between 1 and n_A, or NA."
-      )
-    }
-  }
   if (v$larval_dd == "none" && v$gamma_L > 0) {
     .sg_warn("gamma_L = ", v$gamma_L, " has no effect unless larval_dd = \"per_wound\".")
   }
-  if (v$mating == "instant" && (v$X_rec > 0 || !is.na(v$i_m))) {
-    .sg_warn(
-      "With mating = \"instant\" females mate at emergence; ",
-      "X_rec and i_m are ignored."
-    )
+  if (v$mating == "instant" && v$X_rec > 0) {
+    .sg_warn("With mating = \"instant\" females mate at emergence; X_rec is ignored.")
   }
   invisible(TRUE)
 }

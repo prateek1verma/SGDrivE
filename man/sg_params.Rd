@@ -18,7 +18,8 @@ with speed-tuned sub-stage numbers (at most 10 per stage), mating at
 rate \code{nu}, and searching mated females as competitors for wounds.}
 \item{\code{"gp2014"}}{The configuration of the Gutierrez & Ponti (2014)
 Pascal code, for regression tests and benchmarking: 25 sub-stages per
-stage, egg laying from adult class 8, the 0.61 dd per day floor on
+stage, egg laying from adult class 8 (\code{X_ovi} = 7/25 of \code{X_A}), the
+0.61 dd per day floor on
 development, all adults competing for wounds, and instant mating (the
 2014 model has no mating step).}
 }
@@ -35,9 +36,8 @@ sources); arguments given in \code{...} override the defaults.
 }
 \details{
 Each value is checked against its type and allowed range. Cross-checks
-then catch combinations that cannot work, for example a pre-oviposition
-period \code{X_pre} longer than the adult lifespan \code{X_A}, or an egg-laying class
-override \code{i0} larger than the number of adult classes \code{n_A}. Settings that
+then catch combinations that cannot work, for example an age at first
+oviposition \code{X_ovi} longer than the adult lifespan \code{X_A}. Settings that
 are valid but have no effect (such as \code{gamma_L > 0} without larval density
 dependence) give a warning.
 

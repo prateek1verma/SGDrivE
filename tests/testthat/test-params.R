@@ -9,8 +9,6 @@ test_that("sg_params() returns validated defaults in table order", {
 test_that("integer parameters are stored as integers", {
   p <- sg_params(n_A = 8)
   expect_identical(p$n_A, 8L)
-  expect_identical(sg_params()$i0, NA_integer_)
-  expect_identical(sg_params(i0 = 4)$i0, 4L)
 })
 
 test_that("overrides change only the named values", {
@@ -42,9 +40,9 @@ test_that("type, length and range errors are informative", {
 })
 
 test_that("cross-checks catch impossible combinations", {
-  expect_error(sg_params(X_pre = 300), "shorter than the adult lifespan")
+  expect_error(sg_params(X_ovi = 300), "shorter than the adult lifespan")
+  expect_silent(sg_params(X_pre = 300)) # X_pre only scales degree-days (D-018)
   expect_error(sg_params(X_rec = 202.8), "shorter than the adult lifespan")
-  expect_error(sg_params(i0 = 11), "exceeds the number of adult classes")
   expect_error(sg_params(T_L = 30, T_U = 25), "greater than T_L")
   expect_error(sg_params(T_L = 35, TU_ovip = 30), "greater than T_L")
 })
@@ -62,7 +60,7 @@ test_that("gp2014 preset reproduces the Gutierrez & Ponti code configuration", {
     unlist(unclass(gp)[c("n_E", "n_L", "n_P", "n_A")]),
     c(n_E = 25L, n_L = 25L, n_P = 25L, n_A = 25L)
   )
-  expect_identical(gp$i0, 8L)
+  expect_equal(gp$X_ovi, 56.784)
   expect_identical(gp$dx_floor, 0.01)
   expect_identical(gp$search_denominator, "all_adults")
   expect_identical(gp$mating, "instant")
@@ -77,8 +75,7 @@ test_that("update() changes values, re-validates and keeps the preset", {
   expect_s3_class(gp2, "sg_params")
   expect_identical(gp2$R, 50)
   expect_identical(attr(gp2, "preset"), "gp2014")
-  expect_error(update(gp, i0 = 30), "exceeds the number of adult classes")
-  expect_error(update(gp, n_A = 5), "exceeds the number of adult classes") # preset i0 is 8, above 5
+  expect_error(update(gp, X_ovi = 300), "shorter than the adult lifespan")
 })
 
 test_that("as.data.frame() lists every parameter and flags changes", {

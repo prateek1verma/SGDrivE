@@ -3,7 +3,7 @@
     Code
       print(sg_params(n_A = 8))
     Output
-      <sg_params> preset "default": 44 parameters, 1 differ from the defaults (*)
+      <sg_params> preset "default": 42 parameters, 1 differ from the defaults (*)
       
       temperature
           T_L                 14.5                 degC                  GP2014
@@ -30,11 +30,9 @@
         * n_A                 8                    -                     adapted
       
       thresholds
+          X_ovi               61                   dd                    GP2014
           X_rec               0                    dd                    adapted
           X_mat               0                    dd                    adapted
-          i0                  NA                   -                     adapted
-          i_m                 NA                   -                     adapted
-          i_mM                NA                   -                     adapted
       
       mortality
           c_A                 0.00036              degC^-2               GP2014

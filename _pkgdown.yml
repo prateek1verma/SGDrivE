@@ -23,6 +23,10 @@ reference:
   - title: Releases
     contents:
       - sg_releases
+  - title: Model assembly
+    contents:
+      - sg_model
+      - sg_state_index
   - title: Backend
     contents:
       - sg_backend_info

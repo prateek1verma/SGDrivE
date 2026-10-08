@@ -15,7 +15,7 @@
 #'   }
 #'   Gaps must be filled before use, e.g. with [sg_fill_weather()].
 #' @param p An `sg_params` object. Only the temperature, development and
-#'   mortality constants are used here; `sg_model()` (milestone M1, WP5) checks that the model is
+#'   mortality constants are used here; [sg_model()] checks that the model is
 #'   assembled with the same values.
 #' @param start,end Optional first and last date of the simulation (`Date` or
 #'   `"YYYY-MM-DD"`). Day 1 of a simulation is `start` (D-015). Defaults: the
@@ -43,7 +43,7 @@
 #'
 #' @return An object of class `sg_forcing`: a list with `dates`, `day`
 #'   (1, 2, ...) and the daily vectors above, plus `n_days`, `has_rain` and
-#'   `param_values` (the parameter values used, so `sg_model()` can check
+#'   `param_values` (the parameter values used, so [sg_model()] can check
 #'   consistency).
 #' @seealso [sg_example_weather()], [sg_fill_weather()], [sg_cold_index()],
 #'   [temperature_functions]
