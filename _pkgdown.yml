@@ -3,6 +3,11 @@ template:
   bootstrap: 5
 
 reference:
+  - title: Parameters
+    contents:
+      - sg_params
+      - update.sg_params
+      - sg_param_table
   - title: Backend
     contents:
       - sg_backend_info

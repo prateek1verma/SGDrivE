@@ -108,14 +108,52 @@ rate evaluation; the Petri net adds no benefit here and would make NWS
 features (adult ageing chains, age kept on mating, wound-limited egg laying)
 harder to express.
 
+## D-011 Offspring viability τ applies at egg production (Accepted, 2026-10-08; was O-001)
+
+τ[g,m,k] multiplies egg production (MODEL_SPEC S9), as in MGDrivE2. Non-viable
+eggs are never created.
+
+## D-012 Converting cube ω needs μ_ref (Accepted, 2026-10-08; was O-002)
+
+`sg_cube()` requires `mu_ref` (the daily adult mortality used when the cube's ω
+values were computed with `MGDrivE::calcOmega()`) whenever any ω ≠ 1, unless
+lifespan fractions `ell` are given directly. The error message explains why.
+
+## D-013 "both"-sex releases split 0.5 by default (Accepted, 2026-10-08; was O-003)
+
+`sg_releases(sex = "both")` splits each release equally between males and
+females; the `split` argument (fraction female) changes this.
+
+## D-014 Egg development temperature: ambient by default, host option (Accepted, 2026-10-08; was O-005)
+
+Default `egg_temperature = "ambient"` ages eggs with ambient degree-days, as
+in the Gutierrez & Ponti code. Option `"host"` uses a constant host body
+temperature `T_host` = 38.5 °C (Gutierrez & Ponti 2014, citing Rubink 1987),
+so q_E = n_E Δx(T_host) / X_E is constant.
+
+## D-015 Simulation time origin (Accepted, 2026-10-08)
+
+Day 1 of a simulation is the first date of the forcing. Release times may be
+given as day numbers or as `Date`s (converted using the forcing dates).
+
+## D-016 Base-R error handling (Accepted, 2026-10-08)
+
+Errors and warnings use base R (`stop(call. = FALSE)`, `warning()`), with
+messages that say what is wrong and how to fix it. No `cli`/`rlang`
+dependency.
+
+## D-017 Parameter table defined in R code, returned by `sg_param_table()` (Accepted, 2026-10-08)
+
+The parameter table (names, defaults, ranges, units, sources, spec equations)
+is defined once, in `R/param-table.R`, and returned by the exported function
+`sg_param_table()`, instead of being shipped as a lazily loaded dataset. It is
+the single source for defaults, validation, `print()` and documentation, and
+changes to it are visible in code review.
+
 ---
 
 ## Open questions
 
 | ID | Question | Current assumption |
 |---|---|---|
-| O-001 | Where offspring viability τ applies | At egg production, as in MGDrivE2 |
-| O-002 | μ_ref needed to convert cube ω to ℓ_g | User supplies μ_ref, or gives ℓ_g directly |
-| O-003 | "both" sexes release: how the count is split | Equal split unless the user gives separate numbers |
-| O-004 | Suspected `calcOmega` argument misuse in the legacy parameter table (0.4767 and 0.0740 look like reductions; `calcOmega` expects the fraction retained) | To be checked before converting legacy ω values |
-| O-005 | Egg development temperature: ambient degree-days (Gutierrez code) or host temperature (biology) | Ambient degree-days, as in the Gutierrez code |
+| O-004 | Suspected `calcOmega` argument misuse in the legacy parameter table (0.4767 and 0.0740 look like reductions; `calcOmega` expects the fraction retained) | To be checked before building SIT cubes in M6 |

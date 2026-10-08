@@ -87,7 +87,8 @@ c_E = 0.00375, p_E0 = 0.3.
 
 **(S5) Transfer rates** (per sub-stage, d⁻¹)
 
-    q_E(t)   = n_E Δx(T) / X_E            X_E = 10 dd       [GP2014 code; O-005]
+    q_E(t)   = n_E Δx(T) / X_E            X_E = 10 dd       [GP2014 code; D-014]
+               (egg_temperature = "host": q_E = n_E Δx(T_host) / X_E, constant)
     q_L      = n_L / τ_L                  τ_L = 6 d         [GP2014 code]
     q_P(t)   = n_P Δx(T) / X_P            X_P = 95 dd       [GP2014]
     q_A,g(t) = n_A Δx(T) / (ℓ_g X_A)      X_A = 202.8 dd    [GP2014] + [adapted, D-002]
@@ -228,39 +229,28 @@ stages are below an extinction threshold (default 1 individual).
 `sg_init()` options: constant counts per sub-stage, user-supplied state, or a
 burn-in run under repeated weather.
 
-## 12. Parameters (defaults)
+## 12. Parameters
 
-| Symbol | R name (planned) | Description | Units | Default | Source |
-|---|---|---|---|---|---|
-| T_L | `T_L` | lower developmental threshold | °C | 14.5 | [GP2014] |
-| T_U | `T_U` | upper parameter of development curve | °C | 40.5 | [GP2014] code |
-| a | `a_dev` | slope of r(T) | h⁻¹ °C⁻¹ | 0.00065 | [GP2014] |
-| b | `b_dev` | high-temperature decline | – | 1.75 | [GP2014] |
-| X_pre | `X_pre` | pre-oviposition period; scales Δx | dd | 61 | [GP2014] |
-| dx_floor | `dx_floor` | floor on 24·r(T) | – | 0 (0.01 = GP) | [GP2014] code |
-| X_E | `X_E` | mean egg duration | dd | 10 | [GP2014] code |
-| τ_L | `tau_L` | mean larval duration | d | 6 | [GP2014] code |
-| X_P | `X_P` | mean pupal duration | dd | 95 | [GP2014] |
-| X_A | `X_A` | mean adult physiological lifespan | dd | 202.8 | [GP2014] |
-| n_E, n_L, n_P, n_A | `n_E` … | Erlang sub-stages | – | 3, 6, 10, 10 | [adapted] D-003 |
-| T_opt | `T_opt` | temperature of minimum mortality | °C | 27.2 | [GP2014] |
-| c_A, p_A0 | `c_A`, `p_A0` | pupal/adult mortality curve | °C⁻²; – | 0.00036; 0.0035 | [GP2014] |
-| c_E, p_E0 | `c_E`, `p_E0` | egg hatch-failure curve | °C⁻²; – | 0.00375; 0.3 | [GP2014] |
-| s_L | `s_L` | daily larval survival | – | 0.95 | [GP2014] |
-| μ_b | `mu_b_F`, `mu_b_M` | background field mortality | d⁻¹ | 0 | [adapted] |
-| R | `R` | max eggs per egg-laying female per day | eggs d⁻¹ | 90 | [GP2014] |
-| T_ov, ψ | – | oviposition optimum, half-range | °C | 29, 14.5 | [GP2014] |
-| a_s | `a_s` | search constant | dd⁻¹ | 0.001 | [GP2014] |
-| H | `H` | wounds available in the node | count | calibrated (`calibrate_H()`) | [GP2014] + D-009 |
-| σ₀ | `sigma0` | baseline search efficiency | – | 1 | [adapted] |
-| search denominator | `search_denominator` | competitors for wounds | – | `"searching_females"` | D-006 |
-| ν | `nu` | mating rate of receptive virgins | d⁻¹ | ln 2 | [G2019] |
-| h_M | `h_M` | mate-finding half-saturation | males km⁻² | 0 | [adapted] |
-| X_rec, X_mat | `X_rec`, `X_mat` | female receptivity, male maturity | dd | 0, 0 | [adapted] D-004 |
-| ℓ_g | from cube | genotype lifespan fraction | – | 1 | [MGDrivE] → D-002 |
-| φ_g, ξ_F,g, ξ_M,g, s_g, η, ih, τ | from cube | sex ratio, emergence, fecundity, mating fitness, inheritance, viability | – | cube | [MGDrivE] |
-| A | `area` | node area | km² | 1 | D-009 |
-| ε_s | – | survival clamp | – | 1e−5 | [GP2014] code |
+The authoritative list of parameters, with names, defaults, allowed ranges,
+units, sources and the equations that use them, is the parameter table in
+`R/param-table.R`, returned by `sg_param_table()` (D-017). `print(sg_params())`
+shows the current values.
 
-Values marked "calibrated" are set so the model matches target densities
-(e.g. 7–54 females km⁻² in the field, Gutierrez et al. 2019).
+Groups: temperature (T_L, T_U, a_dev, b_dev, dx_floor, T_opt, TU_ovip,
+egg_temperature, T_host); development (X_pre, X_E, tau_L, X_P, X_A); stages
+(n_E = 3, n_L = 6, n_P = 10, n_A = 10); thresholds (X_rec, X_mat and the class
+overrides i0, i_m, i_mM); mortality (c_A, p_A0, c_E, p_E0, s_L, mu_b_F, mu_b_M,
+larval_dd, gamma_L, mu_W, rain_threshold, eps_s); reproduction (R, a_s, H,
+sigma0, search_denominator); mating (nu, h_M, mating); numerical
+(ext_threshold).
+
+Cube-derived quantities (ℓ_g, φ_g, ξ_F,g, ξ_M,g, s_g, η, ih, τ) come from
+`sg_cube()`; the node area A comes from `sg_model()`.
+
+Preset `"gp2014"` (regression configuration of the Gutierrez & Ponti code):
+n_E = n_L = n_P = n_A = 25, i0 = 8, dx_floor = 0.01,
+search_denominator = "all_adults", mating = "instant".
+
+Values marked "calibrate" in the table (notably H) should be set so the model
+matches target densities (e.g. 7–54 females km⁻² in the field, Gutierrez et
+al. 2019).

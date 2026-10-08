@@ -1,5 +1,13 @@
 # SGDrivE 0.0.0.9000
 
+## Milestone M1: inputs (in progress)
+
+* `sg_params()` creates validated model parameters, with presets
+  `"default"` and `"gp2014"` (the Gutierrez & Ponti 2014 code
+  configuration); `update()`, `print()` and `as.data.frame()` methods.
+* `sg_param_table()` returns the definition of every parameter: default,
+  allowed range, units, source and model equation.
+
 ## Milestone M0: foundations
 
 * Package skeleton: DESCRIPTION, GPL-3 licence, Rcpp/C++17 build setup.

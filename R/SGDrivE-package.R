@@ -35,5 +35,6 @@
 ## usethis namespace: start
 #' @useDynLib SGDrivE, .registration = TRUE
 #' @importFrom Rcpp evalCpp
+#' @importFrom stats update
 ## usethis namespace: end
 NULL

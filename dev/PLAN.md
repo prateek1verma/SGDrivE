@@ -64,7 +64,7 @@ processes with L'Ecuyer streams and stored seeds.
 
 ## 4. Development practices
 
-* Imports: Rcpp, utils (stats added when first used). Suggests: MGDrivE, deSolve, testthat, knitr,
+* Imports: Rcpp, stats, utils. Suggests: MGDrivE, deSolve, testthat, knitr,
   rmarkdown, ggplot2, bench, future.apply.
 * S3 classes with print/summary/plot methods; no modification of inputs; no
   global state; informative error messages.
