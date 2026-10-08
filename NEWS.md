@@ -1,5 +1,13 @@
 # SGDrivE 0.0.0.9000
 
+## Milestone M2: reference model (in progress)
+
+* `sg_init()` builds initial states: `"constant"` counts per sub-stage split
+  by genotype weights (defaults reproduce the Gutierrez & Ponti starting
+  state), `"hardy_weinberg"` from allele frequencies, or a full `"state"`
+  vector. Adults go only to genotypes of the matching sex and to adult classes
+  they reach; mated females are split across mates by random mating (D-020).
+
 ## Milestone M1: inputs
 
 * `sg_params()` creates validated model parameters, with presets

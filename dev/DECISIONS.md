@@ -186,6 +186,44 @@ the last segment). The spread of threshold ages is still set by the number of
 sub-stages before the threshold (CV = 1/sqrt(n)); about 25 sub-stages before
 oviposition would match the observed 61 ± 12.2 dd.
 
+## D-019 Reference solver design for M2 (Accepted, 2026-10-09)
+
+* API: `simulate_ode(model, init, backend = "R")`. The pure-R reference
+  backend comes first (M2); the C++ backend becomes the default in M3 with the
+  same interface, so the two are compared directly in tests.
+* Integration day by day with `deSolve`, holding each day's forcing constant,
+  so midnight changes are exact breakpoints; releases are added between days,
+  at the start of their release day (D-005).
+* Output: daily states (end of each day) by default, with an `output_every`
+  option; daily increments of cumulative counters (eggs laid, egg batches,
+  emergences, matings, deaths by block, releases) for flow accounting.
+* Regression target: new tight-tolerance legacy runs (rtol 1e-10, atol 1e-12,
+  no floors) are added to `data-raw/reference/` as `*_tight.rds`; the existing
+  reference files are kept.
+* The 24-year legacy regression is a slow test, run only when the environment
+  variable `SGDRIVE_SLOW_TESTS` is `"true"` (and in a manually triggered CI
+  job); routine tests use the first 3 years.
+
+## D-020 Initial conditions (Accepted, 2026-10-09)
+
+`sg_init()` provides, in M2:
+* `"constant"`: a count per sub-stage for each block (eggs, larvae, pupae,
+  males, unmated females, mated females), split between genotypes by given
+  weights (default: equally between the wild types). Adults go only to
+  genotypes of the matching sex (males only where phi < 1, females only where
+  phi > 0) and only to adult classes the genotype reaches (D-018). Mated
+  females are split across mate genotypes in proportion to eta-weighted
+  starting males (random mating).
+* `"hardy_weinberg"`: genotype weights from allele frequencies for
+  single-locus two-allele-letter genotype names (e.g. "AA", "Aa"), then as
+  `"constant"`.
+* `"state"`: a full state vector supplied by the user.
+
+The defaults (0.25 per sub-stage for E, L, P; 0.125 for M and F; 0 for U)
+reproduce the starting state of the Gutierrez & Ponti runs (0.25 per class,
+adults split equally between the sexes, all females mated). Starting at
+equilibrium or after a burn-in is deferred to M5 (calibration).
+
 ---
 
 ## Open questions

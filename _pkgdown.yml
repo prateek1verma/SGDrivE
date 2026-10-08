@@ -27,6 +27,7 @@ reference:
     contents:
       - sg_model
       - sg_state_index
+      - sg_init
   - title: Backend
     contents:
       - sg_backend_info
