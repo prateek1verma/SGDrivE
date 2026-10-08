@@ -15,9 +15,10 @@ World screwworm (*Cochliomyia hominivorax*) under genetic control: the
 sterile insect technique (SIT), precision-guided SIT (pgSIT),
 female-specific RIDL (fsRIDL) and gene drives.
 
-> **Status: under development (milestone M0, foundations).** The package
-> builds and checks, but contains no model code yet. Do not use it for
-> analysis.
+> **Status: under development (milestone M1, inputs, complete).** The
+> package builds model inputs (parameters, inheritance cubes, weather
+> forcing, releases) and assembles models, but has no solvers yet
+> (milestones M2-M4). Do not use it for analysis.
 
 ## Planned model (v0.1)
 
@@ -59,12 +60,45 @@ sg_backend_info()
 #> [1] "clang 21.0.0 (clang-2100.3.34.2)"
 ```
 
+## Building a model (milestone M1)
+
+``` r
+# parameters (definitions: sg_param_table())
+p <- sg_params()
+# any MGDrivE inheritance cube
+cube <- sg_cube(MGDrivE::cubeMendelian())
+# daily forcing from the bundled McAllen, Texas weather
+wx <- sg_forcing(sg_example_weather(), p, start = "1971-01-01", end = "1972-12-31")
+# weekly releases of 500 adult males of genotype aa
+rel <- sg_releases("aa", "adult", "male", times = seq(60, by = 7, length.out = 20), number = 500)
+mod <- sg_model(p, cube, wx, rel, area = 1)
+mod
+#> <sg_model> 207 states; 3 genotypes; 731 days (1971-01-01 to 1972-12-31)
+#>   sub-stages: eggs 3, larvae 6, pupae 10, adults 10 per sex
+#>   female chain: [0, 61) dd: 3; [61, 202.8) dd: 7
+#>   male chain: [0, 202.8) dd: 10
+#>   node area 1 km^2; wounds H = 5 per node; mating "rate"; search competitors "searching_females"
+#>   releases: 20 events on 20 days (days 60 to 193), 10,000 individuals
+#>   hash: a5844ca5f27e0c07362d7651d7b9b72a
+```
+
+The McAllen cold-stress index reproduces the values published by
+Gutierrez & Ponti (2014) and Gutierrez et al. (2019):
+
+``` r
+ci <- sg_cold_index(sg_example_weather())
+ci[ci$year %in% c(1971, 1979), c("year", "mu_cold")]
+#>    year  mu_cold
+#> 12 1971 6.667763
+#> 20 1979 9.798071
+```
+
 ## Roadmap
 
 | Milestone | Content |
 |----|----|
-| **M0** | Foundations: package skeleton, tests, linting, CI, design documents |
-| M1 | Inputs: parameters, inheritance cubes, weather forcing, releases, model assembly |
+| M0 ✔ | Foundations: package skeleton, tests, linting, CI, design documents |
+| M1 ✔ | Inputs: parameters, inheritance cubes, weather forcing, releases, model assembly |
 | M2 | Reference genotype-resolved ODE in pure R |
 | M3 | C++ rate kernel and ODE solver |
 | M4 | C++ chain-binomial stochastic solver |

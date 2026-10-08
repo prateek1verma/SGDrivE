@@ -23,9 +23,10 @@ screwworm (*Cochliomyia hominivorax*) under genetic control: the sterile insect
 technique (SIT), precision-guided SIT (pgSIT), female-specific RIDL (fsRIDL)
 and gene drives.
 
-> **Status: under development (milestone M0, foundations).** The package
-> builds and checks, but contains no model code yet. Do not use it for
-> analysis.
+> **Status: under development (milestone M1, inputs, complete).** The package
+> builds model inputs (parameters, inheritance cubes, weather forcing,
+> releases) and assembles models, but has no solvers yet (milestones M2-M4).
+> Do not use it for analysis.
 
 ## Planned model (v0.1)
 
@@ -59,12 +60,35 @@ library(SGDrivE)
 sg_backend_info()
 ```
 
+## Building a model (milestone M1)
+
+```{r model, eval = requireNamespace("MGDrivE", quietly = TRUE)}
+# parameters (definitions: sg_param_table())
+p <- sg_params()
+# any MGDrivE inheritance cube
+cube <- sg_cube(MGDrivE::cubeMendelian())
+# daily forcing from the bundled McAllen, Texas weather
+wx <- sg_forcing(sg_example_weather(), p, start = "1971-01-01", end = "1972-12-31")
+# weekly releases of 500 adult males of genotype aa
+rel <- sg_releases("aa", "adult", "male", times = seq(60, by = 7, length.out = 20), number = 500)
+mod <- sg_model(p, cube, wx, rel, area = 1)
+mod
+```
+
+The McAllen cold-stress index reproduces the values published by Gutierrez &
+Ponti (2014) and Gutierrez et al. (2019):
+
+```{r cold}
+ci <- sg_cold_index(sg_example_weather())
+ci[ci$year %in% c(1971, 1979), c("year", "mu_cold")]
+```
+
 ## Roadmap
 
 | Milestone | Content |
 |---|---|
-| **M0** | Foundations: package skeleton, tests, linting, CI, design documents |
-| M1 | Inputs: parameters, inheritance cubes, weather forcing, releases, model assembly |
+| M0 ✔ | Foundations: package skeleton, tests, linting, CI, design documents |
+| M1 ✔ | Inputs: parameters, inheritance cubes, weather forcing, releases, model assembly |
 | M2 | Reference genotype-resolved ODE in pure R |
 | M3 | C++ rate kernel and ODE solver |
 | M4 | C++ chain-binomial stochastic solver |

@@ -1,6 +1,6 @@
 # SGDrivE 0.0.0.9000
 
-## Milestone M1: inputs (in progress)
+## Milestone M1: inputs
 
 * `sg_params()` creates validated model parameters, with presets
   `"default"` and `"gp2014"` (the Gutierrez & Ponti 2014 code
