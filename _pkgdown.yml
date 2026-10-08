@@ -20,6 +20,9 @@ reference:
       - sg_example_weather
       - sg_read_ghcn
       - sg_fill_weather
+  - title: Releases
+    contents:
+      - sg_releases
   - title: Backend
     contents:
       - sg_backend_info

@@ -22,6 +22,9 @@
   `sg_read_ghcn()`, `sg_fill_weather()` (Gutierrez et al. 2019 gap-filling
   procedure) and `sg_cold_index()`, which reproduces the published McAllen
   cold-stress index (1971 = 6.67, 1979 = 9.80).
+* `sg_releases()` defines release schedules of any genotype as eggs, pupae
+  or unmated adults (male, female or both), on day numbers or dates, per
+  node or per km2; schedules combine with `c()`.
 
 ## Milestone M0: foundations
 
