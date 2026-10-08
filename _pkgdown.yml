@@ -8,6 +8,10 @@ reference:
       - sg_params
       - update.sg_params
       - sg_param_table
+  - title: Inheritance cubes
+    contents:
+      - sg_cube
+      - sg_omega_to_ell
   - title: Backend
     contents:
       - sg_backend_info

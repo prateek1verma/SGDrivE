@@ -7,6 +7,11 @@
   configuration); `update()`, `print()` and `as.data.frame()` methods.
 * `sg_param_table()` returns the definition of every parameter: default,
   allowed range, units, source and model equation.
+* `sg_cube()` reads and validates MGDrivE inheritance cubes (including
+  sex-linked cubes, whose impossible crosses have zero inheritance slices),
+  converts omega to lifespan fractions and precomputes the egg tensor
+  s * ih * tau.
+* `sg_omega_to_ell()` inverts `MGDrivE::calcOmega()`.
 
 ## Milestone M0: foundations
 
