@@ -1,0 +1,17 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+^\.github$
+^\.lintr$
+^\.clang-format$
+^\.editorconfig$
+^README\.Rmd$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$
+^dev$
+^data-raw$
+^bench$
+^LICENSE\.md$
+^CONTRIBUTING\.md$
+^coverage\.html$
+^lib$

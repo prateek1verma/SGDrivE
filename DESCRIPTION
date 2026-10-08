@@ -1,0 +1,42 @@
+Package: SGDrivE
+Title: Screwworm Genetic-Control Dynamics Explorer
+Version: 0.0.0.9000
+Authors@R:
+    person("Prateek", "Verma", , "prateekverma@berkeley.edu", role = c("aut", "cre", "cph"))
+Description: Simulates genotype-resolved population dynamics of the New
+    World screwworm (Cochliomyia hominivorax) under genetic control, such
+    as the sterile insect technique, precision-guided sterile insect
+    technique, female-specific release of insects carrying a dominant
+    lethal, and gene drives. Life-history biology follows the
+    temperature-driven physiologically based demographic model of
+    Gutierrez and Ponti (2014) <doi:10.1111/afe.12046>. Inheritance is
+    read from 'MGDrivE' inheritance cubes (Sanchez et al. 2020
+    <doi:10.1111/2041-210X.13318>) and mating follows the unmated/mated
+    structure of 'MGDrivE2' (Wu et al. 2021
+    <doi:10.1371/journal.pcbi.1009030>). Deterministic (ordinary
+    differential equation) and stochastic (chain-binomial) solvers share
+    a single 'C++' rate kernel.
+License: GPL (>= 3)
+URL: https://github.com/prateek1verma/SGDrivE
+BugReports: https://github.com/prateek1verma/SGDrivE/issues
+Depends:
+    R (>= 4.1)
+Imports:
+    Rcpp (>= 1.0.10),
+    utils
+LinkingTo:
+    Rcpp
+Suggests:
+    bench,
+    deSolve,
+    future.apply,
+    ggplot2,
+    knitr,
+    MGDrivE,
+    rmarkdown,
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 8.0.0
+SystemRequirements: C++17

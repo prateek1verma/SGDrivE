@@ -1,0 +1,8 @@
+# Local-only compiler flags for checks on macOS (used by dev/check.R via
+# R_MAKEVARS_USER; never used by CI or by users installing the package).
+#
+# R 4.5.0's header R_ext/Boolean.h uses a clang warning group unknown to
+# Apple clang 21, which R CMD check reports as an installation WARNING.
+# The warning comes from R itself, not from SGDrivE code.
+CXXFLAGS += -Wno-unknown-warning-option
+CXX17FLAGS += -Wno-unknown-warning-option

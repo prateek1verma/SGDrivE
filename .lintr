@@ -1,0 +1,10 @@
+linters: linters_with_defaults(
+    line_length_linter(100L),
+    object_name_linter(styles = c("snake_case", "symbols"))
+  )
+exclusions: list(
+    "R/RcppExports.R",
+    "data-raw",
+    "dev"
+  )
+encoding: "UTF-8"

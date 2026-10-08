@@ -1,0 +1,52 @@
+bibentry(
+  bibtype = "Manual",
+  title = "{SGDrivE}: Screwworm Genetic-Control Dynamics Explorer",
+  author = person("Prateek", "Verma"),
+  year = "2026",
+  note = paste("R package version", utils::packageVersion("SGDrivE")),
+  url = "https://github.com/prateek1verma/SGDrivE",
+  textVersion = paste0(
+    "Verma, P. (2026). SGDrivE: Screwworm Genetic-Control Dynamics Explorer. ",
+    "R package version ", utils::packageVersion("SGDrivE"), ". ",
+    "https://github.com/prateek1verma/SGDrivE"
+  )
+)
+
+bibentry(
+  bibtype = "Article",
+  title = "The new world screwworm: prospective distribution and role of weather in eradication",
+  author = c(person("Andrew Paul", "Gutierrez"), person("Luigi", "Ponti")),
+  journal = "Agricultural and Forest Entomology",
+  year = "2014",
+  volume = "16",
+  pages = "158--173",
+  doi = "10.1111/afe.12046"
+)
+
+bibentry(
+  bibtype = "Article",
+  title = paste("MGDrivE: A modular simulation framework for the spread of gene",
+                "drives through spatially explicit mosquito populations"),
+  author = c(person("H\\'ector M.", "S\\'anchez C."), person("Sean L.", "Wu"),
+             person("Jared B.", "Bennett"), person("John M.", "Marshall")),
+  journal = "Methods in Ecology and Evolution",
+  year = "2020",
+  volume = "11",
+  pages = "229--239",
+  doi = "10.1111/2041-210X.13318"
+)
+
+bibentry(
+  bibtype = "Article",
+  title = paste("MGDrivE 2: A simulation framework for gene drive systems",
+                "incorporating seasonality and epidemiological dynamics"),
+  author = c(person("Sean L.", "Wu"), person("Jared B.", "Bennett"),
+             person("H\\'ector M.", "S\\'anchez C."), person("Andrew J.", "Dolgert"),
+             person("Tom\\'as M.", "Le\\'on"), person("John M.", "Marshall")),
+  journal = "PLoS Computational Biology",
+  year = "2021",
+  volume = "17",
+  number = "5",
+  pages = "e1009030",
+  doi = "10.1371/journal.pcbi.1009030"
+)

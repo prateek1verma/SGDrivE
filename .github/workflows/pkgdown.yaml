@@ -1,0 +1,38 @@
+# Build the pkgdown website. Manual trigger only until milestone M7.
+# Publishing to GitHub Pages from a private repository needs a paid GitHub
+# plan; until then the built site is uploaded as a workflow artifact.
+# Based on https://github.com/r-lib/actions/tree/v2/examples
+on:
+  workflow_dispatch:
+
+name: pkgdown
+
+permissions: read-all
+
+jobs:
+  pkgdown:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::pkgdown, local::.
+          needs: website
+
+      - name: Build site
+        run: pkgdown::build_site_github_pages(new_process = FALSE, install = FALSE)
+        shell: Rscript {0}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pkgdown-site
+          path: docs

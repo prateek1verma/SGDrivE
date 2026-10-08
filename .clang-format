@@ -1,0 +1,8 @@
+# C++ formatting for src/ (run: clang-format -i src/*.cpp src/*.h)
+BasedOnStyle: Google
+IndentWidth: 2
+ColumnLimit: 100
+AllowShortFunctionsOnASingleLine: Empty
+DerivePointerAlignment: false
+PointerAlignment: Left
+SortIncludes: true

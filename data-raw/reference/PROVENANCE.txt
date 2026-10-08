@@ -1,0 +1,16 @@
+# Provenance of data-raw/reference/*.rds
+generated: 2026-10-08 13:14:56 PDT
+R: R version 4.5.0 (2025-04-11)
+deSolve: 1.41
+weather: McAllen TX, NOAA GHCN-Daily USC00415701, gaps filled from
+  USW00012959 then interpolation (Gutierrez et al. 2019 Appendix S1 method),
+  1960-01-01 to 1983-12-31; first year is burn-in in analyses.
+source scripts (unchanged copies of the legacy project scripts):
+  mcallen_1960_1983_filled.csv  md5 60101cdc82df1e5397ad070573f58804
+  scripts/gutierrez_ponti_2014_pbdm.R  md5 200a87d76cc3abb8204345a1157cfcce
+  scripts/gp2014_ode.R  md5 56905605531813614241f9a89e230d04
+runs:
+  discrete  0.7 s
+  ode  21.9 s
+  ode_no_floors  21.0 s
+  ode_match_larvae  22.1 s
