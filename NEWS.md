@@ -18,6 +18,14 @@
   states (or every `output_every` days), daily flow totals, releases per
   block and solver diagnostics (steps, evaluations, stiff-method use,
   largest rate, smallest state value).
+* Milestone checks of the reference solver: with one wild genotype and the
+  `"gp2014"` preset it reproduces the legacy Gutierrez & Ponti ODE to a
+  relative error below 1e-6 (1960 in routine tests; 1960-1983 as a slow test,
+  `SGDRIVE_SLOW_TESTS=true`, also available as a manual CI workflow); a
+  neutral Mendelian cube stays at Hardy-Weinberg with constant allele
+  frequency; rate mating approaches instant mating as nu grows; sterile-male
+  releases divert matings and suppress the wild population; genotype
+  lifespan costs act as specified; sex-linked cubes keep sexes consistent.
 
 ## Milestone M1: inputs
 
