@@ -12,6 +12,12 @@
   egg batches, emergences, matings by female x mate genotype, deaths by
   block, deaths by old age) for one day's forcing; the test oracle for the
   C++ kernel.
+* `simulate_ode(model, init, backend = "R")` solves the model with
+  'deSolve', one day at a time (exact daily breakpoints; releases added as
+  jumps at the start of their day). Returns an `sg_sim` object with daily
+  states (or every `output_every` days), daily flow totals, releases per
+  block and solver diagnostics (steps, evaluations, stiff-method use,
+  largest rate, smallest state value).
 
 ## Milestone M1: inputs
 

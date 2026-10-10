@@ -230,4 +230,5 @@ equilibrium or after a burn-in is deferred to M5 (calibration).
 
 | ID | Question | Current assumption |
 |---|---|---|
+| O-006 | Integrator for the C++ ODE backend (M3) | M2 diagnostics (1 year, McAllen): `lsoda` never switched to its stiff method; largest rate 13 per day with defaults and 40 per day under "gp2014", about 40-95 steps per day. An explicit adaptive Runge-Kutta (Dormand-Prince) is expected to suffice; confirm with the 24-year runs of M2-WP5 |
 | O-004 | Suspected `calcOmega` argument misuse in the legacy parameter table (0.4767 and 0.0740 look like reductions; `calcOmega` expects the fraction retained) | To be checked before building SIT cubes in M6 |

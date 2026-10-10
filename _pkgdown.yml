@@ -28,6 +28,9 @@ reference:
       - sg_model
       - sg_state_index
       - sg_init
+  - title: Simulation
+    contents:
+      - simulate_ode
   - title: Backend
     contents:
       - sg_backend_info
