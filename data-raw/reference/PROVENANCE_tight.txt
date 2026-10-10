@@ -1,0 +1,23 @@
+# Provenance of the tight-tolerance legacy reference (make_reference_tight.R)
+generated: 2026-10-09 18:39:28 PDT
+R: R version 4.6.1 (2026-06-24)
+deSolve: 1.42
+run: gp_ode_simulate(floors = FALSE), lsoda over the whole period (hmax 0.25),
+  rtol 1e-10, atol 1e-12
+weather: McAllen TX 1960-01-01 to 1983-12-31 (see PROVENANCE.txt)
+source scripts (unchanged copies of the legacy project scripts):
+  mcallen_1960_1983_filled.csv  md5 60101cdc82df1e5397ad070573f58804
+  scripts/gutierrez_ponti_2014_pbdm.R  md5 200a87d76cc3abb8204345a1157cfcce
+  scripts/gp2014_ode.R  md5 56905605531813614241f9a89e230d04
+run time: full 39.6 s; 3-year check at rtol 1e-11 5.9 s
+legacy convergence, 1960-1962, max relative difference rtol 1e-10 vs 1e-11:
+  eggs  1.87e-09
+  larvae  8.31e-10
+  pupae  6.14e-10
+  females  4.76e-10
+  adults  4.76e-10
+  eggs_laid  1.86e-09
+  egg_batches  1.93e-09
+  pupae_in  1.04e-09
+  adults_in  7.11e-10
+fixture: tests/testthat/fixtures/gp2014_mcallen_ode_tight_3yr.rds (daily totals 1960-1962)

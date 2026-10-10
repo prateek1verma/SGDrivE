@@ -12,6 +12,7 @@ This folder is excluded from the built package (`.Rbuildignore`).
 | `make_reference.R` | Regenerates `reference/`: `Rscript data-raw/make_reference.R` (about 1 minute). |
 | `reference/*.rds` | Reference outputs on McAllen weather: `discrete`, `ode`, `ode_no_floors`, `ode_match_larvae`, plus the parameter list. |
 | `make_test_fixtures.R` | Builds `tests/testthat/fixtures/`: legacy temperature functions on a grid, legacy McAllen forcing terms, and short raw NOAA extracts around backup-filled and interpolated days (needs the raw NOAA files; see the script). |
+| `make_reference_tight.R` | Tight-tolerance legacy run without floors (rtol 1e-10, atol 1e-12) for the M2 regression (D-019): writes `reference/gp2014_mcallen_ode_no_floors_tight.rds` (1960-1983), `reference/PROVENANCE_tight.txt` and the test fixture `tests/testthat/fixtures/gp2014_mcallen_ode_tight_3yr.rds` (daily totals 1960-1962). About 1 minute. A 3-year rerun at rtol 1e-11 changes the legacy solution by at most 2e-9 (recorded in the provenance). |
 | `reference/PROVENANCE.txt` | Date, R and deSolve versions, md5 of inputs and scripts, run times. |
 
 ## Weather data (`inst/extdata/mcallen_tx_1960_1983.csv`)
