@@ -1,0 +1,6 @@
+"scenario","genotypes","states","days","seconds","seconds_per_year","steps_per_day","evaluations","us_per_evaluation","rtol","atol","machine","r_version","date"
+"wild, gp2014 preset, 1960",1,150,366,8.01,8,93.6,70212,114.1,1e-08,1e-10,"Darwin arm64","R version 4.6.1 (2026-06-24)","2026-10-11"
+"wild, defaults, 1971",1,49,365,3.36,3.37,41.1,31009,108.5,1e-08,1e-10,"Darwin arm64","R version 4.6.1 (2026-06-24)","2026-10-11"
+"SIT W/S, defaults, weekly releases, 1971",2,118,365,2.54,2.54,28.4,20805,122,1e-08,1e-10,"Darwin arm64","R version 4.6.1 (2026-06-24)","2026-10-11"
+"Mendelian (3), defaults, 1971",3,207,365,4.2,4.2,41.1,31009,135.3,1e-08,1e-10,"Darwin arm64","R version 4.6.1 (2026-06-24)","2026-10-11"
+"homing drive (10), defaults, 90 days",10,1390,90,2.24,9.09,39.7,7284,307.4,1e-08,1e-10,"Darwin arm64","R version 4.6.1 (2026-06-24)","2026-10-11"

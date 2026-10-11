@@ -15,10 +15,11 @@ World screwworm (*Cochliomyia hominivorax*) under genetic control: the
 sterile insect technique (SIT), precision-guided SIT (pgSIT),
 female-specific RIDL (fsRIDL) and gene drives.
 
-> **Status: under development (milestone M1, inputs, complete).** The
-> package builds model inputs (parameters, inheritance cubes, weather
-> forcing, releases) and assembles models, but has no solvers yet
-> (milestones M2-M4). Do not use it for analysis.
+> **Status: under development (milestone M2, reference model,
+> complete).** The package builds models and solves them with a pure-R
+> reference ODE solver, verified against the legacy Gutierrez & Ponti
+> (2014) model. The fast C++ solvers follow in milestones M3 (ODE) and
+> M4 (stochastic). Do not use it for analysis yet.
 
 ## Planned model (v0.1)
 
@@ -82,6 +83,22 @@ mod
 #>   hash: a5844ca5f27e0c07362d7651d7b9b72a
 ```
 
+## Simulating (milestone M2)
+
+``` r
+sim <- simulate_ode(mod) # reference solver (pure R, deSolve)
+sim
+#> <sg_sim> 731 days (1971-01-01 to 1972-12-31), backend "R", method "lsoda"
+#>   final totals: E 0.49452, L 0.30710, P 0.67484, M 0.47005, U 0.01378, F 0.45628
+#>   eggs laid 2669.2; adults emerged 1229.2; released 10000
+#>   solver: 42 steps/day (max 95), stiff method on 0 of 731 days, largest rate 13.5 per day, min state -4.41e-13
+#>   run time 7.96 s
+```
+
+With one wild genotype and the `"gp2014"` preset, the reference solver
+reproduces the legacy Gutierrez & Ponti (2014) ODE to a relative error
+below 10^-6 over 1960-1983 at McAllen, Texas.
+
 The McAllen cold-stress index reproduces the values published by
 Gutierrez & Ponti (2014) and Gutierrez et al. (2019):
 
@@ -99,7 +116,7 @@ ci[ci$year %in% c(1971, 1979), c("year", "mu_cold")]
 |----|----|
 | M0 ✔ | Foundations: package skeleton, tests, linting, CI, design documents |
 | M1 ✔ | Inputs: parameters, inheritance cubes, weather forcing, releases, model assembly |
-| M2 | Reference genotype-resolved ODE in pure R |
+| M2 ✔ | Reference genotype-resolved ODE in pure R |
 | M3 | C++ rate kernel and ODE solver |
 | M4 | C++ chain-binomial stochastic solver |
 | M5 | Checks, summaries, calibration and plots |

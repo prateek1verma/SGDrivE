@@ -1,6 +1,6 @@
 # SGDrivE 0.0.0.9000
 
-## Milestone M2: reference model (in progress)
+## Milestone M2: reference model
 
 * `sg_init()` builds initial states: `"constant"` counts per sub-stage split
   by genotype weights (defaults reproduce the Gutierrez & Ponti starting
@@ -26,6 +26,12 @@
   frequency; rate mating approaches instant mating as nu grows; sterile-male
   releases divert matings and suppress the wild population; genotype
   lifespan costs act as specified; sex-linked cubes keep sexes consistent.
+* Stress tests: very large sterile-male releases (10x to 1000x the wild
+  males), larval crowding with a huge fertile egg release, a very large
+  mating rate and many sub-stages; lsoda and radau agree within 1e-6 and
+  states stay non-negative. Release size adds no stiffness.
+* `bench/m2_reference_baseline.R`: runtime baseline of the reference solver
+  (results in `bench/results/`), the reference for the C++ backend (M3).
 
 ## Milestone M1: inputs
 
