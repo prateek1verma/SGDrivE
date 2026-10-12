@@ -93,7 +93,7 @@ sim
 #>   final totals: E 0.49452, L 0.30710, P 0.67484, M 0.47005, U 0.01378, F 0.45628
 #>   eggs laid 2669.2; adults emerged 1229.2; released 10000
 #>   solver: 17 steps/day (max 60), stiffness detected on 0 of 731 days, 0 integrated by the lsoda fallback, largest rate 13.5 per day, min state 0
-#>   run time 0.27 s
+#>   run time 0.77 s
 ```
 
 `simulate_ode()` integrates the model one day at a time with a

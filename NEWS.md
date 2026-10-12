@@ -43,6 +43,21 @@
   that the starting state no longer matters) and `method = "equilibrium"`
   (closed-form equilibrium of a wild-type population at constant
   temperature, with R0 reported; D-025).
+* `simulate_cb()` also reports `wild_extinct_day`, the first day without
+  individuals of the wild type: the measure of eradication when released
+  sterile insects remain (`extinct_day` requires every compartment empty).
+* Statistical validation of the chain-binomial solver: one-step
+  distributions match binomial and multinomial theory (means, variances,
+  covariances over 40,000 steps); the replicate mean converges to the
+  deterministic map like 1/sqrt(N) and the map matches the ODE; neutral
+  allele frequencies keep their mean while drift grows in small
+  populations; sterile-male releases eliminate the wild type; egg batches
+  raise extinction in small populations (22% against 1% at 3 km^2 through a
+  McAllen winter). Stress tests: counts above 1e9, step sizes 0.05-1 day,
+  fast mating, 25 sub-stages, a ten-genotype homing drive.
+* `bench/m4_cb_speed.R`: 0.06-0.34 s per simulated year and replicate,
+  nearly independent of population size; the C++ step is 23-55 times
+  faster than the R reference step.
 
 ## Milestone M3: C++ backend
 

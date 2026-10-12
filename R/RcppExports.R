@@ -13,6 +13,10 @@ sg_cb_run_cpp <- function(view, x0, rel_count, dt, stochastic, n_days, record) {
     .Call(`_SGDrivE_sg_cb_run_cpp`, view, x0, rel_count, dt, stochastic, n_days, record)
 }
 
+sg_cb_step_rep_cpp <- function(view, day, dt, x, n_rep) {
+    .Call(`_SGDrivE_sg_cb_step_rep_cpp`, view, day, dt, x, n_rep)
+}
+
 sg_chain_advance_cpp <- function(q, last, dt, average = FALSE, mu = 0.0) {
     .Call(`_SGDrivE_sg_chain_advance_cpp`, q, last, dt, average, mu)
 }

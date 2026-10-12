@@ -52,6 +52,21 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// sg_cb_step_rep_cpp
+Rcpp::NumericMatrix sg_cb_step_rep_cpp(const Rcpp::List& view, int day, double dt, const Rcpp::NumericVector& x, int n_rep);
+RcppExport SEXP _SGDrivE_sg_cb_step_rep_cpp(SEXP viewSEXP, SEXP daySEXP, SEXP dtSEXP, SEXP xSEXP, SEXP n_repSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::List& >::type view(viewSEXP);
+    Rcpp::traits::input_parameter< int >::type day(daySEXP);
+    Rcpp::traits::input_parameter< double >::type dt(dtSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type x(xSEXP);
+    Rcpp::traits::input_parameter< int >::type n_rep(n_repSEXP);
+    rcpp_result_gen = Rcpp::wrap(sg_cb_step_rep_cpp(view, day, dt, x, n_rep));
+    return rcpp_result_gen;
+END_RCPP
+}
 // sg_chain_advance_cpp
 Rcpp::NumericMatrix sg_chain_advance_cpp(const Rcpp::NumericVector& q, int last, double dt, bool average, double mu);
 RcppExport SEXP _SGDrivE_sg_chain_advance_cpp(SEXP qSEXP, SEXP lastSEXP, SEXP dtSEXP, SEXP averageSEXP, SEXP muSEXP) {
@@ -197,6 +212,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_SGDrivE_sg_backend_info_cpp", (DL_FUNC) &_SGDrivE_sg_backend_info_cpp, 0},
     {"_SGDrivE_sg_cb_step_cpp", (DL_FUNC) &_SGDrivE_sg_cb_step_cpp, 5},
     {"_SGDrivE_sg_cb_run_cpp", (DL_FUNC) &_SGDrivE_sg_cb_run_cpp, 7},
+    {"_SGDrivE_sg_cb_step_rep_cpp", (DL_FUNC) &_SGDrivE_sg_cb_step_rep_cpp, 5},
     {"_SGDrivE_sg_chain_advance_cpp", (DL_FUNC) &_SGDrivE_sg_chain_advance_cpp, 5},
     {"_SGDrivE_sg_dopri5_test_cpp", (DL_FUNC) &_SGDrivE_sg_dopri5_test_cpp, 9},
     {"_SGDrivE_sg_model_view_info_cpp", (DL_FUNC) &_SGDrivE_sg_model_view_info_cpp, 1},

@@ -146,7 +146,9 @@ Rcpp::List sg_cb_step_cpp(const Rcpp::List& view, int day, double dt,
 // the day's forcing. The run stops early once every compartment is zero and
 // no release is left (later days stay zero). Returns the states recorded,
 // daily counters, the first day ending with every compartment zero
-// (extinct_day, 0 if none) and the number of days simulated.
+// (extinct_day, 0 if none), the first day ending with no individual of the
+// wild-type genotype(s) (wild_extinct_day; mated females by their own
+// genotype; 0 if none) and the number of days simulated.
 // [[Rcpp::export]]
 Rcpp::List sg_cb_run_cpp(const Rcpp::List& view, const Rcpp::NumericVector& x0,
                          const Rcpp::NumericVector& rel_count, double dt, bool stochastic,
@@ -185,7 +187,27 @@ Rcpp::List sg_cb_run_cpp(const Rcpp::List& view, const Rcpp::NumericVector& x0,
   sgdrive::CbStepper stepper(mv, dt);
   sgdrive::RandomDraws random_draws;
   sgdrive::ExpectedDraws expected_draws;
-  int row = 0, extinct_day = 0, days_run = 0;
+  int row = 0, extinct_day = 0, wild_extinct_day = 0, days_run = 0;
+  // individuals of the wild-type genotype(s): blocks E..U by genotype, F by
+  // the female's genotype
+  auto wild_total = [&](const std::vector<double>& y) {
+    double tot = 0.0;
+    const int ng = mv.n_g;
+    const int len[5] = {mv.n_E, mv.n_L, mv.n_P, mv.n_A, mv.n_A};
+    for (int b = 0; b < 5; ++b) {
+      for (int g = 0; g < ng; ++g) {
+        if (!mv.wild[g]) continue;
+        const double* p = y.data() + mv.offsets[b] + g * len[b];
+        for (int s = 0; s < len[b]; ++s) tot += p[s];
+      }
+    }
+    for (int g = 0; g < ng; ++g) {
+      if (!mv.wild[g]) continue;
+      const double* p = y.data() + mv.offsets[sgdrive::kF] + g * ng * mv.n_A;
+      for (int s = 0; s < ng * mv.n_A; ++s) tot += p[s];
+    }
+    return tot;
+  };
 
   for (int d = 1; d <= n_days; ++d) {
     Rcpp::checkUserInterrupt();
@@ -206,6 +228,7 @@ Rcpp::List sg_cb_run_cpp(const Rcpp::List& view, const Rcpp::NumericVector& x0,
     }
     const bool empty = std::all_of(x.begin(), x.end(), [](double v) { return v == 0.0; });
     if (empty && extinct_day == 0) extinct_day = d;
+    if (wild_extinct_day == 0 && (empty || wild_total(x) == 0.0)) wild_extinct_day = d;
     if (empty && d >= last_release_day) break;  // nothing can happen any more
   }
   // days after an early stop stay zero; give them their rows
@@ -215,5 +238,33 @@ Rcpp::List sg_cb_run_cpp(const Rcpp::List& view, const Rcpp::NumericVector& x0,
   return Rcpp::List::create(Rcpp::Named("states") = states, Rcpp::Named("state_days") = state_days,
                             Rcpp::Named("counters") = counters,
                             Rcpp::Named("extinct_day") = extinct_day,
+                            Rcpp::Named("wild_extinct_day") = wild_extinct_day,
                             Rcpp::Named("days_run") = days_run);
+}
+
+// n_rep independent stochastic steps from the same state x (statistical tests
+// of the step): a matrix with one row per replicate, the new state followed by
+// the step's flows.
+// [[Rcpp::export]]
+Rcpp::NumericMatrix sg_cb_step_rep_cpp(const Rcpp::List& view, int day, double dt,
+                                       const Rcpp::NumericVector& x, int n_rep) {
+  const sgdrive::ModelView mv(view);
+  if (x.size() != mv.n_states) Rcpp::stop("state has the wrong length");
+  if (day < 1 || day > mv.n_days) Rcpp::stop("day %d is outside the forcing", day);
+  if (n_rep < 1) Rcpp::stop("n_rep must be >= 1");
+  steps_per_day(dt);
+  if (!is_whole(x)) Rcpp::stop("stochastic steps need whole, non-negative counts");
+  sgdrive::CbStepper stepper(mv, dt);
+  stepper.prepare_day(day);
+  sgdrive::RandomDraws draws;
+  const int n = mv.n_states, nc = mv.n_counters;
+  Rcpp::NumericMatrix out(n_rep, n + nc);
+  std::vector<double> y(n), flows(nc);
+  for (int r = 0; r < n_rep; ++r) {
+    std::copy(x.begin(), x.end(), y.begin());
+    stepper.step(y.data(), flows.data(), draws);
+    for (int i = 0; i < n; ++i) out(r, i) = y[i];
+    for (int c = 0; c < nc; ++c) out(r, n + c) = flows[c];
+  }
+  return out;
 }

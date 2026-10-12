@@ -142,6 +142,8 @@ ModelView::ModelView(const Rcpp::List& view) {
   phi = get_doubles(view, "phi", n_g);
   xiF = get_doubles(view, "xiF", n_g);
   xiM = get_doubles(view, "xiM", n_g);
+  wild = get_ints(view, "wild", n_g);
+  check_flags(wild, "wild");
 
   dx = get_doubles(view, "dx", n_days);
   dx_egg = get_doubles(view, "dx_egg", n_days);

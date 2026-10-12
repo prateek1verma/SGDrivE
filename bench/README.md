@@ -11,6 +11,7 @@ visible.
 | Script | Measures |
 |---|---|
 | `m2_reference_baseline.R` | Pure-R reference ODE solver (M2): seconds per simulated year, steps per day and time per rate evaluation for five scenarios (1 to 10 genotypes). Results in `results/m2_reference_baseline.csv`. |
+| `m4_cb_speed.R` | Chain-binomial solver (M4): seconds per simulated year and replicate of `simulate_cb()` from a one-year burn-in, for five scenarios, two node areas and two time steps, and the speed-up of the C++ step over the R reference step. Results in `results/m4_cb_speed.csv`. |
 | `m4_dt_convergence.R` | Time step of the chain-binomial solver (M4): deterministic map of the reference step against the ODE for dt from 1 to 0.05 day, six scenarios over a year. Results in `results/m4_dt_convergence.csv`. |
 | `m3_cpp_vs_reference.R` | C++ backend (M3) against the R backend on the same scenarios and tolerances: run times (C++ Dormand-Prince day loop, C++ rates with lsoda, R), speed-ups, time per rate evaluation and the largest difference between backends, plus the full 24-year gp2014 run. Results in `results/m3_cpp_vs_reference.csv`. |
 
@@ -34,3 +35,21 @@ The backends agree to about 1e-8 (relative). The C++ kernel costs about the
 same per state in every scenario (17-18 ns per state and evaluation); the
 speed-up is smaller for large models because the vectorised R code spreads
 its fixed per-call overhead over more states.
+
+## Chain-binomial solver (M4, Apple silicon, R 4.6.1)
+
+Seconds per simulated year and replicate (`simulate_cb()`, eggs in batches,
+one-year burn-in, area 1000 km^2):
+
+| Scenario | States | dt = 0.1 | dt = 0.05 | C++ vs R reference step |
+|---|---|---|---|---|
+| wild, defaults | 49 | 0.074 | 0.102 | 55x |
+| wild, gp2014 preset | 150 | 0.34 | 0.41 | 27x |
+| SIT W/S, weekly releases | 118 | 0.063 | 0.084 | 30x |
+| Mendelian (3 genotypes) | 207 | 0.099 | 0.132 | 31x |
+| homing drive (10 genotypes) | 1390 | 0.33 | | 23x |
+
+With 100 times more individuals (area 1e5 km^2, up to 11 million adults) the
+time per year grows by only about 10-35% (0.081 s and 0.092 s for the wild
+and SIT models): the cost depends on the number of compartments in use, not
+on the number of individuals.

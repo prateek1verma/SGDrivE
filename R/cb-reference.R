@@ -376,6 +376,7 @@
   colnames(res$counters) <- attr(view, "counter_names")
   list(
     day = 0:inp$n_days, state = state, counters = res$counters, releases = inp$released,
-    dt = dt, stochastic = stochastic, extinct_day = res$extinct_day, days_run = res$days_run
+    dt = dt, stochastic = stochastic, extinct_day = res$extinct_day,
+    wild_extinct_day = res$wild_extinct_day, days_run = res$days_run
   )
 }

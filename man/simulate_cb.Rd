@@ -60,7 +60,8 @@ mates).}
 \item{\code{counters}}{Array of daily flows, day x counter x replicate.}
 \item{\code{releases}}{Array of individuals released, day x block x
 replicate.}
-\item{\code{extinct_day}}{First day ending with no individuals, per
+\item{\code{extinct_day}, \code{wild_extinct_day}}{First day ending with no
+individuals, and with no individuals of the wild type, per
 replicate.}
 \item{\code{meta}}{Settings, the seed and each replicate's stream, run
 time, model hash, package version, initial state (before rounding).}
@@ -90,8 +91,11 @@ as it was (apart from drawing the seed when \code{seed = NULL}).
 
 \strong{Extinction.} A replicate whose population is zero at the end of a day
 with no releases left stops early; its later days are zero.
-\code{extinct_day} gives the first day ending with no individuals (\code{NA} if
-none), also when later releases bring the population back.
+\code{extinct_day} gives the first day ending with no individuals at all, and
+\code{wild_extinct_day} the first day ending with no individuals of the cube's
+wild-type genotype(s) (mated females counted by their own genotype), the
+measure of eradication when released insects remain, as with the sterile
+insect technique (\code{NA} if none; also when the population returns later).
 
 \strong{Population size.} Counts are whole individuals per node, so the node
 area matters: with the defaults (1 km^2, H = 5 wounds per km^2) a McAllen

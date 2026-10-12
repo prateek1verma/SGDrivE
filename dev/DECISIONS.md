@@ -313,7 +313,10 @@ and needs 'deSolve' only when a fallback day occurs.
 8. **Output.** `simulate_cb()` returns an `sg_sim_cb` object: states
    [output day, state, replicate] or block x genotype totals (`keep`),
    daily counters per replicate, releases, extinction day per replicate
-   (first day end with every compartment zero), and `meta`. A memory
+   (first day end with every compartment zero), the day the wild type is
+   eliminated (first day end with no individual of the wild-type
+   genotype(s); added in WP5, since released sterile insects keep the total
+   above zero under SIT), and `meta`. A memory
    estimate is checked before running. A replicate stops early when extinct
    with no releases left.
 9. **Time step.** dt divides the day (1/dt a whole number); default 0.1

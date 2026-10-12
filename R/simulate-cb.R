@@ -47,8 +47,11 @@
 #'
 #' **Extinction.** A replicate whose population is zero at the end of a day
 #' with no releases left stops early; its later days are zero.
-#' `extinct_day` gives the first day ending with no individuals (`NA` if
-#' none), also when later releases bring the population back.
+#' `extinct_day` gives the first day ending with no individuals at all, and
+#' `wild_extinct_day` the first day ending with no individuals of the cube's
+#' wild-type genotype(s) (mated females counted by their own genotype), the
+#' measure of eradication when released insects remain, as with the sterile
+#' insect technique (`NA` if none; also when the population returns later).
 #'
 #' **Population size.** Counts are whole individuals per node, so the node
 #' area matters: with the defaults (1 km^2, H = 5 wounds per km^2) a McAllen
@@ -65,7 +68,8 @@
 #'     \item{`counters`}{Array of daily flows, day x counter x replicate.}
 #'     \item{`releases`}{Array of individuals released, day x block x
 #'       replicate.}
-#'     \item{`extinct_day`}{First day ending with no individuals, per
+#'     \item{`extinct_day`, `wild_extinct_day`}{First day ending with no
+#'       individuals, and with no individuals of the wild type, per
 #'       replicate.}
 #'     \item{`meta`}{Settings, the seed and each replicate's stream, run
 #'       time, model hash, package version, initial state (before rounding).}
@@ -138,7 +142,8 @@ simulate_cb <- function(model, init = NULL, n_rep = 1L, dt = 0.1, output_every =
     list(
       state = if (keep == "state") states else states %*% agg,
       counters = res$counters, releases = inp$released,
-      extinct_day = if (res$extinct_day > 0L) res$extinct_day else NA_integer_
+      extinct_day = if (res$extinct_day > 0L) res$extinct_day else NA_integer_,
+      wild_extinct_day = if (res$wild_extinct_day > 0L) res$wild_extinct_day else NA_integer_
     )
   }
   t0 <- proc.time()[["elapsed"]]
@@ -163,6 +168,7 @@ simulate_cb <- function(model, init = NULL, n_rep = 1L, dt = 0.1, output_every =
   out$counters <- stack("counters", cnames)
   out$releases <- stack("releases", c("E", "P", "M", "U"))
   out$extinct_day <- stats::setNames(vapply(reps, `[[`, 0L, "extinct_day"), rep_names)
+  out$wild_extinct_day <- stats::setNames(vapply(reps, `[[`, 0L, "wild_extinct_day"), rep_names)
   p <- model$params
   out$meta <- list(
     backend = "cpp", dt = dt, n_rep = n_rep, keep = keep,
@@ -195,15 +201,18 @@ print.sg_sim_cb <- function(x, ...) {
       fmt(min(last[b, ])), fmt(max(last[b, ]))
     ))
   }
-  ext <- x$extinct_day
-  cat(sprintf(
-    "  extinct: %d of %d replicates%s\n", sum(!is.na(ext)), length(ext),
-    if (any(!is.na(ext))) {
-      sprintf(" (median day %g)", stats::median(ext, na.rm = TRUE))
-    } else {
-      ""
-    }
-  ))
+  ext_line <- function(label, ext) {
+    cat(sprintf(
+      "  %s: %d of %d replicates%s\n", label, sum(!is.na(ext)), length(ext),
+      if (any(!is.na(ext))) {
+        sprintf(" (median day %g)", stats::median(ext, na.rm = TRUE))
+      } else {
+        ""
+      }
+    ))
+  }
+  ext_line("extinct", x$extinct_day)
+  ext_line("wild type eliminated", x$wild_extinct_day)
   egg_cols <- grepl("^eggs_laid", dimnames(x$counters)[[2L]])
   eggs <- apply(x$counters[, egg_cols, , drop = FALSE], 3L, sum)
   cat(sprintf(

@@ -53,6 +53,7 @@
     # cube: egg tensor [(g, m) with m fastest, k]; eta [g, m]; per genotype
     egg_tensor = as.numeric(s$egg_tensor), eta = as.numeric(s$eta),
     phi = as.numeric(s$phi), xiF = as.numeric(s$xiF), xiM = as.numeric(s$xiM),
+    wild = as.integer(s$geno %in% model$cube$wild_type),
     # daily forcing
     dx = as.numeric(f$dx), dx_egg = as.numeric(f$dx_egg), mu_T = as.numeric(f$mu_T),
     mu_E = as.numeric(f$mu_E), phi_ov = as.numeric(f$phi_ov),

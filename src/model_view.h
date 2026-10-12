@@ -46,6 +46,7 @@ struct ModelView {
   std::vector<double> egg_tensor;  // [n_g * n_g, n_g]; rows (g, m) with m fastest
   std::vector<double> eta;         // [n_g, n_g]; eta[g, m]
   std::vector<double> phi, xiF, xiM;  // [n_g]
+  std::vector<int> wild;              // [n_g]: 1 for the cube's wild type(s)
 
   // daily forcing (S1-S4, S7)
   std::vector<double> dx, dx_egg, mu_T, mu_E, phi_ov, moisture;  // [n_days]
