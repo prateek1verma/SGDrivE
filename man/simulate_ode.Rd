@@ -8,10 +8,11 @@ simulate_ode(
   model,
   init = NULL,
   backend = "R",
-  method = "lsoda",
+  method = NULL,
   rtol = 1e-08,
   atol = 1e-10,
-  output_every = 1L
+  output_every = 1L,
+  stiff_fallback = TRUE
 )
 }
 \arguments{
@@ -21,18 +22,29 @@ simulate_ode(
 this model (default: \code{sg_init(model)}), or a numeric vector of length
 \code{model$n_states}.}
 
-\item{backend}{\code{"R"}: the pure-R reference implementation, solved with
-'deSolve' (milestone M2). A compiled C++ backend follows in milestone M3.}
+\item{backend}{\code{"cpp"}: the compiled C++ rate kernel and day loop
+(milestone M3). \code{"R"}: the pure-R reference implementation (milestone
+M2), slower but easy to read; the two agree to within the integration
+tolerance.}
 
-\item{method}{Integration method passed to \code{\link[deSolve:ode]{deSolve::ode()}}; default
-\code{"lsoda"}, which switches automatically between a non-stiff (Adams) and a
-stiff (BDF) method. \code{"radau"}, \code{"bdf"}, \code{"ode45"} and other deSolve
-methods can be used to check that results do not depend on the solver.}
+\item{method}{Integration method. \code{"dopri5"} (C++ backend only) is the
+package's own Dormand-Prince 5(4) integrator, run entirely in C++. Any
+method of \code{\link[deSolve:ode]{deSolve::ode()}} can be used with either backend: \code{"lsoda"},
+which switches automatically between a non-stiff (Adams) and a stiff (BDF)
+method, \code{"radau"}, \code{"bdf"}, \code{"ode45"} and others, e.g. to check that
+results do not depend on the solver. Default: \code{"dopri5"} for the C++
+backend, \code{"lsoda"} for the R backend.}
 
 \item{rtol, atol}{Relative and absolute error tolerances of the integrator.}
 
 \item{output_every}{Record the state every this many days (and always on
 the last day). Counters and diagnostics are always daily.}
+
+\item{stiff_fallback}{Only for \code{method = "dopri5"}: if \code{TRUE} (default), a
+day on which the explicit integrator detects stiffness (or fails) is
+integrated again with \code{"lsoda"} (needs 'deSolve'), using the C++ rates.
+If \code{FALSE}, stiff days are integrated with Dormand-Prince regardless
+(accurate but slow), and a failure is an error.}
 }
 \value{
 An object of class \code{sg_sim}, a list with:
@@ -43,8 +55,9 @@ An object of class \code{sg_sim}, a list with:
 \item{\code{counters}}{Matrix of daily flow totals (rows: days 1 to n).}
 \item{\code{releases}}{Matrix of individuals released per day and block.}
 \item{\code{diagnostics}}{Data frame of daily solver diagnostics.}
-\item{\code{meta}}{Backend, method, tolerances, run time, model hash,
-package and deSolve versions, initial state.}
+\item{\code{meta}}{Backend, method, tolerances, stiff fallback setting and
+number of fallback days, run time, model hash, package and deSolve
+versions, initial state.}
 }
 }
 \description{
@@ -59,15 +72,25 @@ breakpoint. Releases (D-005) are added to the state at the start of their
 day, before it is integrated: a release is an instantaneous jump, so the
 solver only ever sees smooth problems and releases add no stiffness.
 
+\strong{Stiffness} (D-021). The model is rarely stiff (larval crowding and very
+short sub-stages can make it so), which favours an explicit integrator.
+Dormand-Prince estimates the stiffness of the problem at every step
+(Hairer's test); when it is detected, that one day is handed to \code{"lsoda"}
+and the C++ day loop resumes on the next day.
+
 \strong{Counters.} Alongside the states, the flows of the model are integrated
 over each day (eggs laid by genotype, egg batches, larval and pupal
 entries, emergences, matings by female x mate genotype, deaths by block and
 by old age), giving daily totals used for flow accounting and outputs.
 
-\strong{Diagnostics.} For each day: integration steps, derivative evaluations,
-whether \code{lsoda} finished on its stiff method, the largest rate (transfer
-plus mortality) of any compartment, and the smallest state value. Values
-slightly below zero (round-off near extinction) are reported, not removed.
+\strong{Diagnostics.} For each day: integration steps, rejected steps
+(Dormand-Prince only), derivative evaluations, whether stiffness was
+detected (\code{lsoda}: finished on its stiff method; Dormand-Prince: Hairer's
+test; \code{NA} for other methods), whether the day was integrated by the
+\code{lsoda} fallback (steps and evaluations are then those of \code{lsoda}), the
+largest rate (transfer plus mortality) of any compartment, and the smallest
+state value. Values slightly below zero (round-off near extinction) are
+reported, not removed.
 }
 \examples{
 if (requireNamespace("deSolve", quietly = TRUE) &&
@@ -77,6 +100,9 @@ if (requireNamespace("deSolve", quietly = TRUE) &&
   mod <- sg_model(p, sg_cube(MGDrivE::cubeMendelian()), wx)
   sim <- simulate_ode(mod)
   sim
+  # the compiled backend gives the same result, faster
+  sim_cpp <- simulate_ode(mod, backend = "cpp")
+  max(abs(sim_cpp$state - sim$state)) / max(sim$state)
 }
 }
 \seealso{

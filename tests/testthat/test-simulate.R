@@ -24,7 +24,10 @@ test_that("simulate_ode() returns daily states, counters, releases and diagnosti
   expect_identical(colnames(sim$state), sg_state_names(m3))
   expect_identical(unname(sim$state[1, ]), as.numeric(sg_init(m3)))
   expect_identical(dim(sim$counters), c(60L, length(SGDrivE:::.sg_counter_names(cube3$genotypes))))
-  expect_named(sim$diagnostics, c("day", "steps", "evaluations", "stiff", "max_rate", "min_state"))
+  expect_named(sim$diagnostics, c(
+    "day", "steps", "rejected", "evaluations", "stiff", "fallback", "max_rate", "min_state"
+  ))
+  expect_true(all(is.na(sim$diagnostics$rejected)) && !any(sim$diagnostics$fallback))
   expect_identical(sim$meta$model_hash, m3$meta$hash)
   expect_identical(sim$meta$backend, "R")
 })
@@ -95,7 +98,9 @@ test_that("init is checked against the model", {
 
 test_that("invalid arguments give informative errors", {
   expect_error(simulate_ode(list()), "sg_model object")
-  expect_error(simulate_ode(m3, backend = "cpp"), "milestone M3")
+  expect_error(simulate_ode(m3, method = "dopri5"), "C\\+\\+ backend's own integrator")
+  expect_error(simulate_ode(m3, method = 1), "single string")
+  expect_error(simulate_ode(m3, stiff_fallback = NA), "TRUE or FALSE")
   expect_error(simulate_ode(m3, backend = "julia"), "must be one of")
   expect_error(simulate_ode(m3, rtol = -1), "positive")
   expect_error(simulate_ode(m3, output_every = 0), "whole number >= 1")

@@ -37,6 +37,7 @@ struct Dopri5Options {
   double fixed_h = 0.0;     // > 0: fixed steps of this size, no error control
   bool detect_stiff = true;
   int stiff_steps = 15;     // Hairer's threshold
+  bool stop_when_stiff = false;  // return (status 3) as soon as stiffness is detected
 };
 
 struct Dopri5Stats {
@@ -46,7 +47,7 @@ struct Dopri5Stats {
   long evaluations = 0;  // calls of the right-hand side
   bool stiff = false;    // stiffness detected during this call
   double h_last = 0.0;   // last accepted step size
-  int status = 0;        // 0 ok, 1 too many steps, 2 step size too small
+  int status = 0;        // 0 ok, 1 too many steps, 2 step size too small, 3 stopped: stiff
 };
 
 class Dopri5 {
@@ -126,7 +127,13 @@ class Dopri5 {
             const double hlamb = h * std::sqrt(stnum / stden);
             if (hlamb > 3.25) {
               nonsti = 0;
-              if (++iasti >= opt.stiff_steps) st.stiff = true;
+              if (++iasti >= opt.stiff_steps) {
+                st.stiff = true;
+                if (opt.stop_when_stiff) {
+                  st.status = 3;
+                  return st;
+                }
+              }
             } else if (++nonsti >= 6) {
               iasti = 0;
             }

@@ -76,6 +76,62 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// sg_kernel_new_cpp
+SEXP sg_kernel_new_cpp(const Rcpp::List& view);
+RcppExport SEXP _SGDrivE_sg_kernel_new_cpp(SEXP viewSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::List& >::type view(viewSEXP);
+    rcpp_result_gen = Rcpp::wrap(sg_kernel_new_cpp(view));
+    return rcpp_result_gen;
+END_RCPP
+}
+// sg_kernel_rates_cpp
+Rcpp::NumericVector sg_kernel_rates_cpp(SEXP ptr, int day, const Rcpp::NumericVector& y);
+RcppExport SEXP _SGDrivE_sg_kernel_rates_cpp(SEXP ptrSEXP, SEXP daySEXP, SEXP ySEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type ptr(ptrSEXP);
+    Rcpp::traits::input_parameter< int >::type day(daySEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type y(ySEXP);
+    rcpp_result_gen = Rcpp::wrap(sg_kernel_rates_cpp(ptr, day, y));
+    return rcpp_result_gen;
+END_RCPP
+}
+// sg_kernel_max_rate_cpp
+double sg_kernel_max_rate_cpp(SEXP ptr, int day, const Rcpp::NumericVector& x);
+RcppExport SEXP _SGDrivE_sg_kernel_max_rate_cpp(SEXP ptrSEXP, SEXP daySEXP, SEXP xSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type ptr(ptrSEXP);
+    Rcpp::traits::input_parameter< int >::type day(daySEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type x(xSEXP);
+    rcpp_result_gen = Rcpp::wrap(sg_kernel_max_rate_cpp(ptr, day, x));
+    return rcpp_result_gen;
+END_RCPP
+}
+// sg_ode_run_cpp
+Rcpp::List sg_ode_run_cpp(SEXP ptr, const Rcpp::NumericVector& x0, int day_from, int day_to, double rtol, double atol, const Rcpp::LogicalVector& record, bool stop_on_stiff, double max_steps);
+RcppExport SEXP _SGDrivE_sg_ode_run_cpp(SEXP ptrSEXP, SEXP x0SEXP, SEXP day_fromSEXP, SEXP day_toSEXP, SEXP rtolSEXP, SEXP atolSEXP, SEXP recordSEXP, SEXP stop_on_stiffSEXP, SEXP max_stepsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type ptr(ptrSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type x0(x0SEXP);
+    Rcpp::traits::input_parameter< int >::type day_from(day_fromSEXP);
+    Rcpp::traits::input_parameter< int >::type day_to(day_toSEXP);
+    Rcpp::traits::input_parameter< double >::type rtol(rtolSEXP);
+    Rcpp::traits::input_parameter< double >::type atol(atolSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::LogicalVector& >::type record(recordSEXP);
+    Rcpp::traits::input_parameter< bool >::type stop_on_stiff(stop_on_stiffSEXP);
+    Rcpp::traits::input_parameter< double >::type max_steps(max_stepsSEXP);
+    rcpp_result_gen = Rcpp::wrap(sg_ode_run_cpp(ptr, x0, day_from, day_to, rtol, atol, record, stop_on_stiff, max_steps));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_SGDrivE_sg_backend_info_cpp", (DL_FUNC) &_SGDrivE_sg_backend_info_cpp, 0},
@@ -83,6 +139,10 @@ static const R_CallMethodDef CallEntries[] = {
     {"_SGDrivE_sg_model_view_info_cpp", (DL_FUNC) &_SGDrivE_sg_model_view_info_cpp, 1},
     {"_SGDrivE_sg_rates_cpp", (DL_FUNC) &_SGDrivE_sg_rates_cpp, 3},
     {"_SGDrivE_sg_max_rate_cpp", (DL_FUNC) &_SGDrivE_sg_max_rate_cpp, 3},
+    {"_SGDrivE_sg_kernel_new_cpp", (DL_FUNC) &_SGDrivE_sg_kernel_new_cpp, 1},
+    {"_SGDrivE_sg_kernel_rates_cpp", (DL_FUNC) &_SGDrivE_sg_kernel_rates_cpp, 3},
+    {"_SGDrivE_sg_kernel_max_rate_cpp", (DL_FUNC) &_SGDrivE_sg_kernel_max_rate_cpp, 3},
+    {"_SGDrivE_sg_ode_run_cpp", (DL_FUNC) &_SGDrivE_sg_ode_run_cpp, 9},
     {NULL, NULL, 0}
 };
 

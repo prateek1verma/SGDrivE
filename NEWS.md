@@ -15,6 +15,19 @@
   control, starting step and stiffness test; first-same-as-last (6
   evaluations per step); tested for accuracy on problems with known
   solutions, 5th-order convergence and stiffness detection.
+* `simulate_ode(backend = "cpp")`: the C++ backend. The whole day loop
+  (releases, Dormand-Prince integration with daily counters, diagnostics)
+  runs in C++ (`src/simulate.cpp`); a day on which stiffness is detected is
+  integrated again with `lsoda` using the C++ rates, and the C++ loop resumes
+  on the next day (`stiff_fallback`, default `TRUE`). Any deSolve method can
+  also be driven by the C++ rates (`method = "lsoda"`, `"radau"`, ...).
+  About 25-30 times faster than the R backend on a year of McAllen weather,
+  agreeing to the integration tolerance (about 1e-11 at `rtol = 1e-10`).
+  `method` now defaults to `"dopri5"` (C++) or `"lsoda"` (R).
+* Solver diagnostics gain `rejected` (Dormand-Prince rejected steps) and
+  `fallback` (day integrated by the `lsoda` fallback); `meta` records
+  `stiff_fallback` and the number of fallback days, and `print()` reports
+  them.
 
 ## Milestone M2: reference model
 

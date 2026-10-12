@@ -21,3 +21,19 @@ sg_max_rate_cpp <- function(view, day, state) {
     .Call(`_SGDrivE_sg_max_rate_cpp`, view, day, state)
 }
 
+sg_kernel_new_cpp <- function(view) {
+    .Call(`_SGDrivE_sg_kernel_new_cpp`, view)
+}
+
+sg_kernel_rates_cpp <- function(ptr, day, y) {
+    .Call(`_SGDrivE_sg_kernel_rates_cpp`, ptr, day, y)
+}
+
+sg_kernel_max_rate_cpp <- function(ptr, day, x) {
+    .Call(`_SGDrivE_sg_kernel_max_rate_cpp`, ptr, day, x)
+}
+
+sg_ode_run_cpp <- function(ptr, x0, day_from, day_to, rtol, atol, record, stop_on_stiff, max_steps) {
+    .Call(`_SGDrivE_sg_ode_run_cpp`, ptr, x0, day_from, day_to, rtol, atol, record, stop_on_stiff, max_steps)
+}
+
