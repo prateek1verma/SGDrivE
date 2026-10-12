@@ -5,6 +5,10 @@ sg_backend_info_cpp <- function() {
     .Call(`_SGDrivE_sg_backend_info_cpp`)
 }
 
+sg_chain_advance_cpp <- function(q, last, dt) {
+    .Call(`_SGDrivE_sg_chain_advance_cpp`, q, last, dt)
+}
+
 sg_dopri5_test_cpp <- function(problem, y0, t0, t1, rtol, atol, fixed_h, max_steps, par) {
     .Call(`_SGDrivE_sg_dopri5_test_cpp`, problem, y0, t0, t1, rtol, atol, fixed_h, max_steps, par)
 }
@@ -19,6 +23,10 @@ sg_rates_cpp <- function(view, day, state) {
 
 sg_max_rate_cpp <- function(view, day, state) {
     .Call(`_SGDrivE_sg_max_rate_cpp`, view, day, state)
+}
+
+sg_aggregates_cpp <- function(view, day, state) {
+    .Call(`_SGDrivE_sg_aggregates_cpp`, view, day, state)
 }
 
 sg_kernel_new_cpp <- function(view) {

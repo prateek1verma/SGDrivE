@@ -253,20 +253,78 @@ Ponti (2014) ODE to 1e-6. Over 24 years of McAllen weather the model was
 never stiff with the defaults or the gp2014 preset; artificial stiffness
 needs extreme settings such as near-instant mating (ν ≥ 10⁴ d⁻¹).
 
-**Chain-binomial (time step dt, rates fixed within the step).**
+**Chain-binomial** (`simulate_cb()`, D-022). Counts are whole numbers.
+Each day is divided into steps of length dt (1/dt a whole number, default
+0.1 day); every step of day d uses day d's forcing. Releases are added at the
+start of their day, as in the ODE.
 
-| Process | Draw |
-|---|---|
-| Chain compartment (advance or die) | leaving ~ Binomial(N, 1 − e^{−(q+μ)dt}); advancing ~ Binomial(leaving, q/(q+μ)) |
-| Virgins (advance, die, mate) | Multinomial over the three outcomes with total probability 1 − e^{−(q+μ+ν)dt}; mate genotype ~ Multinomial(π_{g,·}) |
-| Eggs from (g, m) | viable eggs ~ Poisson(R φ_ov Ψ s_g W_{g,m} Σ_k ih τ · dt); split ~ Multinomial(ih τ normalised) |
-| Emergence | survival ~ Binomial(ξ); sex ~ Binomial(φ) |
+**(S15) Aggregates.** At the start of each step, W_{g,m}, N_s, Ψ (S8), M̄_m,
+g_find, π_{g,m} (S12) and the larval hazard μ_L (S7) are computed from the
+current counts and held fixed for the step.
 
-Counts never become negative. A warning is issued when max (q + μ) dt > 0.1.
-Random numbers come from R's generator, so `set.seed()` reproduces runs.
+**(S16) Chain moves.** For a chain with sub-stage rates q_1, …, q_n, last
+reached sub-stage l and hazard μ (the same in every sub-stage), let A(dt) =
+exp(G dt), where G is the generator of pure advancement (sub-stage i → i + 1
+at rate q_i for i < l, and from l out of the chain). A is computed once per
+day for each chain (E, L, P per day; adults per genotype and sex). From
+sub-stage i with X_i individuals:
 
-**Extinction.** No population floors. Eradication is reached when all wild
-stages are below an extinction threshold (default 1 individual).
+    deaths   D_i ~ Binomial(X_i, 1 − e^{−μ dt})
+    movers   (N_{i→i}, …, N_{i→l}, N_{i→out}) ~ Multinomial(X_i − D_i; A_{i,i}, …, A_{i,l}, A_{i,out})
+
+Leaving the chain means: E → L_1, L → P_1, P → emergence (S19), adults →
+death by old age. Transit through a chain is exact for any dt; for larvae
+μ_L includes crowding from S15.
+
+**(S17) Eggs.** For each female × mate genotype pair (g, m), with
+T[g,m,k] = s_g · ih[g,m,k] · τ[g,m,k] (S9):
+
+    N_{g,m}         ~ Poisson(R φ_ov Ψ W_{g,m} Σ_k T[g,m,k] dt)
+    (N_{g,m,k})_k   ~ Multinomial(N_{g,m}; T[g,m,·] / Σ_k T[g,m,k])
+
+The eggs enter E_{k,1} at the end of the step.
+
+**(S18) Mating** (before ageing; unmated and mated females share age chain
+and hazard, so the order does not bias ageing or survival):
+
+    Y_{g,i}             ~ Binomial(U_{g,i}, 1 − e^{−ν_{g,i} dt})      ν_{g,i} = ν · 1[i receptive] · g_find
+    (Y_{g,m,i})_m       ~ Multinomial(Y_{g,i}; π_{g,·})
+
+The mated females move to F_{g,m,i} and then age with all other females
+(S16). ν_{g,i} = 0 when no compatible male is present. With
+`mating = "instant"` the receptivity flag is not used, and emerging females
+are split over mates by Multinomial(π_{g,·}) at emergence (to U_{g,1} only
+when no compatible male is present).
+
+**(S19) Emergence.** For the Z_g pupae of genotype g leaving the pupal chain:
+
+    females Z^F_g ~ Binomial(Z_g, φ_g)
+    into U_{g,1} (or F, S18): Binomial(Z^F_g, ξ_F,g)    into M_{g,1}: Binomial(Z_g − Z^F_g, ξ_M,g)
+
+the rest die at emergence.
+
+**Order of draws in a step.** Aggregates (S15); eggs (S17, pairs (g, m) with
+m fastest); mating (S18, genotype then sub-stage); chain moves (S16) block by
+block (E, L, P, M, U, F) and compartment by compartment in state order;
+emergence (S19, by genotype). All draws use the counts at the start of the
+step; arrivals are added at its end. Multinomials are sequential conditional
+binomials in category order. The R reference step and the C++ step follow
+this order, so they use the same random numbers.
+
+**Deterministic map.** Replacing every draw by its expectation gives a
+deterministic map, the exact conditional mean of one step. As dt → 0 it
+converges to the ODE at first order (from S15 quantities held fixed and from
+stage-boundary crossings waiting until the end of the step).
+
+**Integers.** Non-integer initial states and releases are rounded without
+bias in each replicate: x → ⌊x⌋ + Bernoulli(x − ⌊x⌋). Counts never become
+negative. Random numbers come from R's generator; replicate r uses
+L'Ecuyer-CMRG stream r derived from the seed (D-022).
+
+**Extinction.** No population floors. A stochastic replicate is extinct on
+the first day that ends with every compartment at zero. Eradication
+summaries with an extinction threshold (default 1 individual) for the ODE
+follow in M5.
 
 ## 11. Initial conditions
 

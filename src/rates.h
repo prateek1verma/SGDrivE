@@ -5,8 +5,10 @@
 // S7-S14. The two must agree to floating-point round-off; the R version is
 // the readable reference and the test oracle.
 //
-// Working arrays are allocated once in the constructor; eval() allocates
-// nothing.
+// The day's forcing-dependent rates (day_rates) and the state-dependent
+// aggregates (aggregate) are separate steps so that the chain-binomial solver
+// reuses them (D-010, D-022). Working arrays are allocated once in the
+// constructor; eval() and aggregate() allocate nothing.
 
 #ifndef SGDRIVE_RATES_H
 #define SGDRIVE_RATES_H
@@ -17,9 +19,43 @@
 
 namespace sgdrive {
 
+// Quantities that depend only on the day's forcing (S1-S5, S7 without
+// density dependence). Shared by the ODE and chain-binomial solvers.
+struct DayRates {
+  double dx = 0.0;      // degree-days per day, adults and pupae
+  double mu_e = 0.0;    // egg hazard
+  double phi_ov = 0.0;  // oviposition scalar
+  double q_e = 0.0, q_l = 0.0, q_p = 0.0;  // juvenile transfer rates per sub-stage
+  double mu_p = 0.0, mu_f = 0.0, mu_m = 0.0;  // pupal, female and male hazards
+};
+
+// Quantities that depend on the state (S7 larval crowding, S8, S9, S12).
+// Shared by the ODE and chain-binomial solvers.
+struct Aggregates {
+  double sum_e = 0.0, sum_l = 0.0, sum_p = 0.0, sum_m = 0.0, sum_u = 0.0, sum_f = 0.0;
+  double mu_l = 0.0;    // larval hazard, with crowding
+  double sum_w = 0.0;   // egg-laying mated females
+  double n_s = 0.0;     // wound-search competitors
+  double psi = 0.0;     // wound-finding rate
+  double m_tot = 0.0;   // mature males
+  double g_find = 0.0;  // probability scale of finding a male
+  std::vector<double> w_lay;  // [n_g * n_g]: egg-laying females (g, m), m fastest
+  std::vector<double> births; // [n_g]: egg production by offspring genotype
+  std::vector<double> m_bar;  // [n_g]: mature males by genotype
+  std::vector<double> pi;     // [n_g * n_g]: mate shares pi[g, m] at g * n_g + m
+  std::vector<int> mate_ok;   // [n_g]: compatible mature males present
+};
+
 class RateKernel {
  public:
   explicit RateKernel(const ModelView& mv);
+
+  // Forcing-dependent rates of simulation day `day` (1-based).
+  DayRates day_rates(int day) const;
+
+  // State-dependent aggregates for state `y` (stored in agg()).
+  void aggregate(const DayRates& r, const double* y);
+  const Aggregates& agg() const { return agg_; }
 
   // Derivatives of all states (dydt, length n_states) and rates of the
   // cumulative counters (counters, length n_counters; order of
@@ -35,14 +71,12 @@ class RateKernel {
 
  private:
   const ModelView& mv_;
-  // working arrays (sizes in comments)
-  std::vector<double> w_lay_;        // [n_g * n_g]: egg-laying females, (g, m) with m fastest
-  std::vector<double> births_;       // [n_g]
-  std::vector<double> m_bar_;        // [n_g]: mature males
-  std::vector<double> pi_;           // [n_g * n_g]: pi[g, m] at g * n_g + m
-  std::vector<int> mate_ok_;         // [n_g]
+  Aggregates agg_;
+  // working arrays of eval() (sizes in comments)
   std::vector<double> in_m_, in_f_, in_u_, in_f_mated_;  // [n_g]
   std::vector<double> mating_flux_;  // [n_A * n_g]: [substage, genotype]
+
+  double larval_hazard(double sum_l) const;
 };
 
 }  // namespace sgdrive

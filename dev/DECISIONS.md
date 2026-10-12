@@ -254,6 +254,72 @@ and needs 'deSolve' only when a fallback day occurs.
 
 ---
 
+## D-022 Chain-binomial solver design for M4 (Accepted, 2026-10-12)
+
+1. **Exact chain moves within a step.** In a step of length dt, an
+   individual in sub-stage i survives with probability exp(-mu dt) (the
+   hazard is the same in every sub-stage of a chain) and the survivors move
+   to sub-stage j >= i, or leave the chain, with the exact probabilities of
+   the pure-advancement chain over dt (matrix exponential of its generator,
+   computed once per day by uniformization; S16). Chain transit times are
+   then exact for any dt, unlike the classic one-sub-stage-per-step
+   chain-binomial, whose sub-stage durations are too long by about
+   (q + mu) dt / 2. The remaining error is first order in dt and comes only
+   from quantities held fixed within a step (wound search, male
+   availability, larval crowding) and from individuals that cross a stage
+   boundary waiting until the end of the step in sub-stage 1 of the next
+   stage.
+2. **Mating before ageing.** Unmated and mated females share their age chain
+   and hazard, so mating can be drawn first (probability
+   1 - exp(-nu_{g,i} dt), mate genotype from pi) and all females then age
+   and die together; only male numbers and the receptivity flag are held at
+   their start-of-step values. Large nu causes no stiffness. With
+   `mating = "instant"` emerging females draw their mate at emergence.
+3. **Order of events and draws in a step** (all from the state at the start
+   of the step; arrivals enter sub-stage 1 at its end): aggregates; eggs
+   (Poisson per female x mate genotype, multinomial split over offspring
+   genotypes); mating; chain moves of E, L, P, M, U, F in state order
+   (binomial survival, then multinomial destination); emergence (binomial
+   sex, then binomial survival). Multinomials are drawn as sequential
+   conditional binomials in category order. This canonical order lets the
+   R reference step and the C++ step consume the same random numbers.
+4. **Deterministic map.** Replacing every draw by its expectation gives a
+   deterministic map whose value is the exact conditional mean of one
+   stochastic step. Used in tests: replicate mean vs map (large sizes), map
+   vs ODE (dt -> 0, first order).
+5. **Shared kernel.** The C++ rate kernel is split into day rates and state
+   aggregates used by both solvers (D-010); ODE results are unchanged
+   (bitwise).
+6. **Random numbers.** R's generator through Rmath (`set.seed()` works).
+   Replicate r uses its own L'Ecuyer-CMRG stream derived from `seed`, so it
+   is identical whether run alone, among others, sequentially or in
+   parallel. Parallel runs use R processes (`future.apply`), not C++
+   threads. The user's RNG state is restored; seeds are stored in `meta`.
+7. **Integers.** Non-integer initial states and releases are rounded
+   without bias in each replicate (floor plus a Bernoulli draw on the
+   fraction). Counts are stored as doubles (exact integers to 2^53). Flow
+   accounting is an exact integer identity. The `egg_batches` counter is
+   recorded as its expected value (eggs are Poisson; clutch structure is
+   not modelled in v0.1).
+8. **Output.** `simulate_cb()` returns an `sg_sim_cb` object: states
+   [output day, state, replicate] or block x genotype totals (`keep`),
+   daily counters per replicate, releases, extinction day per replicate
+   (first day end with every compartment zero), and `meta`. A memory
+   estimate is checked before running. A replicate stops early when extinct
+   with no releases left.
+9. **Time step.** dt divides the day (1/dt a whole number); default 0.1 day,
+   to be confirmed by the convergence study of the deterministic map (WP2).
+10. **R reference step** (`.sg_cb_step_r`), pure R, used to test the C++ step
+    draw for draw and the deterministic map to round-off.
+11. **Population scale.** The defaults (1 km² node, H = 5 wounds per km²)
+    give tens of adults at the seasonal peak and fewer than one individual
+    in most McAllen winters, so stochastic runs at 1 km² go extinct almost
+    every winter. Defaults are kept (ODE regressions); stochastic tests and
+    examples use node areas of at least 1000 km²; realistic wound densities
+    are calibrated in M5 (`calibrate_H()`).
+
+---
+
 ## Open questions
 
 | ID | Question | Current assumption |

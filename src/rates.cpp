@@ -10,21 +10,123 @@ namespace sgdrive {
 
 RateKernel::RateKernel(const ModelView& mv)
     : mv_(mv),
-      w_lay_(static_cast<std::size_t>(mv.n_g) * mv.n_g),
-      births_(mv.n_g),
-      m_bar_(mv.n_g),
-      pi_(static_cast<std::size_t>(mv.n_g) * mv.n_g),
-      mate_ok_(mv.n_g),
       in_m_(mv.n_g),
       in_f_(mv.n_g),
       in_u_(mv.n_g),
       in_f_mated_(mv.n_g),
-      mating_flux_(static_cast<std::size_t>(mv.n_A) * mv.n_g) {}
+      mating_flux_(static_cast<std::size_t>(mv.n_A) * mv.n_g) {
+  const std::size_t ng = mv.n_g;
+  agg_.w_lay.assign(ng * ng, 0.0);
+  agg_.births.assign(ng, 0.0);
+  agg_.m_bar.assign(ng, 0.0);
+  agg_.pi.assign(ng * ng, 0.0);
+  agg_.mate_ok.assign(ng, 0);
+}
+
+double RateKernel::larval_hazard(double sum_l) const {
+  double mu_l = mv_.mu_L0;
+  if (mv_.larval_per_wound && mv_.H > 0) mu_l += mv_.gamma_L * sum_l / mv_.H;
+  return mu_l;
+}
+
+DayRates RateKernel::day_rates(int day) const {
+  const ModelView& v = mv_;
+  const int d = day - 1;  // 0-based index into the daily forcing
+  DayRates r;
+  // daily forcing (S1-S4, S7)
+  r.dx = v.dx[d];
+  r.mu_e = v.mu_E[d];
+  r.phi_ov = v.phi_ov[d];
+  // transfer rates (S5, S6); adult rates per sub-stage are dx * inv_w
+  r.q_e = v.n_E * v.dx_egg[d] / v.X_E;
+  r.q_l = v.n_L / v.tau_L;
+  r.q_p = v.n_P * r.dx / v.X_P;
+  // hazards (S7)
+  r.mu_p = v.mu_T[d] + v.mu_W * (1.0 - v.moisture[d]);
+  r.mu_f = v.mu_T[d] + v.mu_b_F;
+  r.mu_m = v.mu_T[d] + v.mu_b_M;
+  return r;
+}
+
+void RateKernel::aggregate(const DayRates& r, const double* y) {
+  const ModelView& v = mv_;
+  Aggregates& a = agg_;
+  const int ng = v.n_g, nE = v.n_E, nL = v.n_L, nP = v.n_P, nA = v.n_A;
+  const double* egg = y + v.offsets[kE];
+  const double* lar = y + v.offsets[kL];
+  const double* pup = y + v.offsets[kP];
+  const double* mal = y + v.offsets[kM];
+  const double* unm = y + v.offsets[kU];
+  const double* fem = y + v.offsets[kF];
+
+  // ---- block totals ----------------------------------------------------------
+  a.sum_e = a.sum_l = a.sum_p = a.sum_m = a.sum_u = a.sum_f = 0.0;
+  for (int i = 0; i < ng * nE; ++i) a.sum_e += egg[i];
+  for (int i = 0; i < ng * nL; ++i) a.sum_l += lar[i];
+  for (int i = 0; i < ng * nP; ++i) a.sum_p += pup[i];
+  for (int i = 0; i < ng * nA; ++i) a.sum_m += mal[i];
+  for (int i = 0; i < ng * nA; ++i) a.sum_u += unm[i];
+  for (int i = 0; i < ng * ng * nA; ++i) a.sum_f += fem[i];
+
+  // ---- larval crowding (S7) ------------------------------------------------------
+  a.mu_l = larval_hazard(a.sum_l);
+
+  // ---- wound search and egg production (S8, S9) ----------------------------
+  a.sum_w = 0.0;
+  for (int g = 0; g < ng; ++g) {
+    for (int m = 0; m < ng; ++m) {
+      const double* x = fem + (g * ng + m) * nA;
+      double w = 0.0;
+      for (int s = 0; s < nA; ++s) {
+        if (v.laying[s]) w += x[s];
+      }
+      a.w_lay[g * ng + m] = w;
+      a.sum_w += w;
+    }
+  }
+  a.n_s = v.search_all_adults ? (a.sum_m + a.sum_u + a.sum_f) : a.sum_w;
+  a.psi = a.n_s > 0.0 ? v.sigma0 * (1.0 - std::exp(-v.a_s * r.dx * v.H / a.n_s)) : v.sigma0;
+  const int n_cross = ng * ng;
+  for (int k = 0; k < ng; ++k) {
+    const double* col = v.egg_tensor.data() + static_cast<std::size_t>(k) * n_cross;
+    double b = 0.0;
+    for (int c = 0; c < n_cross; ++c) b += col[c] * a.w_lay[c];
+    a.births[k] = v.R * r.phi_ov * a.psi * b;
+  }
+
+  // ---- male availability and mating (S12) ----------------------------------
+  a.m_tot = 0.0;
+  for (int m = 0; m < ng; ++m) {
+    const double* x = mal + m * nA;
+    double mb = 0.0;
+    for (int s = 0; s < nA; ++s) {
+      if (v.mature[s]) mb += x[s];
+    }
+    a.m_bar[m] = mb;
+    a.m_tot += mb;
+  }
+  if (v.h_M_param > 0) {
+    a.g_find = a.m_tot / (v.h_M + a.m_tot);
+  } else {
+    a.g_find = a.m_tot > 0.0 ? 1.0 : 0.0;
+  }
+  for (int g = 0; g < ng; ++g) {
+    double pref_sum = 0.0;
+    for (int m = 0; m < ng; ++m) {
+      const double pref = v.eta[g + m * ng] * a.m_bar[m];  // eta[g, m] * M_bar[m]
+      a.pi[g * ng + m] = pref;
+      pref_sum += pref;
+    }
+    a.mate_ok[g] = pref_sum > 0.0;
+    for (int m = 0; m < ng; ++m) {
+      a.pi[g * ng + m] = a.mate_ok[g] ? a.pi[g * ng + m] / pref_sum : 0.0;
+    }
+  }
+}
 
 void RateKernel::eval(int day, const double* y, double* dydt, double* counters) {
   const ModelView& v = mv_;
   const int ng = v.n_g, nE = v.n_E, nL = v.n_L, nP = v.n_P, nA = v.n_A;
-  const int d = day - 1;  // 0-based index into the daily forcing
   const double* egg = y + v.offsets[kE];
   const double* lar = y + v.offsets[kL];
   const double* pup = y + v.offsets[kP];
@@ -38,86 +140,15 @@ void RateKernel::eval(int day, const double* y, double* dydt, double* counters) 
   double* d_u = dydt + v.offsets[kU];
   double* d_f = dydt + v.offsets[kF];
 
-  // ---- daily forcing (S1-S4, S7) -------------------------------------------
-  const double dx = v.dx[d];
-  const double mu_e = v.mu_E[d];
-  const double phi_ov = v.phi_ov[d];
-
-  // ---- transfer rates (S5, S6) ---------------------------------------------
-  const double q_e = nE * v.dx_egg[d] / v.X_E;
-  const double q_l = nL / v.tau_L;
-  const double q_p = nP * dx / v.X_P;
-  // adult rates per sub-stage: q[s, g] = dx * inv_w[s + g * nA] (0 if never reached)
-
-  // ---- block totals ----------------------------------------------------------
-  double sum_e = 0.0, sum_l = 0.0, sum_p = 0.0, sum_m = 0.0, sum_u = 0.0, sum_f = 0.0;
-  for (int i = 0; i < ng * nE; ++i) sum_e += egg[i];
-  for (int i = 0; i < ng * nL; ++i) sum_l += lar[i];
-  for (int i = 0; i < ng * nP; ++i) sum_p += pup[i];
-  for (int i = 0; i < ng * nA; ++i) sum_m += mal[i];
-  for (int i = 0; i < ng * nA; ++i) sum_u += unm[i];
-  for (int i = 0; i < ng * ng * nA; ++i) sum_f += fem[i];
-
-  // ---- hazards (S7) ------------------------------------------------------------
-  double mu_l = v.mu_L0;
-  if (v.larval_per_wound && v.H > 0) mu_l += v.gamma_L * sum_l / v.H;
-  const double mu_p = v.mu_T[d] + v.mu_W * (1.0 - v.moisture[d]);
-  const double mu_f = v.mu_T[d] + v.mu_b_F;
-  const double mu_m = v.mu_T[d] + v.mu_b_M;
-
-  // ---- wound search and egg production (S8, S9) ----------------------------
-  double sum_w = 0.0;
-  for (int g = 0; g < ng; ++g) {
-    for (int m = 0; m < ng; ++m) {
-      const double* x = fem + (g * ng + m) * nA;
-      double w = 0.0;
-      for (int s = 0; s < nA; ++s) {
-        if (v.laying[s]) w += x[s];
-      }
-      w_lay_[g * ng + m] = w;
-      sum_w += w;
-    }
-  }
-  const double n_s = v.search_all_adults ? (sum_m + sum_u + sum_f) : sum_w;
-  const double psi =
-      n_s > 0.0 ? v.sigma0 * (1.0 - std::exp(-v.a_s * dx * v.H / n_s)) : v.sigma0;
-  const int n_cross = ng * ng;
-  for (int k = 0; k < ng; ++k) {
-    const double* col = v.egg_tensor.data() + static_cast<std::size_t>(k) * n_cross;
-    double b = 0.0;
-    for (int r = 0; r < n_cross; ++r) b += col[r] * w_lay_[r];
-    births_[k] = v.R * phi_ov * psi * b;
-  }
-
-  // ---- male availability and mating (S12) ----------------------------------
-  double m_tot = 0.0;
-  for (int m = 0; m < ng; ++m) {
-    const double* x = mal + m * nA;
-    double mb = 0.0;
-    for (int s = 0; s < nA; ++s) {
-      if (v.mature[s]) mb += x[s];
-    }
-    m_bar_[m] = mb;
-    m_tot += mb;
-  }
-  double g_find;
-  if (v.h_M_param > 0) {
-    g_find = m_tot / (v.h_M + m_tot);
-  } else {
-    g_find = m_tot > 0.0 ? 1.0 : 0.0;
-  }
-  for (int g = 0; g < ng; ++g) {
-    double pref_sum = 0.0;
-    for (int m = 0; m < ng; ++m) {
-      const double pref = v.eta[g + m * ng] * m_bar_[m];  // eta[g, m] * M_bar[m]
-      pi_[g * ng + m] = pref;
-      pref_sum += pref;
-    }
-    mate_ok_[g] = pref_sum > 0.0;
-    for (int m = 0; m < ng; ++m) {
-      pi_[g * ng + m] = mate_ok_[g] ? pi_[g * ng + m] / pref_sum : 0.0;
-    }
-  }
+  const DayRates r = day_rates(day);
+  aggregate(r, y);
+  const Aggregates& a = agg_;
+  const double dx = r.dx, mu_e = r.mu_e, q_e = r.q_e, q_l = r.q_l, q_p = r.q_p;
+  const double mu_l = a.mu_l, mu_p = r.mu_p, mu_f = r.mu_f, mu_m = r.mu_m;
+  const double g_find = a.g_find, psi = a.psi;
+  const std::vector<int>& mate_ok_ = a.mate_ok;
+  const std::vector<double>& births_ = a.births;
+  const std::vector<double>& pi_ = a.pi;
 
   // ---- emergence (S10, S11) ------------------------------------------------------
   double sum_emerge = 0.0, sum_in_m = 0.0, sum_in_f = 0.0;
@@ -230,7 +261,7 @@ void RateKernel::eval(int day, const double* y, double* dydt, double* counters) 
     last_e += egg[g * nE + (nE - 1)];
     last_l += lar[g * nL + (nL - 1)];
   }
-  counters[c++] = psi * sum_w;     // egg_batches
+  counters[c++] = psi * a.sum_w;   // egg_batches
   counters[c++] = q_e * last_e;    // larvae_in
   counters[c++] = q_l * last_l;    // pupae_in
   counters[c++] = sum_in_m;        // emerged_male
@@ -241,12 +272,12 @@ void RateKernel::eval(int day, const double* y, double* dydt, double* counters) 
     for (int s = 0; s < nA; ++s) flux_g += mating_flux_[g * nA + s];
     for (int m = 0; m < ng; ++m) counters[c++] = flux_g * pi_[g * ng + m];
   }
-  counters[c++] = mu_e * sum_e;
-  counters[c++] = mu_l * sum_l;
-  counters[c++] = mu_p * sum_p;
-  counters[c++] = mu_m * sum_m;
-  counters[c++] = mu_f * sum_u;
-  counters[c++] = mu_f * sum_f;
+  counters[c++] = mu_e * a.sum_e;
+  counters[c++] = mu_l * a.sum_l;
+  counters[c++] = mu_p * a.sum_p;
+  counters[c++] = mu_m * a.sum_m;
+  counters[c++] = mu_f * a.sum_u;
+  counters[c++] = mu_f * a.sum_f;
   counters[c++] = sen_m;
   counters[c++] = sen_u;
   counters[c++] = sen_f;
@@ -254,18 +285,13 @@ void RateKernel::eval(int day, const double* y, double* dydt, double* counters) 
 
 double RateKernel::max_rate(int day, const double* y) {
   const ModelView& v = mv_;
-  const int d = day - 1;
-  const double dx = v.dx[d];
+  const DayRates r = day_rates(day);
   double sum_l = 0.0;
   const double* lar = y + v.offsets[kL];
   for (int i = 0; i < v.n_g * v.n_L; ++i) sum_l += lar[i];
-  double mu_l = v.mu_L0;
-  if (v.larval_per_wound && v.H > 0) mu_l += v.gamma_L * sum_l / v.H;
-  const double mu_p = v.mu_T[d] + v.mu_W * (1.0 - v.moisture[d]);
-  const double mu_f = v.mu_T[d] + v.mu_b_F;
-  const double mu_m = v.mu_T[d] + v.mu_b_M;
-  double best = std::max({v.n_E * v.dx_egg[d] / v.X_E + v.mu_E[d], v.n_L / v.tau_L + mu_l,
-                          v.n_P * dx / v.X_P + mu_p});
+  const double mu_l = larval_hazard(sum_l);
+  const double dx = r.dx, mu_f = r.mu_f, mu_m = r.mu_m;
+  double best = std::max({r.q_e + r.mu_e, r.q_l + mu_l, r.q_p + r.mu_p});
   double max_iw_f = -1.0, max_iw_m = -1.0;
   for (double iw : v.inv_w_f) {
     if (iw > 0) max_iw_f = std::max(max_iw_f, iw);
@@ -299,4 +325,25 @@ double sg_max_rate_cpp(const Rcpp::List& view, int day, const Rcpp::NumericVecto
   if (day < 1 || day > mv.n_days) Rcpp::stop("day %d is outside the forcing", day);
   sgdrive::RateKernel kernel(mv);
   return kernel.max_rate(day, state.begin());
+}
+
+// Day rates and state aggregates for one state (tests of the shared parts
+// used by both solvers).
+// [[Rcpp::export]]
+Rcpp::List sg_aggregates_cpp(const Rcpp::List& view, int day, const Rcpp::NumericVector& state) {
+  const sgdrive::ModelView mv(view);
+  if (state.size() != mv.n_states) Rcpp::stop("state has the wrong length");
+  if (day < 1 || day > mv.n_days) Rcpp::stop("day %d is outside the forcing", day);
+  sgdrive::RateKernel kernel(mv);
+  const sgdrive::DayRates r = kernel.day_rates(day);
+  kernel.aggregate(r, state.begin());
+  const sgdrive::Aggregates& a = kernel.agg();
+  return Rcpp::List::create(
+      Rcpp::Named("q") = Rcpp::NumericVector::create(r.q_e, r.q_l, r.q_p),
+      Rcpp::Named("mu") = Rcpp::NumericVector::create(r.mu_e, a.mu_l, r.mu_p, r.mu_f, r.mu_m),
+      Rcpp::Named("dx") = r.dx, Rcpp::Named("phi_ov") = r.phi_ov,
+      Rcpp::Named("w_lay") = Rcpp::wrap(a.w_lay), Rcpp::Named("n_s") = a.n_s,
+      Rcpp::Named("psi") = a.psi, Rcpp::Named("births") = Rcpp::wrap(a.births),
+      Rcpp::Named("m_bar") = Rcpp::wrap(a.m_bar), Rcpp::Named("g_find") = a.g_find,
+      Rcpp::Named("pi") = Rcpp::wrap(a.pi), Rcpp::Named("mate_ok") = Rcpp::wrap(a.mate_ok));
 }

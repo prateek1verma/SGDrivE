@@ -116,3 +116,32 @@ test_that("the C++ test entry points check their input", {
   expect_error(rates_cpp(v, 0, numeric(m$n_states)), "outside the forcing")
   expect_error(max_rate_cpp(v, 366, numeric(m$n_states)), "outside the forcing")
 })
+
+test_that("C++ day rates and state aggregates equal the R reference", {
+  agg_cpp <- SGDrivE:::sg_aggregates_cpp
+  for (pn in c("default", "instant", "all_adults", "crowding", "allee", "gp2014")) {
+    for (cn in c("sit", "mendelian")) {
+      m <- mk(param_sets[[pn]], cubes[[cn]], area = 3)
+      s <- setup(m)
+      v <- view(m)
+      x <- rand_state(m, seed = 7)
+      for (d in days) {
+        a <- rates_r(d, x, s, aux = TRUE)$aux
+        cc <- agg_cpp(v, d, x)
+        lab <- paste(pn, cn, d)
+        expect_equal(cc$q, unname(a$q), tolerance = 1e-14, label = lab)
+        expect_equal(cc$mu, unname(a$mu[c("E", "L", "P", "F", "M")]), tolerance = 1e-14)
+        expect_equal(cc$w_lay, as.vector(a$w_lay), tolerance = 1e-14) # mate fastest
+        expect_equal(cc$n_s, a$n_s, tolerance = 1e-14)
+        expect_equal(cc$psi, a$psi, tolerance = 1e-14)
+        expect_equal(cc$births, unname(a$births), tolerance = 1e-13)
+        expect_equal(cc$m_bar, unname(a$m_bar), tolerance = 1e-14)
+        expect_equal(cc$g_find, a$g_find, tolerance = 1e-14)
+        expect_equal(cc$pi, as.vector(t(a$pi)), tolerance = 1e-14) # [g, m], m fastest
+        expect_identical(as.logical(cc$mate_ok), unname(rowSums(a$pi) > 0))
+      }
+    }
+  }
+  expect_error(agg_cpp(view(m), 0, x), "outside the forcing")
+  expect_error(agg_cpp(view(m), 1, x[-1]), "wrong length")
+})

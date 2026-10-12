@@ -1,5 +1,18 @@
 # SGDrivE 0.0.0.9000
 
+## Milestone M4: chain-binomial stochastic solver (in progress)
+
+* Design of the chain-binomial solver (D-022; model specification S15-S19):
+  exact moves along sub-stage chains within a step, mating before ageing,
+  a canonical order of random draws shared by an R reference and the C++
+  step, a deterministic map for testing, per-replicate random-number
+  streams.
+* The C++ rate kernel is split into day rates and state aggregates, shared
+  by the ODE and chain-binomial solvers; ODE results are unchanged.
+* Exact advancement probabilities along a chain over a time step
+  (`src/chains.h`, uniformization; an independent R version by matrix
+  exponential), tested against Poisson and hypoexponential closed forms.
+
 ## Milestone M3: C++ backend
 
 * `simulate_ode()` now uses the C++ backend by default (`backend = "cpp"`,

@@ -20,6 +20,19 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// sg_chain_advance_cpp
+Rcpp::NumericMatrix sg_chain_advance_cpp(const Rcpp::NumericVector& q, int last, double dt);
+RcppExport SEXP _SGDrivE_sg_chain_advance_cpp(SEXP qSEXP, SEXP lastSEXP, SEXP dtSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type q(qSEXP);
+    Rcpp::traits::input_parameter< int >::type last(lastSEXP);
+    Rcpp::traits::input_parameter< double >::type dt(dtSEXP);
+    rcpp_result_gen = Rcpp::wrap(sg_chain_advance_cpp(q, last, dt));
+    return rcpp_result_gen;
+END_RCPP
+}
 // sg_dopri5_test_cpp
 Rcpp::List sg_dopri5_test_cpp(std::string problem, Rcpp::NumericVector y0, double t0, double t1, double rtol, double atol, double fixed_h, double max_steps, double par);
 RcppExport SEXP _SGDrivE_sg_dopri5_test_cpp(SEXP problemSEXP, SEXP y0SEXP, SEXP t0SEXP, SEXP t1SEXP, SEXP rtolSEXP, SEXP atolSEXP, SEXP fixed_hSEXP, SEXP max_stepsSEXP, SEXP parSEXP) {
@@ -73,6 +86,19 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type day(daySEXP);
     Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type state(stateSEXP);
     rcpp_result_gen = Rcpp::wrap(sg_max_rate_cpp(view, day, state));
+    return rcpp_result_gen;
+END_RCPP
+}
+// sg_aggregates_cpp
+Rcpp::List sg_aggregates_cpp(const Rcpp::List& view, int day, const Rcpp::NumericVector& state);
+RcppExport SEXP _SGDrivE_sg_aggregates_cpp(SEXP viewSEXP, SEXP daySEXP, SEXP stateSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::List& >::type view(viewSEXP);
+    Rcpp::traits::input_parameter< int >::type day(daySEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type state(stateSEXP);
+    rcpp_result_gen = Rcpp::wrap(sg_aggregates_cpp(view, day, state));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -135,10 +161,12 @@ END_RCPP
 
 static const R_CallMethodDef CallEntries[] = {
     {"_SGDrivE_sg_backend_info_cpp", (DL_FUNC) &_SGDrivE_sg_backend_info_cpp, 0},
+    {"_SGDrivE_sg_chain_advance_cpp", (DL_FUNC) &_SGDrivE_sg_chain_advance_cpp, 3},
     {"_SGDrivE_sg_dopri5_test_cpp", (DL_FUNC) &_SGDrivE_sg_dopri5_test_cpp, 9},
     {"_SGDrivE_sg_model_view_info_cpp", (DL_FUNC) &_SGDrivE_sg_model_view_info_cpp, 1},
     {"_SGDrivE_sg_rates_cpp", (DL_FUNC) &_SGDrivE_sg_rates_cpp, 3},
     {"_SGDrivE_sg_max_rate_cpp", (DL_FUNC) &_SGDrivE_sg_max_rate_cpp, 3},
+    {"_SGDrivE_sg_aggregates_cpp", (DL_FUNC) &_SGDrivE_sg_aggregates_cpp, 3},
     {"_SGDrivE_sg_kernel_new_cpp", (DL_FUNC) &_SGDrivE_sg_kernel_new_cpp, 1},
     {"_SGDrivE_sg_kernel_rates_cpp", (DL_FUNC) &_SGDrivE_sg_kernel_rates_cpp, 3},
     {"_SGDrivE_sg_kernel_max_rate_cpp", (DL_FUNC) &_SGDrivE_sg_kernel_max_rate_cpp, 3},
