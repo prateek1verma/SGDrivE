@@ -9,3 +9,11 @@ sg_model_view_info_cpp <- function(view) {
     .Call(`_SGDrivE_sg_model_view_info_cpp`, view)
 }
 
+sg_rates_cpp <- function(view, day, state) {
+    .Call(`_SGDrivE_sg_rates_cpp`, view, day, state)
+}
+
+sg_max_rate_cpp <- function(view, day, state) {
+    .Call(`_SGDrivE_sg_max_rate_cpp`, view, day, state)
+}
+

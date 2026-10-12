@@ -6,6 +6,11 @@
   C++ backend needs, flattened once per simulation with 0-based indices,
   column-major matrices and inverse adult sub-stage widths, and validated on
   the C++ side (D-021).
+* C++ rate kernel (`src/rates.h`, `src/rates.cpp`): a block-by-block
+  translation of the R reference rate function, allocation-free per
+  evaluation. Derivatives, counter rates and the largest-rate diagnostic
+  equal the R reference to round-off (about 1e-16; tested to 1e-12) for every
+  option, preset and cube type, including sex-linked cubes.
 
 ## Milestone M2: reference model
 

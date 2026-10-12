@@ -31,10 +31,38 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// sg_rates_cpp
+Rcpp::List sg_rates_cpp(const Rcpp::List& view, int day, const Rcpp::NumericVector& state);
+RcppExport SEXP _SGDrivE_sg_rates_cpp(SEXP viewSEXP, SEXP daySEXP, SEXP stateSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::List& >::type view(viewSEXP);
+    Rcpp::traits::input_parameter< int >::type day(daySEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type state(stateSEXP);
+    rcpp_result_gen = Rcpp::wrap(sg_rates_cpp(view, day, state));
+    return rcpp_result_gen;
+END_RCPP
+}
+// sg_max_rate_cpp
+double sg_max_rate_cpp(const Rcpp::List& view, int day, const Rcpp::NumericVector& state);
+RcppExport SEXP _SGDrivE_sg_max_rate_cpp(SEXP viewSEXP, SEXP daySEXP, SEXP stateSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::List& >::type view(viewSEXP);
+    Rcpp::traits::input_parameter< int >::type day(daySEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type state(stateSEXP);
+    rcpp_result_gen = Rcpp::wrap(sg_max_rate_cpp(view, day, state));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_SGDrivE_sg_backend_info_cpp", (DL_FUNC) &_SGDrivE_sg_backend_info_cpp, 0},
     {"_SGDrivE_sg_model_view_info_cpp", (DL_FUNC) &_SGDrivE_sg_model_view_info_cpp, 1},
+    {"_SGDrivE_sg_rates_cpp", (DL_FUNC) &_SGDrivE_sg_rates_cpp, 3},
+    {"_SGDrivE_sg_max_rate_cpp", (DL_FUNC) &_SGDrivE_sg_max_rate_cpp, 3},
     {NULL, NULL, 0}
 };
 
