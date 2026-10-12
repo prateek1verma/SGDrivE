@@ -5,6 +5,10 @@ sg_backend_info_cpp <- function() {
     .Call(`_SGDrivE_sg_backend_info_cpp`)
 }
 
+sg_dopri5_test_cpp <- function(problem, y0, t0, t1, rtol, atol, fixed_h, max_steps, par) {
+    .Call(`_SGDrivE_sg_dopri5_test_cpp`, problem, y0, t0, t1, rtol, atol, fixed_h, max_steps, par)
+}
+
 sg_model_view_info_cpp <- function(view) {
     .Call(`_SGDrivE_sg_model_view_info_cpp`, view)
 }

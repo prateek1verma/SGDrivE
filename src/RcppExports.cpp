@@ -20,6 +20,25 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// sg_dopri5_test_cpp
+Rcpp::List sg_dopri5_test_cpp(std::string problem, Rcpp::NumericVector y0, double t0, double t1, double rtol, double atol, double fixed_h, double max_steps, double par);
+RcppExport SEXP _SGDrivE_sg_dopri5_test_cpp(SEXP problemSEXP, SEXP y0SEXP, SEXP t0SEXP, SEXP t1SEXP, SEXP rtolSEXP, SEXP atolSEXP, SEXP fixed_hSEXP, SEXP max_stepsSEXP, SEXP parSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< std::string >::type problem(problemSEXP);
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type y0(y0SEXP);
+    Rcpp::traits::input_parameter< double >::type t0(t0SEXP);
+    Rcpp::traits::input_parameter< double >::type t1(t1SEXP);
+    Rcpp::traits::input_parameter< double >::type rtol(rtolSEXP);
+    Rcpp::traits::input_parameter< double >::type atol(atolSEXP);
+    Rcpp::traits::input_parameter< double >::type fixed_h(fixed_hSEXP);
+    Rcpp::traits::input_parameter< double >::type max_steps(max_stepsSEXP);
+    Rcpp::traits::input_parameter< double >::type par(parSEXP);
+    rcpp_result_gen = Rcpp::wrap(sg_dopri5_test_cpp(problem, y0, t0, t1, rtol, atol, fixed_h, max_steps, par));
+    return rcpp_result_gen;
+END_RCPP
+}
 // sg_model_view_info_cpp
 Rcpp::List sg_model_view_info_cpp(const Rcpp::List& view);
 RcppExport SEXP _SGDrivE_sg_model_view_info_cpp(SEXP viewSEXP) {
@@ -60,6 +79,7 @@ END_RCPP
 
 static const R_CallMethodDef CallEntries[] = {
     {"_SGDrivE_sg_backend_info_cpp", (DL_FUNC) &_SGDrivE_sg_backend_info_cpp, 0},
+    {"_SGDrivE_sg_dopri5_test_cpp", (DL_FUNC) &_SGDrivE_sg_dopri5_test_cpp, 9},
     {"_SGDrivE_sg_model_view_info_cpp", (DL_FUNC) &_SGDrivE_sg_model_view_info_cpp, 1},
     {"_SGDrivE_sg_rates_cpp", (DL_FUNC) &_SGDrivE_sg_rates_cpp, 3},
     {"_SGDrivE_sg_max_rate_cpp", (DL_FUNC) &_SGDrivE_sg_max_rate_cpp, 3},

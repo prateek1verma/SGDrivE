@@ -11,6 +11,10 @@
   evaluation. Derivatives, counter rates and the largest-rate diagnostic
   equal the R reference to round-off (about 1e-16; tested to 1e-12) for every
   option, preset and cube type, including sex-linked cubes.
+* Dormand-Prince 5(4) integrator (`src/dopri5.h`): Hairer's PI step-size
+  control, starting step and stiffness test; first-same-as-last (6
+  evaluations per step); tested for accuracy on problems with known
+  solutions, 5th-order convergence and stiffness detection.
 
 ## Milestone M2: reference model
 
