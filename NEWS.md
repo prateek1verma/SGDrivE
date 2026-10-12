@@ -9,9 +9,16 @@
   streams.
 * The C++ rate kernel is split into day rates and state aggregates, shared
   by the ODE and chain-binomial solvers; ODE results are unchanged.
-* Exact advancement probabilities along a chain over a time step
+* Exact advancement probabilities along a chain over a time step, with
+  death in the chain, and their time average over the step for arrivals
   (`src/chains.h`, uniformization; an independent R version by matrix
-  exponential), tested against Poisson and hypoexponential closed forms.
+  exponential), tested against closed forms.
+* Reference chain-binomial step in pure R (stochastic and deterministic
+  modes; internal, the test oracle for the C++ step). The deterministic map
+  matches the ODE derivatives for short steps, and its mean equals the
+  stochastic step. Time-step study (`bench/m4_dt_convergence.R`): placing
+  arrivals at their expected position within the step brings the error at
+  dt = 0.1 from 3-5% to below 0.6% in every block; default dt = 0.1.
 
 ## Milestone M3: C++ backend
 

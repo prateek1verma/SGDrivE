@@ -11,6 +11,7 @@ visible.
 | Script | Measures |
 |---|---|
 | `m2_reference_baseline.R` | Pure-R reference ODE solver (M2): seconds per simulated year, steps per day and time per rate evaluation for five scenarios (1 to 10 genotypes). Results in `results/m2_reference_baseline.csv`. |
+| `m4_dt_convergence.R` | Time step of the chain-binomial solver (M4): deterministic map of the reference step against the ODE for dt from 1 to 0.05 day, six scenarios over a year. Results in `results/m4_dt_convergence.csv`. |
 | `m3_cpp_vs_reference.R` | C++ backend (M3) against the R backend on the same scenarios and tolerances: run times (C++ Dormand-Prince day loop, C++ rates with lsoda, R), speed-ups, time per rate evaluation and the largest difference between backends, plus the full 24-year gp2014 run. Results in `results/m3_cpp_vs_reference.csv`. |
 
 Run benchmarks with the computer plugged in and awake.

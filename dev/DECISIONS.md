@@ -256,33 +256,42 @@ and needs 'deSolve' only when a fallback day occurs.
 
 ## D-022 Chain-binomial solver design for M4 (Accepted, 2026-10-12)
 
-1. **Exact chain moves within a step.** In a step of length dt, an
-   individual in sub-stage i survives with probability exp(-mu dt) (the
-   hazard is the same in every sub-stage of a chain) and the survivors move
-   to sub-stage j >= i, or leave the chain, with the exact probabilities of
-   the pure-advancement chain over dt (matrix exponential of its generator,
-   computed once per day by uniformization; S16). Chain transit times are
-   then exact for any dt, unlike the classic one-sub-stage-per-step
-   chain-binomial, whose sub-stage durations are too long by about
-   (q + mu) dt / 2. The remaining error is first order in dt and comes only
-   from quantities held fixed within a step (wound search, male
-   availability, larval crowding) and from individuals that cross a stage
-   boundary waiting until the end of the step in sub-stage 1 of the next
-   stage.
-2. **Mating before ageing.** Unmated and mated females share their age chain
+1. **Exact chain moves within a step.** For an individual in sub-stage i of
+   a chain (hazard mu, the same in every sub-stage), the probabilities of
+   being alive in sub-stage j >= i at the end of a step of length dt, of
+   having left the chain alive, or of having died in it come from the
+   matrix exponential of the chain's generator with advancement and death
+   (computed once per day by uniformization; S16). An individual that
+   leaves the chain during the step no longer dies at this chain's rate.
+   Chain transit is then exact for any dt, unlike the classic
+   one-sub-stage-per-step chain-binomial, whose sub-stage durations are too
+   long by about (q + mu) dt / 2.
+2. **Arrivals during a step** (eggs laid, individuals leaving the previous
+   stage, emerged adults) enter at times spread over the step. They face
+   the hazard of their new chain for the rest of the step and are placed at
+   their expected position: the time average of the chain's transition
+   matrix over the step (S16). Emerged females can also mate during the rest
+   of the step (S18). (Amended 2026-10-12 in WP2: first drafted as "arrivals
+   wait in sub-stage 1 until the end of the step", which the time-step study
+   showed to be the dominant error, 3-5% at dt = 0.1 against below 0.6%
+   now.) The remaining error comes from quantities held fixed within a step
+   (wound search, male availability, larval crowding).
+3. **Mating before ageing.** Unmated and mated females share their age chain
    and hazard, so mating can be drawn first (probability
    1 - exp(-nu_{g,i} dt), mate genotype from pi) and all females then age
    and die together; only male numbers and the receptivity flag are held at
    their start-of-step values. Large nu causes no stiffness. With
    `mating = "instant"` emerging females draw their mate at emergence.
-3. **Order of events and draws in a step** (all from the state at the start
-   of the step; arrivals enter sub-stage 1 at its end): aggregates; eggs
-   (Poisson per female x mate genotype, multinomial split over offspring
-   genotypes); mating; chain moves of E, L, P, M, U, F in state order
-   (binomial survival, then multinomial destination); emergence (binomial
-   sex, then binomial survival). Multinomials are drawn as sequential
-   conditional binomials in category order. This canonical order lets the
-   R reference step and the C++ step consume the same random numbers.
+   **Order of events and draws in a step** (from the state at the start of
+   the step): aggregates; eggs (Poisson per female x mate genotype,
+   multinomial split over offspring genotypes); mating; chain moves of E, L,
+   P, M, U, F in state order (binomial death, then multinomial destination);
+   emergence (binomial sex, then binomial survival, by genotype); arrivals in
+   state order (binomial death, then multinomial placement; emerged females
+   also binomial mating and multinomial mate genotype). Multinomials are
+   drawn as sequential conditional binomials in category order. This
+   canonical order lets the R reference step and the C++ step consume the
+   same random numbers.
 4. **Deterministic map.** Replacing every draw by its expectation gives a
    deterministic map whose value is the exact conditional mean of one
    stochastic step. Used in tests: replicate mean vs map (large sizes), map
@@ -307,8 +316,12 @@ and needs 'deSolve' only when a fallback day occurs.
    (first day end with every compartment zero), and `meta`. A memory
    estimate is checked before running. A replicate stops early when extinct
    with no releases left.
-9. **Time step.** dt divides the day (1/dt a whole number); default 0.1 day,
-   to be confirmed by the convergence study of the deterministic map (WP2).
+9. **Time step.** dt divides the day (1/dt a whole number); default 0.1
+   day. Confirmed by the time-step study (bench/m4_dt_convergence.R, six
+   scenarios over a year of McAllen weather): at dt = 0.1 the deterministic
+   map is within 0.13-0.55% of the ODE in every block (relative to the
+   block's maximum), within 0.08% in total adults and 0.35% in eggs laid per
+   year; at dt = 0.25 up to 1.9%, 0.27% and 0.9%.
 10. **R reference step** (`.sg_cb_step_r`), pure R, used to test the C++ step
     draw for draw and the deterministic map to round-off.
 11. **Population scale.** The defaults (1 km² node, H = 5 wounds per km²)

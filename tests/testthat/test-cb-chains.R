@@ -4,6 +4,7 @@
 
 adv_cpp <- SGDrivE:::sg_chain_advance_cpp
 adv_r <- SGDrivE:::.sg_chain_advance_r
+avg_r <- SGDrivE:::.sg_chain_average_r
 
 test_that("equal rates give Poisson advancement (Erlang chain)", {
   for (dt in c(0.05, 0.4, 3)) {
@@ -44,12 +45,62 @@ test_that("C++ and R agree for segmented chains that end early, at any step size
       a <- adv_cpp(q, last, dt)
       b <- adv_r(q, last, dt)
       expect_lt(max(abs(a - b)), 1e-12)
-      expect_equal(rowSums(a)[seq_len(last)], rep(1, last), tolerance = 1e-15)
+      expect_equal(rowSums(a)[seq_len(last)], rep(1, last), tolerance = 1e-14) # no death
       expect_true(all(a >= 0) && all(a <= 1))
       if (last < n) expect_true(all(a[(last + 1):n, ] == 0))
       expect_true(all(a[lower.tri(a)] == 0))
     }
   }
+})
+
+test_that("death in the chain: closed forms, and C++ against R", {
+  q <- 2
+  mu <- 0.7
+  t <- 0.4
+  a <- adv_cpp(c(q, q), 2, t, mu = mu)
+  expect_equal(a[1, 1], exp(-(q + mu) * t), tolerance = 1e-14)
+  expect_equal(a[2, 2], exp(-(q + mu) * t), tolerance = 1e-14)
+  # leaving the chain alive from the last class: the hazard stops at exit
+  expect_equal(a[2, 3], q / (q + mu) * (1 - exp(-(q + mu) * t)), tolerance = 1e-14)
+  expect_lt(sum(a[1, ]), 1)
+  # time average for one class: mean over a uniform arrival time
+  r <- (q + mu) * t
+  avg <- adv_cpp(q, 1, t, average = TRUE, mu = mu)
+  expect_equal(avg[1, 1], (1 - exp(-r)) / r, tolerance = 1e-14)
+  expect_equal(avg[1, 2], q / (q + mu) * (1 - (1 - exp(-r)) / r), tolerance = 1e-14)
+  # hazard only: survival exp(-mu t) when nobody can move
+  expect_equal(adv_cpp(c(0, 0), 2, t, mu = mu), diag(exp(-mu * t), 2, 3), tolerance = 1e-14)
+  set.seed(4)
+  for (rep in 1:20) {
+    n <- sample(2:10, 1)
+    last <- sample(seq_len(n), 1)
+    qq <- stats::runif(n, 0.1, 15)
+    qq[-seq_len(last)] <- 0
+    m <- stats::runif(1, 0, 3)
+    for (dt in c(0.01, 0.1, 1, 60)) {
+      expect_lt(max(abs(adv_cpp(qq, last, dt, mu = m) - adv_r(qq, last, dt, m))), 1e-13)
+      expect_lt(max(abs(adv_cpp(qq, last, dt, TRUE, m) - avg_r(qq, last, dt, m))), 1e-13)
+    }
+  }
+})
+
+test_that("time-averaged advancement against its R counterpart and limits", {
+  set.seed(2)
+  for (rep in 1:20) {
+    n <- sample(2:10, 1)
+    last <- sample(seq_len(n), 1)
+    q <- stats::runif(n, 0.1, 15)
+    q[-seq_len(last)] <- 0
+    for (dt in c(1e-3, 0.1, 1, 100)) {
+      a <- adv_cpp(q, last, dt, average = TRUE)
+      expect_lt(max(abs(a - avg_r(q, last, dt))), 1e-13)
+      expect_equal(rowSums(a)[seq_len(last)], rep(1, last), tolerance = 1e-14)
+    }
+  }
+  # a short step: arrivals have moved on by about half of A(dt)
+  q <- c(4, 4, 4)
+  h <- 1e-6
+  expect_equal(adv_cpp(q, 3, h, average = TRUE)[1, 2], q[1] * h / 2, tolerance = 1e-5)
 })
 
 test_that("advancement has the semigroup property and the right short-step limit", {
@@ -77,6 +128,8 @@ test_that("degenerate chains are handled", {
   expect_error(adv_cpp(1, 2, 1), "between 0")
   expect_error(adv_cpp(1, 1, -1), ">= 0")
   expect_error(adv_cpp(-1, 1, 1), "finite and >= 0")
+  expect_error(adv_cpp(1, 1, 1, mu = -1), "`mu` must be")
+  expect_identical(avg_r(c(1, 1), 0, 1), matrix(0, 2, 3))
 })
 
 test_that("chains of a real model: adult chains of a short-lived genotype", {

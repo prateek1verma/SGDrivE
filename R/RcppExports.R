@@ -5,8 +5,8 @@ sg_backend_info_cpp <- function() {
     .Call(`_SGDrivE_sg_backend_info_cpp`)
 }
 
-sg_chain_advance_cpp <- function(q, last, dt) {
-    .Call(`_SGDrivE_sg_chain_advance_cpp`, q, last, dt)
+sg_chain_advance_cpp <- function(q, last, dt, average = FALSE, mu = 0.0) {
+    .Call(`_SGDrivE_sg_chain_advance_cpp`, q, last, dt, average, mu)
 }
 
 sg_dopri5_test_cpp <- function(problem, y0, t0, t1, rtol, atol, fixed_h, max_steps, par) {

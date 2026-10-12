@@ -263,18 +263,30 @@ g_find, π_{g,m} (S12) and the larval hazard μ_L (S7) are computed from the
 current counts and held fixed for the step.
 
 **(S16) Chain moves.** For a chain with sub-stage rates q_1, …, q_n, last
-reached sub-stage l and hazard μ (the same in every sub-stage), let A(dt) =
-exp(G dt), where G is the generator of pure advancement (sub-stage i → i + 1
-at rate q_i for i < l, and from l out of the chain). A is computed once per
-day for each chain (E, L, P per day; adults per genotype and sex). From
-sub-stage i with X_i individuals:
+reached sub-stage l and hazard μ (the same in every sub-stage), let A(t) =
+exp(G t), where G is the generator of advancement (sub-stage i → i + 1 at
+rate q_i for i < l, and from l out of the chain, an absorbing state) and
+death (rate μ in every sub-stage). A_{i,j}(dt) is the probability of being
+alive in sub-stage j at the end of a step that started in sub-stage i,
+A_{i,out}(dt) of having left the chain alive (death stops acting at exit),
+and δ_i = 1 − Σ_j A_{i,j} − A_{i,out} of having died in it. A is computed
+once per day for each chain (E, P per day; adults per genotype and sex;
+larvae in every step, as μ_L includes crowding from S15). From sub-stage i
+with X_i individuals:
 
-    deaths   D_i ~ Binomial(X_i, 1 − e^{−μ dt})
-    movers   (N_{i→i}, …, N_{i→l}, N_{i→out}) ~ Multinomial(X_i − D_i; A_{i,i}, …, A_{i,l}, A_{i,out})
+    deaths   D_i ~ Binomial(X_i, δ_i)
+    movers   (N_{i→i}, …, N_{i→l}, N_{i→out}) ~ Multinomial(X_i − D_i; A_{i,·} / (1 − δ_i))
 
-Leaving the chain means: E → L_1, L → P_1, P → emergence (S19), adults →
-death by old age. Transit through a chain is exact for any dt; for larvae
-μ_L includes crowding from S15.
+Leaving the chain means: E → L, L → P, P → emergence (S19), adults → death
+by old age. Transit through a chain is exact for any dt.
+
+**Arrivals.** Individuals entering a chain during a step (eggs laid, those
+leaving the previous stage, emerged adults) enter at times spread uniformly
+over the step. With Ā = (1/dt) ∫_0^dt A(u) du, an arrival dies before the end
+of the step with probability δ̄ = 1 − Σ_j Ā_{1,j} − Ā_{1,out}, and survivors
+are placed over sub-stages by Multinomial(Ā_{1,·} / (1 − δ̄)), the small
+probability Ā_{1,out} of leaving again being kept in sub-stage l. Arrivals of
+a step are added at its end.
 
 **(S17) Eggs.** For each female × mate genotype pair (g, m), with
 T[g,m,k] = s_g · ih[g,m,k] · τ[g,m,k] (S9):
@@ -282,7 +294,7 @@ T[g,m,k] = s_g · ih[g,m,k] · τ[g,m,k] (S9):
     N_{g,m}         ~ Poisson(R φ_ov Ψ W_{g,m} Σ_k T[g,m,k] dt)
     (N_{g,m,k})_k   ~ Multinomial(N_{g,m}; T[g,m,·] / Σ_k T[g,m,k])
 
-The eggs enter E_{k,1} at the end of the step.
+The eggs arrive in the egg chain of genotype k.
 
 **(S18) Mating** (before ageing; unmated and mated females share age chain
 and hazard, so the order does not bias ageing or survival):
@@ -291,30 +303,36 @@ and hazard, so the order does not bias ageing or survival):
     (Y_{g,m,i})_m       ~ Multinomial(Y_{g,i}; π_{g,·})
 
 The mated females move to F_{g,m,i} and then age with all other females
-(S16). ν_{g,i} = 0 when no compatible male is present. With
-`mating = "instant"` the receptivity flag is not used, and emerging females
-are split over mates by Multinomial(π_{g,·}) at emergence (to U_{g,1} only
-when no compatible male is present).
+(S16). ν_{g,i} = 0 when no compatible male is present. Emerged females that
+survive their arrival mate during the rest of the step with probability
+1 − (1 − e^{−ν_{g,1} dt}) / (ν_{g,1} dt) (a uniform arrival time), mates from
+π_{g,·}. With `mating = "instant"` the receptivity flag is not used, and
+surviving emerged females are split over mates by Multinomial(π_{g,·}) (to U
+only when no compatible male is present).
 
 **(S19) Emergence.** For the Z_g pupae of genotype g leaving the pupal chain:
 
     females Z^F_g ~ Binomial(Z_g, φ_g)
-    into U_{g,1} (or F, S18): Binomial(Z^F_g, ξ_F,g)    into M_{g,1}: Binomial(Z_g − Z^F_g, ξ_M,g)
+    surviving females: Binomial(Z^F_g, ξ_F,g)      surviving males: Binomial(Z_g − Z^F_g, ξ_M,g)
 
-the rest die at emergence.
+the rest die at emergence. Survivors arrive in the adult chains (S16, S18).
 
 **Order of draws in a step.** Aggregates (S15); eggs (S17, pairs (g, m) with
 m fastest); mating (S18, genotype then sub-stage); chain moves (S16) block by
 block (E, L, P, M, U, F) and compartment by compartment in state order;
-emergence (S19, by genotype). All draws use the counts at the start of the
-step; arrivals are added at its end. Multinomials are sequential conditional
-binomials in category order. The R reference step and the C++ step follow
-this order, so they use the same random numbers.
+emergence (S19, by genotype); arrivals block by block in state order (eggs
+by genotype, larvae, pupae, males; then females by genotype: death, mating,
+mates, placement of unmated, placement of mated by mate genotype). All draws
+use the counts at the start of the step except that mating moves females
+before the chain moves. Multinomials are sequential conditional binomials in
+category order. The R reference step and the C++ step follow this order, so
+they use the same random numbers.
 
 **Deterministic map.** Replacing every draw by its expectation gives a
 deterministic map, the exact conditional mean of one step. As dt → 0 it
-converges to the ODE at first order (from S15 quantities held fixed and from
-stage-boundary crossings waiting until the end of the step).
+converges to the ODE, with an error from the S15 quantities held fixed
+within a step; at the default dt = 0.1 it is within about 0.5% of the ODE
+in every block (bench/m4_dt_convergence.R).
 
 **Integers.** Non-integer initial states and releases are rounded without
 bias in each replicate: x → ⌊x⌋ + Bernoulli(x − ⌊x⌋). Counts never become

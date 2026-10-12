@@ -21,15 +21,17 @@ BEGIN_RCPP
 END_RCPP
 }
 // sg_chain_advance_cpp
-Rcpp::NumericMatrix sg_chain_advance_cpp(const Rcpp::NumericVector& q, int last, double dt);
-RcppExport SEXP _SGDrivE_sg_chain_advance_cpp(SEXP qSEXP, SEXP lastSEXP, SEXP dtSEXP) {
+Rcpp::NumericMatrix sg_chain_advance_cpp(const Rcpp::NumericVector& q, int last, double dt, bool average, double mu);
+RcppExport SEXP _SGDrivE_sg_chain_advance_cpp(SEXP qSEXP, SEXP lastSEXP, SEXP dtSEXP, SEXP averageSEXP, SEXP muSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const Rcpp::NumericVector& >::type q(qSEXP);
     Rcpp::traits::input_parameter< int >::type last(lastSEXP);
     Rcpp::traits::input_parameter< double >::type dt(dtSEXP);
-    rcpp_result_gen = Rcpp::wrap(sg_chain_advance_cpp(q, last, dt));
+    Rcpp::traits::input_parameter< bool >::type average(averageSEXP);
+    Rcpp::traits::input_parameter< double >::type mu(muSEXP);
+    rcpp_result_gen = Rcpp::wrap(sg_chain_advance_cpp(q, last, dt, average, mu));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -161,7 +163,7 @@ END_RCPP
 
 static const R_CallMethodDef CallEntries[] = {
     {"_SGDrivE_sg_backend_info_cpp", (DL_FUNC) &_SGDrivE_sg_backend_info_cpp, 0},
-    {"_SGDrivE_sg_chain_advance_cpp", (DL_FUNC) &_SGDrivE_sg_chain_advance_cpp, 3},
+    {"_SGDrivE_sg_chain_advance_cpp", (DL_FUNC) &_SGDrivE_sg_chain_advance_cpp, 5},
     {"_SGDrivE_sg_dopri5_test_cpp", (DL_FUNC) &_SGDrivE_sg_dopri5_test_cpp, 9},
     {"_SGDrivE_sg_model_view_info_cpp", (DL_FUNC) &_SGDrivE_sg_model_view_info_cpp, 1},
     {"_SGDrivE_sg_rates_cpp", (DL_FUNC) &_SGDrivE_sg_rates_cpp, 3},
