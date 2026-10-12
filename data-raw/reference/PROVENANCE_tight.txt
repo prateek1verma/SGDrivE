@@ -21,3 +21,7 @@ legacy convergence, 1960-1962, max relative difference rtol 1e-10 vs 1e-11:
   pupae_in  1.04e-09
   adults_in  7.11e-10
 fixture: tests/testthat/fixtures/gp2014_mcallen_ode_tight_3yr.rds (daily totals 1960-1962)
+fixture: tests/testthat/fixtures/gp2014_mcallen_ode_tight_24yr_weekly.rds
+  (totals every 7th day 1960-1983; added 2026-10-11 by step 4 of
+  make_reference_tight.R, derived from the existing reference file without
+  rerunning the legacy model)

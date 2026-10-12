@@ -1,7 +1,8 @@
 # M2 milestone check: with one wild genotype and the "gp2014" preset, the
 # reference ODE reproduces the legacy Gutierrez & Ponti (2014) ODE translation
 # (run without population floors at rtol 1e-10; data-raw/make_reference_tight.R)
-# to a relative error of 1e-6 in every daily total.
+# to a relative error of 1e-6 in every daily total. Milestone M3 check: so does
+# the C++ backend over the full 24 years, routinely (D-021).
 
 skip_if_not_installed("deSolve")
 
@@ -23,7 +24,7 @@ max_rel_error <- function(ours, ref) {
   vapply(names(ours), function(v) max(abs(ours[[v]] - ref[[v]])) / max(abs(ref[[v]])), 0)
 }
 
-test_that("gp2014 configuration matches the legacy ODE over 1960 (relative error < 1e-6)", {
+test_that("R backend: gp2014 matches the legacy ODE over 1960 (relative error < 1e-6)", {
   ref <- readRDS(test_path("fixtures", "gp2014_mcallen_ode_tight_3yr.rds"))
   wx <- sg_forcing(sg_example_weather(), gp, start = "1960-01-01", end = "1960-12-31")
   m <- sg_model(gp, wild, wx)
@@ -34,7 +35,20 @@ test_that("gp2014 configuration matches the legacy ODE over 1960 (relative error
   expect_true(all(err < 1e-6), label = paste(names(err), signif(err, 3), collapse = ", "))
 })
 
-test_that("gp2014 configuration matches the legacy ODE over 1960-1983 (slow)", {
+test_that("C++ backend: gp2014 matches the legacy ODE over 1960-1983 (relative error < 1e-6)", {
+  ref <- readRDS(test_path("fixtures", "gp2014_mcallen_ode_tight_24yr_weekly.rds"))
+  wx <- sg_forcing(sg_example_weather(), gp)
+  m <- sg_model(gp, wild, wx)
+  sim <- simulate_ode(m, backend = "cpp", rtol = 1e-8, atol = 1e-10)
+  rows <- match(as.Date(ref$date), sim$date[-1])
+  expect_false(anyNA(rows))
+  err <- max_rel_error(legacy_totals(sim)[rows, ], ref)
+  expect_true(all(err < 1e-6), label = paste(names(err), signif(err, 3), collapse = ", "))
+  # the explicit integrator never needed the stiff fallback over 24 years (O-006)
+  expect_identical(sim$meta$fallback_days, 0L)
+})
+
+test_that("R backend: gp2014 matches the legacy ODE over 1960-1983 (slow)", {
   skip_if_not(
     identical(Sys.getenv("SGDRIVE_SLOW_TESTS"), "true"),
     "slow test: set SGDRIVE_SLOW_TESTS=true to run"

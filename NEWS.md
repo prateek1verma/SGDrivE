@@ -28,6 +28,16 @@
   `fallback` (day integrated by the `lsoda` fallback); `meta` records
   `stiff_fallback` and the number of fallback days, and `print()` reports
   them.
+* Backend equivalence: every M2 simulation, biology and stress test now runs
+  on both backends, and a new test compares them directly over ten scenarios
+  (options, releases of every kind, lifespan costs, the gp2014 preset,
+  MGDrivE homing-drive and sex-linked cubes) to 1e-8.
+* The C++ backend reproduces the legacy Gutierrez & Ponti (2014) ODE over the
+  full 24 years (1960-1983) to 6e-9 in a routine test (4.5 s; new fixture
+  of totals every 7th day), without needing the stiff fallback on any day.
+* `bench/m3_cpp_vs_reference.R`: the C++ backend is 12-73 times faster than
+  the R backend at the same tolerances (24 years of McAllen weather: 4.5 s
+  instead of about 8 minutes).
 
 ## Milestone M2: reference model
 

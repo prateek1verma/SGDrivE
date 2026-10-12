@@ -92,7 +92,7 @@ sim
 #>   final totals: E 0.49452, L 0.30710, P 0.67484, M 0.47005, U 0.01378, F 0.45628
 #>   eggs laid 2669.2; adults emerged 1229.2; released 10000
 #>   solver: 42 steps/day (max 95), stiff method on 0 of 731 days, largest rate 13.5 per day, min state -4.41e-13
-#>   run time 8.03 s
+#>   run time 7.77 s
 ```
 
 With one wild genotype and the `"gp2014"` preset, the reference solver

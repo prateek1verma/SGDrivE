@@ -32,24 +32,24 @@ test_that("simulate_ode() returns daily states, counters, releases and diagnosti
   expect_identical(sim$meta$backend, "R")
 })
 
-test_that("flow accounting closes over a simulation, with and without releases", {
-  expect_lt(flow_error(simulate_ode(m3)), 1e-12)
+sg_test_each_backend("flow accounting closes over a simulation, with and without releases", {
+  expect_lt(flow_error(sim_ode(m3)), 1e-12)
   rel <- c(
     sg_releases("aa", "adult", "male", times = c(5, 20, 35), number = 40),
     sg_releases("aa", "adult", "female", times = 10, number = 7),
     sg_releases("Aa", "pupa", times = 15, number = 3),
     sg_releases("aa", "egg", times = 25, number = 11)
   )
-  sim <- simulate_ode(sg_model(p, cube3, wx60, rel))
+  sim <- sim_ode(sg_model(p, cube3, wx60, rel))
   expect_lt(flow_error(sim), 1e-12)
   expect_identical(colSums(sim$releases), c(E = 11, P = 3, M = 120, U = 7))
   expect_identical(unname(sim$releases[5, "M"]), 40)
 })
 
-test_that("releases are added at the start of their day", {
+sg_test_each_backend("releases are added at the start of their day", {
   rel <- sg_releases("aa", "pupa", times = 3, number = 100)
   m <- sg_model(p, cube3, wx60, rel)
-  sim <- simulate_ode(m, init = sg_init(m, values = c(E = 0)), output_every = 1)
+  sim <- sim_ode(m, init = sg_init(m, values = c(E = 0)), output_every = 1)
   pupae_aa <- rowSums(sim$state[, sg_state_index(m, "P", genotype = "aa")])
   expect_identical(pupae_aa[1:3], c(0, 0, 0)) # days 0 to 2
   # end of day 3: 100 released at its start, minus that day's mortality and ageing out
@@ -57,8 +57,8 @@ test_that("releases are added at the start of their day", {
   expect_lt(pupae_aa[4], 100)
 })
 
-test_that("an empty population stays empty", {
-  sim <- simulate_ode(m3, init = sg_init(m3, values = c(E = 0)))
+sg_test_each_backend("an empty population stays empty", {
+  sim <- sim_ode(m3, init = sg_init(m3, values = c(E = 0)))
   expect_identical(sum(abs(sim$state)), 0)
   expect_identical(sum(abs(sim$counters)), 0)
 })
@@ -72,8 +72,8 @@ test_that("results do not depend on the integration method", {
   expect_true(all(is.na(b$diagnostics$stiff)))
 })
 
-test_that("states stay non-negative up to round-off", {
-  sim <- simulate_ode(m3)
+sg_test_each_backend("states stay non-negative up to round-off", {
+  sim <- sim_ode(m3)
   expect_gt(min(sim$diagnostics$min_state), -1e-8)
   expect_true(all(sim$diagnostics$max_rate > 0))
   expect_true(all(sim$diagnostics$steps > 0))
@@ -87,13 +87,13 @@ test_that("output_every thins the stored states but keeps daily counters", {
   expect_equal(sim$state[nrow(sim$state), ], full$state[61, ], tolerance = sg_tol_exact)
 })
 
-test_that("init is checked against the model", {
+sg_test_each_backend("init is checked against the model", {
   m_other <- sg_model(sg_params(R = 50), cube3, wx60)
-  expect_error(simulate_ode(m3, init = sg_init(m_other)), "different model")
+  expect_error(sim_ode(m3, init = sg_init(m_other)), "different model")
   x <- as.numeric(sg_init(m3))
-  sim <- simulate_ode(m3, init = x)
+  sim <- sim_ode(m3, init = x)
   expect_identical(unname(sim$state[1, ]), x)
-  expect_error(simulate_ode(m3, init = x[-1]), "length")
+  expect_error(sim_ode(m3, init = x[-1]), "length")
 })
 
 test_that("invalid arguments give informative errors", {

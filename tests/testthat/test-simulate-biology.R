@@ -1,6 +1,6 @@
-# M2 biological checks of the reference solver over time: Hardy-Weinberg
-# neutrality, the instant-mating limit, SIT mechanics, genotype lifespan
-# costs (D-002, D-018) and sex-linked cubes.
+# Biological checks of the solvers over time (M2, run on both backends since
+# M3): Hardy-Weinberg neutrality, the instant-mating limit, SIT mechanics,
+# genotype lifespan costs (D-002, D-018) and sex-linked cubes.
 
 skip_if_not_installed("deSolve")
 
@@ -13,9 +13,9 @@ geno_totals <- function(m, sim, block, row) {
   }, 0)
 }
 
-test_that("a neutral Mendelian cube stays at Hardy-Weinberg with constant allele frequency", {
+sg_test_each_backend("a neutral Mendelian cube stays at Hardy-Weinberg, allele frequency constant", {
   m <- sg_model(p, sg_cube(sg_test_cube_mendelian()), wx90)
-  sim <- simulate_ode(m, sg_init(m, "hardy_weinberg", alleles = c(A = 0.3, a = 0.7)),
+  sim <- sim_ode(m, sg_init(m, "hardy_weinberg", alleles = c(A = 0.3, a = 0.7)),
     rtol = 1e-10, atol = 1e-12
   )
   for (b in c("E", "L", "P", "M", "U", "F")) {
@@ -39,7 +39,7 @@ test_that("a neutral Mendelian cube stays at Hardy-Weinberg with constant allele
   }
 })
 
-test_that("rate mating approaches instant mating as nu grows (S14)", {
+sg_test_each_backend("rate mating approaches instant mating as nu grows (S14)", {
   pr <- sg_params(nu = 1000)
   pi <- sg_params(mating = "instant")
   cube <- sg_cube(sg_test_cube_mendelian())
@@ -47,8 +47,8 @@ test_that("rate mating approaches instant mating as nu grows (S14)", {
   period <- c("1971-05-01", "1971-06-14")
   mr <- sg_model(pr, cube, sg_forcing(sg_example_weather(), pr, period[1], period[2]))
   mi <- sg_model(pi, cube, sg_forcing(sg_example_weather(), pi, period[1], period[2]))
-  sr <- simulate_ode(mr, sg_init(mr))
-  si <- simulate_ode(mi, sg_init(mi))
+  sr <- sim_ode(mr, sg_init(mr))
+  si <- sim_ode(mi, sg_init(mi))
   tot_r <- SGDrivE:::.sg_sim_block_totals(sr)
   tot_i <- SGDrivE:::.sg_sim_block_totals(si)
   # unmated females are a vanishing fraction; all other blocks agree closely
@@ -61,15 +61,15 @@ test_that("rate mating approaches instant mating as nu grows (S14)", {
   expect_lt(max(abs(females_r - females_i)) / max(tot_i[, "F"]), 5e-3)
 })
 
-test_that("sterile male releases divert matings and suppress the wild population", {
+sg_test_each_backend("sterile male releases divert matings and suppress the wild population", {
   raw <- sg_test_cube_sit(residual = 0)
   raw$eta[, "S"] <- 0.5
   cube <- sg_cube(raw)
   control <- sg_model(p, cube, wx90)
   rel <- sg_releases("S", "adult", "male", times = seq(1, 90, by = 3), number = 50)
   sit <- sg_model(p, cube, wx90, rel)
-  s0 <- simulate_ode(control)
-  s1 <- simulate_ode(sit)
+  s0 <- sim_ode(control)
+  s1 <- sim_ode(sit)
   k <- s1$counters
   share_sterile <- sum(k[, "matings[W|S]"]) / sum(k[, "matings[W|S]"] + k[, "matings[W|W]"])
   expect_gt(share_sterile, 0.8)
@@ -84,27 +84,27 @@ test_that("sterile male releases divert matings and suppress the wild population
   expect_lt(wild_adults(sit, s1), 0.5 * wild_adults(control, s0))
 })
 
-test_that("a genotype whose lifespan ends before first oviposition never lays (D-002, D-018)", {
+sg_test_each_backend("a genotype whose lifespan ends before oviposition never lays (D-018)", {
   cube <- sg_cube(sg_test_cube_sit(), ell = c(W = 1, S = 0.25))
   m <- sg_model(p, cube, wx90)
   init <- sg_init(m, values = c(M = 1, F = 1), genotypes = c(W = 0.5, S = 0.5))
-  sim <- simulate_ode(m, init)
+  sim <- sim_ode(m, init)
   f_s <- sim$state[, sg_state_index(m, "F", genotype = "S")]
   expect_true(all(f_s[, 4:10] == 0)) # never enters the laying classes
   # eggs come only from wild-type mothers: compare with a run without S mothers
   init_w <- init
   init_w[sg_state_index(m, "F", genotype = "S")] <- 0
-  sim_w <- simulate_ode(m, init_w)
+  sim_w <- sim_ode(m, init_w)
   expect_equal(sim$counters[1:10, "eggs_laid[W]"], sim_w$counters[1:10, "eggs_laid[W]"],
     tolerance = 1e-6
   )
 })
 
-test_that("a shorter lifespan shortens adult survival", {
+sg_test_each_backend("a shorter lifespan shortens adult survival", {
   cube <- sg_cube(sg_test_cube_sit(), ell = c(W = 1, S = 0.5))
   m <- sg_model(p, cube, wx90)
   init <- sg_init(m, values = c(M = 1), genotypes = c(W = 0.5, S = 0.5))
-  sim <- simulate_ode(m, init)
+  sim <- sim_ode(m, init)
   males <- function(g) rowSums(sim$state[, sg_state_index(m, "M", genotype = g)])
   life_w <- sum(males("W")) # area under the survival curve, cohorts of equal size
   life_s <- sum(males("S"))
@@ -112,12 +112,12 @@ test_that("a shorter lifespan shortens adult survival", {
   expect_gt(life_s, 0.3 * life_w)
 })
 
-test_that("sex-linked cubes: males and females only from genotypes of their sex", {
+sg_test_each_backend("sex-linked cubes: males and females only from genotypes of their sex", {
   skip_if_not_installed("MGDrivE")
   cube <- sg_cube(MGDrivE::cubeXShredderY())
   wx <- sg_forcing(sg_example_weather(), p, start = "1971-05-01", end = "1971-06-14")
   m <- sg_model(p, cube, wx)
-  sim <- simulate_ode(m)
+  sim <- sim_ode(m)
   expect_false(anyNA(sim$state))
   female_only <- cube$genotypes[cube$phi == 1]
   male_only <- cube$genotypes[cube$phi == 0]

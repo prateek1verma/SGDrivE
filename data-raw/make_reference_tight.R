@@ -11,6 +11,9 @@
 #   data-raw/reference/PROVENANCE_tight.txt
 #   tests/testthat/fixtures/gp2014_mcallen_ode_tight_3yr.rds    (1960-1962,
 #     daily totals only, used by the routine regression test)
+#   tests/testthat/fixtures/gp2014_mcallen_ode_tight_24yr_weekly.rds
+#     (1960-1983, totals every 7th day, used by the routine 24-year regression
+#     test of the C++ backend)
 #
 # Run from the package root:  Rscript data-raw/make_reference_tight.R
 # Takes a few minutes.
@@ -68,6 +71,11 @@ print(signif(rel_diff, 3))
 fixture <- full3[, c("date", cols)]
 saveRDS(fixture, file.path(fix_dir, "gp2014_mcallen_ode_tight_3yr.rds"), compress = "xz")
 
+# 4. Compact 24-year fixture: totals every 7th day 1960-1983 (68 kB instead of
+#    450 kB for daily values; any drift of the solution still shows).
+weekly <- full$value[seq(7L, nrow(full$value), by = 7L), c("date", cols)]
+saveRDS(weekly, file.path(fix_dir, "gp2014_mcallen_ode_tight_24yr_weekly.rds"), compress = "xz")
+
 md5 <- tools::md5sum(c(weather_file, file.path("scripts", c(
   "gutierrez_ponti_2014_pbdm.R", "gp2014_ode.R"
 ))))
@@ -84,7 +92,9 @@ prov <- c(
   sprintf("run time: full %.1f s; 3-year check at rtol 1e-11 %.1f s", full$time, tighter$time),
   "legacy convergence, 1960-1962, max relative difference rtol 1e-10 vs 1e-11:",
   paste0("  ", names(rel_diff), "  ", signif(rel_diff, 3)),
-  "fixture: tests/testthat/fixtures/gp2014_mcallen_ode_tight_3yr.rds (daily totals 1960-1962)"
+  "fixture: tests/testthat/fixtures/gp2014_mcallen_ode_tight_3yr.rds (daily totals 1960-1962)",
+  "fixture: tests/testthat/fixtures/gp2014_mcallen_ode_tight_24yr_weekly.rds",
+  "  (totals every 7th day 1960-1983)"
 )
 writeLines(prov, file.path(out_dir, "PROVENANCE_tight.txt"))
 message("Wrote ", out_dir, " and ", fix_dir)

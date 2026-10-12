@@ -1,13 +1,13 @@
-# Stress scenarios for the reference solver. They pin down accuracy and
-# stiffness behaviour in demanding regimes, and are reused in milestone M3 to
-# test the C++ solver against this reference:
+# Stress scenarios for both backends (M2 reference, M3 C++). They pin down
+# accuracy and stiffness behaviour in demanding regimes:
 #   * very large sterile-male releases (10x to 1000x the wild males);
 #   * larval crowding with a very large release of fertile eggs (a stiffness
 #     source that grows with population size);
 #   * a very large mating rate (artificial stiffness);
 #   * many egg sub-stages (fast transfer rates).
-# In each scenario two different integrators (lsoda and the implicit radau)
-# must agree, and states must stay non-negative up to round-off.
+# In each scenario two different integrators must agree (the backend's own
+# explicit one, lsoda for R and Dormand-Prince for C++, and the implicit
+# radau), and states must stay non-negative up to round-off.
 
 skip_if_not_installed("deSolve")
 skip_on_cran()
@@ -26,19 +26,20 @@ rel_diff <- function(a, b, cols, floor_rel = 1e-9) {
   xb <- rowSums(b$state[, cols, drop = FALSE])
   max(abs(xa - xb) / pmax(xb, floor_rel * max(xb)))
 }
-both_methods <- function(m, init = NULL) {
+both_methods <- function(m, backend, init = NULL) {
+  main <- if (backend == "R") "lsoda" else "dopri5"
   list(
-    lsoda = simulate_ode(m, init, method = "lsoda", rtol = 1e-9, atol = 1e-12),
-    radau = simulate_ode(m, init, method = "radau", rtol = 1e-9, atol = 1e-12)
+    main = simulate_ode(m, init, backend, method = main, rtol = 1e-9, atol = 1e-12),
+    radau = simulate_ode(m, init, backend, method = "radau", rtol = 1e-9, atol = 1e-12)
   )
 }
 
-test_that("very large sterile-male releases add no stiffness and stay accurate", {
+sg_test_each_backend("very large sterile-male releases add no stiffness and stay accurate", {
   p <- sg_params()
   wx <- sg_forcing(wx_all, p, period[1], period[2])
   cube <- sit_cube
   m0 <- sg_model(p, cube, wx)
-  control <- simulate_ode(m0, rtol = 1e-9, atol = 1e-12)
+  control <- sim_ode(m0, rtol = 1e-9, atol = 1e-12)
   wm_idx <- sg_state_index(m0, "M", genotype = "W")
   wild_males <- mean(rowSums(control$state[, wm_idx]))
   for (k in c(10, 100, 1000)) {
@@ -49,48 +50,49 @@ test_that("very large sterile-male releases add no stiffness and stay accurate",
       sg_state_index(m, "M", genotype = "W"), sg_state_index(m, "U", genotype = "W"),
       sg_state_index(m, "F", genotype = "W", mate = "W")
     )
-    s <- both_methods(m)
-    expect_lt(rel_diff(s$lsoda, s$radau, wild), 1e-6)
-    expect_identical(sum(s$lsoda$diagnostics$stiff), 0L) # release size adds no stiffness
-    expect_equal(max(s$lsoda$diagnostics$max_rate), max(control$diagnostics$max_rate))
-    expect_gt(min(s$lsoda$diagnostics$min_state), -1e-8)
+    s <- both_methods(m, backend)
+    expect_lt(rel_diff(s$main, s$radau, wild), 1e-6)
+    expect_identical(sum(s$main$diagnostics$stiff), 0L) # release size adds no stiffness
+    expect_identical(sum(s$main$diagnostics$fallback), 0L)
+    expect_equal(max(s$main$diagnostics$max_rate), max(control$diagnostics$max_rate))
+    expect_gt(min(s$main$diagnostics$min_state), -1e-8)
     # releases suppress the wild population
-    expect_lt(sum(s$lsoda$state[91, wild]), sum(control$state[91, wild]))
+    expect_lt(sum(s$main$state[91, wild]), sum(control$state[91, wild]))
   }
 })
 
-test_that("larval crowding with a huge fertile egg release stays accurate", {
+sg_test_each_backend("larval crowding with a huge fertile egg release stays accurate", {
   p <- sg_params(larval_dd = "per_wound", gamma_L = 0.01)
   wx <- sg_forcing(wx_all, p, period[1], period[2])
   m <- sg_model(
     p, sg_cube(sg_test_cube_wild()), wx,
     sg_releases("W", "egg", times = 10, number = 1e6)
   )
-  s <- both_methods(m)
+  s <- both_methods(m, backend)
   lar <- sg_state_index(m, "L")
-  expect_lt(rel_diff(s$lsoda, s$radau, lar), 1e-6)
-  expect_lt(rel_diff(s$lsoda, s$radau, seq_len(m$n_states)), 1e-6)
-  expect_gt(min(s$lsoda$diagnostics$min_state), -1e-8)
+  expect_lt(rel_diff(s$main, s$radau, lar), 1e-6)
+  expect_lt(rel_diff(s$main, s$radau, seq_len(m$n_states)), 1e-6)
+  expect_gt(min(s$main$diagnostics$min_state), -1e-8)
   # crowding makes the largest rate grow with larval density
   m0 <- sg_model(p, sg_cube(sg_test_cube_wild()), wx)
-  no_release <- simulate_ode(m0, rtol = 1e-9, atol = 1e-12)
-  expect_gt(max(s$lsoda$diagnostics$max_rate), 3 * max(no_release$diagnostics$max_rate))
+  no_release <- sim_ode(m0, rtol = 1e-9, atol = 1e-12)
+  expect_gt(max(s$main$diagnostics$max_rate), 3 * max(no_release$diagnostics$max_rate))
 })
 
-test_that("a very large mating rate stays accurate", {
+sg_test_each_backend("a very large mating rate stays accurate", {
   p <- sg_params(nu = 1000)
   wx <- sg_forcing(wx_all, p, "1971-05-01", "1971-05-30")
   m <- sg_model(p, sg_cube(sg_test_cube_mendelian()), wx)
-  s <- both_methods(m)
-  expect_lt(rel_diff(s$lsoda, s$radau, seq_len(m$n_states)), 1e-6)
-  expect_gt(min(s$lsoda$diagnostics$min_state), -1e-8)
+  s <- both_methods(m, backend)
+  expect_lt(rel_diff(s$main, s$radau, seq_len(m$n_states)), 1e-6)
+  expect_gt(min(s$main$diagnostics$min_state), -1e-8)
 })
 
-test_that("many egg sub-stages (fast transfer rates) stay accurate", {
+sg_test_each_backend("many egg sub-stages (fast transfer rates) stay accurate", {
   p <- sg_params(n_E = 25, n_L = 25)
   wx <- sg_forcing(wx_all, p, period[1], period[2])
   m <- sg_model(p, sg_cube(sg_test_cube_wild()), wx)
-  s <- both_methods(m)
-  expect_lt(rel_diff(s$lsoda, s$radau, seq_len(m$n_states)), 1e-6)
-  expect_gt(max(s$lsoda$diagnostics$max_rate), 25 * sg_degree_days(20) / 10)
+  s <- both_methods(m, backend)
+  expect_lt(rel_diff(s$main, s$radau, seq_len(m$n_states)), 1e-6)
+  expect_gt(max(s$main$diagnostics$max_rate), 25 * sg_degree_days(20) / 10)
 })
