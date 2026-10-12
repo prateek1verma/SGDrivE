@@ -13,7 +13,7 @@ geno_totals <- function(m, sim, block, row) {
   }, 0)
 }
 
-sg_test_each_backend("a neutral Mendelian cube stays at Hardy-Weinberg, allele frequency constant", {
+sg_test_each_backend("a neutral Mendelian cube stays at Hardy-Weinberg, allele frequencies fixed", {
   m <- sg_model(p, sg_cube(sg_test_cube_mendelian()), wx90)
   sim <- sim_ode(m, sg_init(m, "hardy_weinberg", alleles = c(A = 0.3, a = 0.7)),
     rtol = 1e-10, atol = 1e-12
