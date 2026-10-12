@@ -218,6 +218,7 @@ oviposition would match the observed 61 ± 12.2 dd.
   single-locus two-allele-letter genotype names (e.g. "AA", "Aa"), then as
   `"constant"`.
 * `"state"`: a full state vector supplied by the user.
+* (added by D-025) `"burn_in"` and `"equilibrium"`.
 
 The defaults (0.25 per sub-stage for E, L, P; 0.125 for M and F; 0 for U)
 reproduce the starting state of the Gutierrez & Ponti runs (0.25 per class,
@@ -365,6 +366,28 @@ for large ones. The `egg_batches` counter becomes a count of events
 (including those of sterile-mated females, whose eggs are not viable); in
 the ODE its rate is Psi f W. Not modelled: the regular laying cycle of each
 female, and aggregation of several females in one wound. Amends D-022 item 7.
+
+---
+
+## D-025 Initial states from burn-in and constant-temperature equilibrium (Accepted, 2026-10-12)
+
+Extends D-020 (added in M4-WP4 at the user's request):
+1. `sg_init(method = "burn_in", years, weather)`: run the ODE (C++
+   backend, no releases) over the `years` before the start date, using the
+   given weather or, without it, the model's first 365 days of forcing
+   repeated, starting from a `"constant"` (or `"hardy_weinberg"`) state,
+   and return the state at the start date. The result records the weather
+   source and `start_effect`, the relative difference to the same burn-in
+   from a start ten times larger (a warning above 1e-3). The ODE forgets
+   its starting state within months at McAllen, so a one-year burn-in is
+   the default.
+2. `sg_init(method = "equilibrium", temperature)`: the equilibrium of a
+   wild-type population at constant temperature, in closed form (model
+   specification section 11), or by a one-dimensional root search with
+   larval crowding or an Allee effect. Only for a single wild-type genotype
+   that produces both sexes and breeds true; an empty state (with a message)
+   when R0 <= 1. Useful for constant-temperature scenarios; at McAllen the
+   seasonal burn-in is the appropriate start.
 
 ---
 

@@ -6,12 +6,15 @@
 \usage{
 sg_init(
   model,
-  method = c("constant", "hardy_weinberg", "state"),
+  method = c("constant", "hardy_weinberg", "state", "burn_in", "equilibrium"),
   values = c(E = 0.25, L = 0.25, P = 0.25, M = 0.125, U = 0, F = 0.125),
   genotypes = NULL,
   alleles = NULL,
   state = NULL,
-  per = c("node", "km2")
+  per = c("node", "km2"),
+  years = 1L,
+  weather = NULL,
+  temperature = NULL
 )
 }
 \arguments{
@@ -24,6 +27,18 @@ given by \code{values}, split between genotypes by \code{genotypes}.}
 \item{\code{"hardy_weinberg"}}{As \code{"constant"}, with genotype weights from
 the allele frequencies \code{alleles} (Hardy-Weinberg proportions).}
 \item{\code{"state"}}{A full state vector given in \code{state}.}
+\item{\code{"burn_in"}}{The state reached by running the ODE (without
+releases) for \code{years} before the model's start, from a \code{"constant"}
+start (or \code{"hardy_weinberg"} if \code{alleles} is given). The burn-in
+weather is that of the years before the start date in \code{weather}, or
+without \code{weather} the model's first 365 days of forcing repeated.
+The ODE forgets its starting state within months, so the result
+depends on the weather and parameters, not on \code{values}.}
+\item{\code{"equilibrium"}}{The equilibrium of a wild-type population at the
+constant \code{temperature} (degC), in closed form (one-dimensional root
+search with larval crowding or an Allee effect). Needs a single
+wild-type genotype that breeds true. Gives an empty state, with a
+message, when the population cannot persist at that temperature.}
 }}
 
 \item{values}{For \code{"constant"} and \code{"hardy_weinberg"}: named counts per
@@ -47,12 +62,24 @@ type(s).}
 
 \item{per}{Unit of \code{values}: \code{"node"} (counts per node) or \code{"km2"}
 (per km^2, multiplied by the node area).}
+
+\item{years}{For \code{"burn_in"}: number of years of burn-in (whole number).}
+
+\item{weather}{For \code{"burn_in"}: optional daily weather (as for
+\code{\link[=sg_forcing]{sg_forcing()}}) covering the \code{years} before the model's start date.}
+
+\item{temperature}{For \code{"equilibrium"}: constant temperature (degC).}
 }
 \value{
 An object of class \code{sg_state}: a named numeric vector of length
 \code{model$n_states} (names from \code{\link[=sg_state_names]{sg_state_names()}}) with attribute
 \code{model_hash}, used by the solvers to check that the state belongs to the
-model.
+model. Burn-in and equilibrium states also carry an attribute \code{burn_in}
+(years, weather source, and \code{start_effect}: the relative difference to
+the same burn-in from a start ten times larger; a warning is given above
+1e-3) or
+\code{equilibrium} (temperature, eggs per egg at low density \code{R0}, wound
+search \code{psi}, eggs laid per day).
 }
 \description{
 Builds the state vector (counts per node) at the start of a simulation.
@@ -78,6 +105,14 @@ if (requireNamespace("MGDrivE", quietly = TRUE)) {
   )
   sg_init(mod) # wild type only
   sg_init(mod, "hardy_weinberg", alleles = c(A = 0.7, a = 0.3))
+  sg_init(mod, "equilibrium", temperature = 27) # wild type at 27 degC
+  # a year of burn-in over the weather before the start date
+  wx <- sg_example_weather()
+  mod_71 <- sg_model(
+    p, sg_cube(MGDrivE::cubeMendelian()),
+    sg_forcing(wx, p, start = "1971-01-01", end = "1971-03-31")
+  )
+  sg_init(mod_71, "burn_in", weather = wx)
 }
 }
 \seealso{

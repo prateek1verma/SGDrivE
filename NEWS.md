@@ -30,6 +30,19 @@
   integer flow accounting, early stop once a population is extinct with no
   releases left. About 0.06 s per simulated year for a two-genotype release
   model, nearly independent of population size.
+* `simulate_cb()`: the stochastic chain-binomial solver for users.
+  Replicates with one L'Ecuyer-CMRG random-number stream each (replicate
+  r is the same whether run alone, among others, or in parallel with
+  `parallel = TRUE` through 'future.apply'); `seed`, or the session's
+  generator, which is otherwise left untouched; `keep = "state"` or
+  `"totals"`, `output_every`, a memory check, extinction days and `print()`.
+  Non-integer initial states and releases are rounded without bias in each
+  replicate.
+* `sg_init()` gains `method = "burn_in"` (the ODE over the years before the
+  start, from the weather or the model's first year repeated, with a check
+  that the starting state no longer matters) and `method = "equilibrium"`
+  (closed-form equilibrium of a wild-type population at constant
+  temperature, with R0 reported; D-025).
 
 ## Milestone M3: C++ backend
 

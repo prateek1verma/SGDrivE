@@ -357,8 +357,38 @@ follow in M5.
 
 ## 11. Initial conditions
 
-`sg_init()` options: constant counts per sub-stage, user-supplied state, or a
-burn-in run under repeated weather.
+`sg_init()` (D-020, D-025):
+
+* `"constant"`, `"hardy_weinberg"`, `"state"`: given counts per sub-stage
+  (the default reproduces the Gutierrez & Ponti starting state), genotype
+  weights from allele frequencies, or a full state vector.
+* `"burn_in"`: the ODE without releases is run for a number of years before
+  the start date, over the weather of those years or, without it, over the
+  model's first 365 days of forcing repeated, and the state at the start
+  date is returned. With the defaults at McAllen the ODE forgets its
+  starting state within about six months (relative differences below 1e-6
+  after 180 days, 1e-14 after a year); the reported `start_effect` is the
+  difference to the same burn-in from a start ten times larger.
+* `"equilibrium"`: the equilibrium of a wild-type population (one wild
+  genotype that breeds true) at constant temperature T. With the day's
+  quantities at T (S1-S7; no moisture term), every chain is linear, so for
+  an egg input B all compartments are B times a fixed profile: Erlang
+  chains E_i = B/(q+μ) (q/(q+μ))^{i−1}, segmented adult chains
+  X_i = X_{i−1} q_{i−1}/(q_i + μ + ν_i), unmated females with the mating
+  rate ν_i (S12) and mated females as the difference to all females. With
+  W(1) and N_s(1) the egg-laying and wound-searching females per unit egg
+  input and T_ww = s_w ih[w,w,w] τ[w,w,w], equilibrium requires
+  R φ_ov T_ww Ψ* W(1) = 1, so
+
+      Ψ*  = 1 / (R φ_ov T_ww W(1))            (needs R0 = σ₀ R φ_ov T_ww W(1) > 1)
+      N_s* = a_s Δx H / (−ln(1 − Ψ*/σ₀))       (S8 solved for N_s)
+      B*  = N_s* / N_s(1)
+
+  R0 is the number of eggs per egg at low density; without a positive
+  equilibrium (R0 ≤ 1 or no development) the state is empty. With larval
+  crowding (μ_L depends on L, solved by a one-dimensional root) or an Allee
+  effect (g_find depends on M̄) B* is found by a one-dimensional root
+  search, taking the upper (stable) root.
 
 ## 12. Parameters
 

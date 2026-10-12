@@ -11,6 +11,10 @@
   warning(paste0(...), call. = FALSE)
 }
 
+.sg_message <- function(...) {
+  message(paste0(...))
+}
+
 # " Did you mean 'x'?" when a close match exists, otherwise "".
 .sg_suggest <- function(x, choices) {
   if (length(choices) == 0L) {

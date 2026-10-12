@@ -22,6 +22,7 @@ BugReports: https://github.com/prateek1verma/SGDrivE/issues
 Depends:
     R (>= 4.1)
 Imports:
+    parallel,
     Rcpp (>= 1.0.10),
     stats,
     tools,
@@ -31,6 +32,7 @@ LinkingTo:
 Suggests:
     bench,
     deSolve,
+    future,
     future.apply,
     ggplot2,
     knitr,
