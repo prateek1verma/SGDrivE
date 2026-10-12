@@ -20,9 +20,21 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// sg_model_view_info_cpp
+Rcpp::List sg_model_view_info_cpp(const Rcpp::List& view);
+RcppExport SEXP _SGDrivE_sg_model_view_info_cpp(SEXP viewSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::List& >::type view(viewSEXP);
+    rcpp_result_gen = Rcpp::wrap(sg_model_view_info_cpp(view));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_SGDrivE_sg_backend_info_cpp", (DL_FUNC) &_SGDrivE_sg_backend_info_cpp, 0},
+    {"_SGDrivE_sg_model_view_info_cpp", (DL_FUNC) &_SGDrivE_sg_model_view_info_cpp, 1},
     {NULL, NULL, 0}
 };
 

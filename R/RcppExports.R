@@ -5,3 +5,7 @@ sg_backend_info_cpp <- function() {
     .Call(`_SGDrivE_sg_backend_info_cpp`)
 }
 
+sg_model_view_info_cpp <- function(view) {
+    .Call(`_SGDrivE_sg_model_view_info_cpp`, view)
+}
+

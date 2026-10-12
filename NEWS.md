@@ -1,5 +1,12 @@
 # SGDrivE 0.0.0.9000
 
+## Milestone M3: C++ backend (in progress)
+
+* Internal model view (`R/model-view.R`, `src/model_view.h`): everything the
+  C++ backend needs, flattened once per simulation with 0-based indices,
+  column-major matrices and inverse adult sub-stage widths, and validated on
+  the C++ side (D-021).
+
 ## Milestone M2: reference model
 
 * `sg_init()` builds initial states: `"constant"` counts per sub-stage split

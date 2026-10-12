@@ -224,11 +224,33 @@ reproduce the starting state of the Gutierrez & Ponti runs (0.25 per class,
 adults split equally between the sexes, all females mated). Starting at
 equilibrium or after a burn-in is deferred to M5 (calibration).
 
+## D-021 C++ backend design for M3 (Accepted, 2026-10-11)
+
+1. Integrator: our own Dormand-Prince 5(4) (Hairer's step-size control,
+   componentwise error norm atol + rtol |y|), no Boost/odeint dependency.
+2. Stiffness: Hairer's stiffness test flags a day; that day is then redone
+   with deSolve's lsoda driven by the C++ rate kernel, recorded in the
+   diagnostics (automatic per-day fallback rather than only a warning).
+3. The whole day loop (releases, integration, recording) runs in C++; R and
+   C++ meet once per simulation.
+4. After M3 the default backend is "cpp"; "R" stays as the readable reference
+   and test oracle.
+5. Default tolerances are the same for both backends (rtol 1e-8,
+   atol 1e-10).
+6. The 24-year legacy regression becomes a routine test with the C++
+   backend; with the R backend it stays slow-gated (D-019).
+7. A manually triggered CI job runs the tests with sanitizers
+   (AddressSanitizer, UBSan) for the C++ code.
+
+The C++ code uses plain C++17 with Rcpp and std::vector, allocates no memory
+inside the rate kernel, checks for user interrupts once per simulated day,
+and reads the model through a flat "model view" built once in R.
+
 ---
 
 ## Open questions
 
 | ID | Question | Current assumption |
 |---|---|---|
-| O-006 | Integrator for the C++ ODE backend (M3) | M2 diagnostics (1 year, McAllen): `lsoda` never switched to its stiff method; largest rate 13 per day with defaults and 40 per day under "gp2014", about 40-95 steps per day. 24-year gp2014 run (M2-WP5): stiff method on 2 of 8766 days, largest rate 43.3 per day, 93 steps per day. An explicit adaptive Runge-Kutta (Dormand-Prince) is expected to suffice; artificial stiffness arises only for extreme settings such as nu = 1000. Stress tests (M2-WP6): weekly sterile releases of 10x-1000x the wild males leave the largest rate unchanged with no stiff days; larval crowding with 1e6 released eggs raises it from 4.9 to 30.7 per day, still without stiff days. M3 should still include a stiffness check (Hairer's Dormand-Prince test) with a warning or fallback to a stiff method, and reuse tests/testthat/test-stress.R against the C++ solver |
+| O-006 (resolved by D-021) | Integrator for the C++ ODE backend (M3) | M2 diagnostics (1 year, McAllen): `lsoda` never switched to its stiff method; largest rate 13 per day with defaults and 40 per day under "gp2014", about 40-95 steps per day. 24-year gp2014 run (M2-WP5): stiff method on 2 of 8766 days, largest rate 43.3 per day, 93 steps per day. An explicit adaptive Runge-Kutta (Dormand-Prince) is expected to suffice; artificial stiffness arises only for extreme settings such as nu = 1000. Stress tests (M2-WP6): weekly sterile releases of 10x-1000x the wild males leave the largest rate unchanged with no stiff days; larval crowding with 1e6 released eggs raises it from 4.9 to 30.7 per day, still without stiff days. M3 should still include a stiffness check (Hairer's Dormand-Prince test) with a warning or fallback to a stiff method, and reuse tests/testthat/test-stress.R against the C++ solver |
 | O-004 | Suspected `calcOmega` argument misuse in the legacy parameter table (0.4767 and 0.0740 look like reductions; `calcOmega` expects the fraction retained) | To be checked before building SIT cubes in M6 |
