@@ -333,6 +333,19 @@ and needs 'deSolve' only when a fallback day occurs.
 
 ---
 
+## D-023 Meaning of the cube's mating parameter eta (Accepted, 2026-10-12)
+
+1. **eta is relative mating competitiveness** (MGDrivE v1 and MGDrivE2
+   convention). It sets which male genotypes females mate with,
+   pi_{g,m} = eta[g,m] M_bar_m / sum_h eta[g,h] M_bar_h, but not how fast
+   females mate: a female mates at rate nu g_find whatever the eta of the
+   males present, and only eta = 0 for every male present prevents mating.
+   Same in the ODE and the chain-binomial solver.
+2. **g_find counts all mature males equally**, not weighted by eta:
+   g_find = M_bar / (h_M A + M_bar).
+
+---
+
 ## Open questions
 
 | ID | Question | Current assumption |
