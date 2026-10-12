@@ -43,8 +43,9 @@ scenario <- function(name, p, cube, area, releases = NULL, dts = c(0.1, 0.05), r
     tot <- .sg_cb_block_totals(sim)
     data.frame(
       scenario = name, genotypes = m$dims$n_genotypes, states = m$n_states, area = area,
-      dt = dt, mean_max_adults = round(mean(apply(tot[, c("M", "U", "F"), , drop = FALSE], 3L,
-        function(a) max(rowSums(a))
+      dt = dt,
+      mean_max_adults = round(mean(apply(
+        tot[, c("M", "U", "F"), , drop = FALSE], 3L, function(a) max(rowSums(a))
       ))),
       seconds_per_rep_year = round(el / n_rep / wx$n_days * 365, 3),
       r_reference_seconds_per_day = round(r_per_day, 3),
@@ -54,13 +55,17 @@ scenario <- function(name, p, cube, area, releases = NULL, dts = c(0.1, 0.05), r
   do.call(rbind, rows)
 }
 
-weekly <- function(g, n) sg_releases(g, "adult", "male", times = seq(1, 365, 7), number = n, per = "km2")
+weekly <- function(g, n) {
+  sg_releases(g, "adult", "male", times = seq(1, 365, 7), number = n, per = "km2")
+}
 res <- list(
   scenario("wild, defaults", sg_params(), sg_test_cube_wild(), 1000),
   scenario("wild, defaults", sg_params(), sg_test_cube_wild(), 1e5, dts = 0.1, ref = FALSE),
   scenario("wild, gp2014 preset", sg_params(preset = "gp2014"), sg_test_cube_wild(), 1000),
   scenario("SIT W/S, weekly releases", sg_params(), sit, 1000, weekly("S", 30)),
-  scenario("SIT W/S, weekly releases", sg_params(), sit, 1e5, weekly("S", 30), dts = 0.1, ref = FALSE),
+  scenario("SIT W/S, weekly releases", sg_params(), sit, 1e5, weekly("S", 30),
+    dts = 0.1, ref = FALSE
+  ),
   scenario("SIT, single eggs", sg_params(oviposition = "eggs"), sit, 1000, weekly("S", 30),
     dts = 0.1, ref = FALSE
   )

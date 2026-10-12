@@ -67,13 +67,13 @@ test_that("matings with a male genotype are binomial thinning of the virgins", {
 test_that("the replicate mean converges to the deterministic map and the ODE", {
   skip_on_cran()
   err <- vapply(c(10, 10000), function(area) {
-    m <- sg_model(p, sg_cube(sg_test_cube_wild()), sg_forcing(wx_all, p, "1971-05-01", "1971-06-29"),
-      area = area
-    )
+    wx <- sg_forcing(wx_all, p, "1971-05-01", "1971-06-29")
+    m <- sg_model(p, sg_cube(sg_test_cube_wild()), wx, area = area)
     init <- sg_init(m, "state", state = as.numeric(sg_init(m, "equilibrium", temperature = 27)))
     sim <- simulate_cb(m, init, n_rep = 40, seed = 1, keep = "totals")
     a <- adults(ns$.sg_cb_block_totals(sim))
-    det <- rowSums(ns$.sg_sim_block_totals(ns$.sg_cb_run_cpp(m, init, stochastic = FALSE))[, c("M", "U", "F")])
+    det_run <- ns$.sg_cb_run_cpp(m, init, stochastic = FALSE)
+    det <- rowSums(ns$.sg_sim_block_totals(det_run)[, c("M", "U", "F")])
     ode <- rowSums(ns$.sg_sim_block_totals(simulate_ode(m, init))[, c("M", "U", "F")])
     se <- apply(a, 1, stats::sd) / sqrt(ncol(a))
     expect_lt(max((abs(rowMeans(a) - det) / se)[-1]), 5) # mean = map, within noise
@@ -87,9 +87,8 @@ test_that("the replicate mean converges to the deterministic map and the ODE", {
 test_that("neutral alleles keep their mean frequency; drift grows in small populations", {
   skip_on_cran()
   freq_sd <- vapply(c(5, 500), function(area) {
-    m <- sg_model(p, sg_cube(sg_test_cube_mendelian()), sg_forcing(wx_all, p, "1971-05-01", "1971-06-29"),
-      area = area
-    )
+    wx <- sg_forcing(wx_all, p, "1971-05-01", "1971-06-29")
+    m <- sg_model(p, sg_cube(sg_test_cube_mendelian()), wx, area = area)
     init <- sg_init(m, "hardy_weinberg",
       alleles = c(A = 0.3, a = 0.7),
       values = c(E = 20, L = 20, P = 20, M = 10, F = 10), per = "km2"
@@ -128,9 +127,8 @@ test_that("egg batches make small populations more likely to die out", {
   ext <- vapply(c("eggs", "batches"), function(ov) {
     pp <- sg_params(oviposition = ov)
     # 3 km^2 through the winter low (January to April)
-    m <- sg_model(pp, sg_cube(sg_test_cube_wild()), sg_forcing(wx_all, pp, "1971-01-01", "1971-04-30"),
-      area = 3
-    )
+    wx <- sg_forcing(wx_all, pp, "1971-01-01", "1971-04-30")
+    m <- sg_model(pp, sg_cube(sg_test_cube_wild()), wx, area = 3)
     init <- sg_init(m, "burn_in", weather = wx_all)
     sim <- simulate_cb(m, init, n_rep = 100, seed = 5, keep = "totals", output_every = 120)
     mean(!is.na(sim$extinct_day))
@@ -184,7 +182,8 @@ test_that("stress: huge counts, step sizes, fast mating, long chains, many genot
     expect_true(flow_ok(r))
     expect_false(anyNA(r$state))
   }
-  fem <- sg_model(p, sg_cube(sg_test_cube_wild()), wx, sg_releases("W", "adult", "female", times = 1, number = 50))
+  females <- sg_releases("W", "adult", "female", times = 1, number = 50)
+  fem <- sg_model(p, sg_cube(sg_test_cube_wild()), wx, females)
   set.seed(9)
   rf <- ns$.sg_cb_run_cpp(fem, sg_init(fem, values = c(E = 0)))
   expect_identical(sum(rf$counters[, "matings[W|W]"]), 0) # no males: no mating
