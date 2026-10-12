@@ -26,7 +26,7 @@ flow_error <- function(sim) {
   max(abs(diff(tot) - pred)) / max(tot)
 }
 
-ref <- simulate_ode(m_rel, rtol = 1e-10, atol = 1e-12)
+ref <- simulate_ode(m_rel, backend = "R", rtol = 1e-10, atol = 1e-12)
 cpp <- simulate_ode(m_rel, backend = "cpp", rtol = 1e-10, atol = 1e-12)
 
 test_that("the C++ backend returns the same structure as the R backend", {
@@ -57,7 +57,7 @@ test_that("the C++ backend agrees with the R backend, with releases", {
 })
 
 test_that("C++ rates driven by a deSolve method reproduce the R backend", {
-  a <- simulate_ode(m_rel, method = "lsoda")
+  a <- simulate_ode(m_rel, backend = "R", method = "lsoda")
   b <- simulate_ode(m_rel, backend = "cpp", method = "lsoda")
   # same integrator and rates equal to round-off, but lsoda's step choices
   # react to round-off, so agreement is at the level of the integration error
@@ -70,7 +70,7 @@ test_that("C++ rates driven by a deSolve method reproduce the R backend", {
 })
 
 test_that("default tolerances keep the backends within the integration error", {
-  a <- simulate_ode(m_rel)
+  a <- simulate_ode(m_rel, backend = "R")
   b <- simulate_ode(m_rel, backend = "cpp")
   expect_lt(rel_diff(a, b), 1e-6)
   expect_lt(rel_diff(ref, b), 1e-6)
@@ -91,7 +91,7 @@ test_that("stiff days fall back to lsoda and give the same result", {
   # near-instant mating (nu = 1e4 per day) makes every day stiff
   ps <- sg_params(nu = 1e4)
   ms <- sg_model(ps, cube3, sg_forcing(sg_example_weather(), ps, "1971-05-01", "1971-05-10"))
-  a <- simulate_ode(ms, rtol = 1e-9, atol = 1e-12)
+  a <- simulate_ode(ms, backend = "R", rtol = 1e-9, atol = 1e-12)
   b <- simulate_ode(ms, backend = "cpp", rtol = 1e-9, atol = 1e-12)
   expect_identical(b$meta$fallback_days, 10L)
   expect_true(all(b$diagnostics$fallback & b$diagnostics$stiff))
@@ -115,7 +115,7 @@ test_that("a stiff day in the middle of a run is handed over and the loop resume
   pc <- sg_params(nu = 1e5, h_M = 1e5)
   wx <- sg_forcing(sg_example_weather(), pc, "1971-05-01", "1971-05-30")
   mc <- sg_model(pc, cube3, wx, sg_releases("aa", "adult", "male", times = 10, number = 1e6))
-  a <- simulate_ode(mc, rtol = 1e-9, atol = 1e-12)
+  a <- simulate_ode(mc, backend = "R", rtol = 1e-9, atol = 1e-12)
   b <- simulate_ode(mc, backend = "cpp", rtol = 1e-9, atol = 1e-12, output_every = 3)
   fb <- which(b$diagnostics$fallback)
   expect_gt(length(fb), 0L)
@@ -136,7 +136,23 @@ test_that("a Dormand-Prince failure without fallback is an informative error", {
   sim <- simulate_ode(m_rel, backend = "cpp")
   expect_identical(sim$meta$fallback_days, 60L)
   expect_false(any(sim$diagnostics$stiff))
-  expect_lt(rel_diff(simulate_ode(m_rel), sim), 1e-7)
+  expect_lt(rel_diff(simulate_ode(m_rel, backend = "R"), sim), 1e-7)
+})
+
+test_that("the C++ backend needs deSolve only for a fallback day or a deSolve method", {
+  local_mocked_bindings(.sg_has_desolve = function() FALSE)
+  sim <- simulate_ode(m_rel)
+  expect_identical(sim$meta$fallback_days, 0L)
+  expect_identical(sim$meta$desolve_version, NA_character_)
+  expect_error(simulate_ode(m_rel, method = "lsoda"), "Method \"lsoda\" needs the 'deSolve'")
+  expect_error(simulate_ode(m_rel, backend = "R"), "Method \"lsoda\" needs the 'deSolve'")
+  ps <- sg_params(nu = 1e4)
+  ms <- sg_model(ps, cube3, sg_forcing(sg_example_weather(), ps, "1971-05-01", "1971-05-03"))
+  expect_error(
+    simulate_ode(ms),
+    "Day 1 \\(1971-05-01\\) is stiff; its fallback needs the 'deSolve' .*stiff_fallback = FALSE"
+  )
+  expect_identical(simulate_ode(ms, stiff_fallback = FALSE)$meta$fallback_days, 0L)
 })
 
 test_that("the C++ day loop can stop and resume without changing the result", {

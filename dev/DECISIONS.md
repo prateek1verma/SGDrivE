@@ -246,6 +246,12 @@ The C++ code uses plain C++17 with Rcpp and std::vector, allocates no memory
 inside the rate kernel, checks for user interrupts once per simulated day,
 and reads the model through a flat "model view" built once in R.
 
+Implemented in M3 (WP1-WP6). Outcome: no stiff day over 24 years of McAllen
+weather (defaults and gp2014 preset); the fallback triggers only in
+artificial settings (nu >= 1e4 per day). The C++ backend is 12-73 times
+faster than the R backend at the same tolerances (bench/m3_cpp_vs_reference.R)
+and needs 'deSolve' only when a fallback day occurs.
+
 ---
 
 ## Open questions
@@ -253,4 +259,5 @@ and reads the model through a flat "model view" built once in R.
 | ID | Question | Current assumption |
 |---|---|---|
 | O-006 (resolved by D-021) | Integrator for the C++ ODE backend (M3) | M2 diagnostics (1 year, McAllen): `lsoda` never switched to its stiff method; largest rate 13 per day with defaults and 40 per day under "gp2014", about 40-95 steps per day. 24-year gp2014 run (M2-WP5): stiff method on 2 of 8766 days, largest rate 43.3 per day, 93 steps per day. An explicit adaptive Runge-Kutta (Dormand-Prince) is expected to suffice; artificial stiffness arises only for extreme settings such as nu = 1000. Stress tests (M2-WP6): weekly sterile releases of 10x-1000x the wild males leave the largest rate unchanged with no stiff days; larval crowding with 1e6 released eggs raises it from 4.9 to 30.7 per day, still without stiff days. M3 should still include a stiffness check (Hairer's Dormand-Prince test) with a warning or fallback to a stiff method, and reuse tests/testthat/test-stress.R against the C++ solver |
+| O-007 | Should the largest-rate diagnostic (`max_rate`) include the effective mating rate ν·g_find? It currently counts transfer and mortality only, so stiffness caused by fast mating (found in M3-WP4: ν = 1e5, h_M = 1e5, large male release) is not visible in it | Unchanged (transfer + mortality), pending the user's decision |
 | O-004 | Suspected `calcOmega` argument misuse in the legacy parameter table (0.4767 and 0.0740 look like reductions; `calcOmega` expects the fraction retained) | To be checked before building SIT cubes in M6 |

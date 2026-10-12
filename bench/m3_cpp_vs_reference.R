@@ -5,9 +5,9 @@
 # For each scenario: run time of the R backend (lsoda, one run), the C++
 # backend with its own Dormand-Prince day loop and with C++ rates driven by
 # lsoda (median of `reps` runs each), the speed-up and the largest relative
-# difference between the R and C++ states. The last scenario is the full
-# 24-year gp2014 run, timed for the C++ backend only (the R backend takes
-# about 8 minutes; see the slow regression test).
+# difference between the R and C++ states. The last two scenarios are full
+# 24-year runs (1960-1983), timed for the C++ backend only (the R backend
+# takes about 8 minutes for gp2014; see the slow regression test).
 #
 # Run from the package root:  Rscript bench/m3_cpp_vs_reference.R
 # Writes bench/results/m3_cpp_vs_reference.csv. Run with the computer plugged
@@ -77,6 +77,10 @@ if (requireNamespace("MGDrivE", quietly = TRUE)) {
 }
 res <- c(res, list(
   scenario("wild, gp2014 preset, 1960-1983", sg_params(preset = "gp2014"), sg_test_cube_wild(),
+           with_r = FALSE),
+  scenario("SIT W/S, defaults, weekly releases, 1960-1983", sg_params(), sit,
+           releases = sg_releases("S", "adult", "male", times = seq(1, 8766, by = 7),
+                                  number = 1000),
            with_r = FALSE)
 ))
 res <- do.call(rbind, res)

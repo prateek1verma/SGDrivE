@@ -12,7 +12,7 @@ are excluded from the built package.
 | Internal R helpers | leading dot or no export | `.check_cube_dims()` |
 | S3 classes | `sg_` prefix | `sg_params`, `sg_model`, `sg_sim` |
 | C++ functions exported to R | `sg_..._cpp` (called only from R wrappers) | `sg_backend_info_cpp()` |
-| C++ files | one responsibility per file | `rates.cpp`, `ode_rk45.cpp` |
+| C++ files | one responsibility per file | `rates.cpp`, `dopri5.h` |
 | Model symbols in code | follow `dev/MODEL_SPEC.md`, ASCII | `q_A`, `mu_T`, `ell_g`, `i0` |
 
 R code follows the tidyverse style guide (apply with `Rscript dev/style.R`), checked by
@@ -54,6 +54,32 @@ An index map built in R (`sg_model()`) gives the offset and dimensions of each
 block. C++ reads blocks through that map and never hard-codes offsets.
 R uses 1-based and C++ 0-based indices; conversion happens only at the R/C++
 boundary.
+
+## C++ code
+
+* Files in `src/`, one responsibility each: `model_view.*` (the model
+  flattened for C++), `rates.*` (rate kernel), `dopri5.h` (integrator),
+  `simulate.cpp` (day loop and R entry points), `backend_info.cpp`.
+  Test-only entry points live in `*_test.cpp`.
+* Plain C++17, Rcpp and `std::vector`; no other dependencies. Code lives in
+  `namespace sgdrive`; only `sg_..._cpp` functions are exported to R (run
+  `Rcpp::compileAttributes()` after changing them) and they are called only
+  from internal R wrappers.
+* C++ reads the model only through the model view built in R
+  (`.sg_model_view()`), validated once in the `ModelView` constructor; it
+  never re-derives parameters or hard-codes offsets.
+* The rate kernel allocates no memory per evaluation: work arrays are
+  allocated once when it is constructed. Objects that live across R calls
+  are held in an `Rcpp::XPtr` handle.
+* Long loops call `Rcpp::checkUserInterrupt()` once per simulated day.
+  Errors use `Rcpp::stop()` with a message that names the problem.
+* Any change to the model goes into the R reference rate function and the
+  C++ kernel together, with an equivalence test (`test-rates-cpp.R`,
+  `test-backend-equivalence.R`); the R code is the readable specification.
+* Format with `.clang-format`. After larger changes to `src/` run
+  `bash dev/sanitize.sh` (AddressSanitizer and UBSan, macOS, a few minutes);
+  before a release also run the manual `sanitizers` GitHub workflow (Linux,
+  R-devel).
 
 ## Errors, warnings and messages
 

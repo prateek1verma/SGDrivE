@@ -27,9 +27,13 @@ test_that("simulate_ode() returns daily states, counters, releases and diagnosti
   expect_named(sim$diagnostics, c(
     "day", "steps", "rejected", "evaluations", "stiff", "fallback", "max_rate", "min_state"
   ))
-  expect_true(all(is.na(sim$diagnostics$rejected)) && !any(sim$diagnostics$fallback))
+  expect_true(all(sim$diagnostics$rejected >= 0) && !any(sim$diagnostics$fallback))
   expect_identical(sim$meta$model_hash, m3$meta$hash)
-  expect_identical(sim$meta$backend, "R")
+  expect_identical(sim$meta$backend, "cpp") # default since M3 (D-021)
+  expect_identical(sim$meta$method, "dopri5")
+  r <- simulate_ode(m3, backend = "R")
+  expect_identical(r$meta$method, "lsoda")
+  expect_true(all(is.na(r$diagnostics$rejected)) && !any(r$diagnostics$fallback))
 })
 
 sg_test_each_backend("flow accounting closes over a simulation, with and without releases", {
@@ -98,7 +102,9 @@ sg_test_each_backend("init is checked against the model", {
 
 test_that("invalid arguments give informative errors", {
   expect_error(simulate_ode(list()), "sg_model object")
-  expect_error(simulate_ode(m3, method = "dopri5"), "C\\+\\+ backend's own integrator")
+  expect_error(
+    simulate_ode(m3, backend = "R", method = "dopri5"), "C\\+\\+ backend's own integrator"
+  )
   expect_error(simulate_ode(m3, method = 1), "single string")
   expect_error(simulate_ode(m3, stiff_fallback = NA), "TRUE or FALSE")
   expect_error(simulate_ode(m3, backend = "julia"), "must be one of")
@@ -109,7 +115,7 @@ test_that("invalid arguments give informative errors", {
 test_that("print() summarises the simulation", {
   sim <- simulate_ode(m3)
   out <- capture.output(print(sim))
-  expect_match(out[1], "^<sg_sim> 60 days \\(1971-05-01 to 1971-06-29\\), backend \"R\"")
+  expect_match(out[1], "^<sg_sim> 60 days \\(1971-05-01 to 1971-06-29\\), backend \"cpp\"")
   expect_true(any(grepl("final totals: E", out)))
   expect_true(any(grepl("steps/day", out)))
 })

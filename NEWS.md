@@ -1,7 +1,16 @@
 # SGDrivE 0.0.0.9000
 
-## Milestone M3: C++ backend (in progress)
+## Milestone M3: C++ backend
 
+* `simulate_ode()` now uses the C++ backend by default (`backend = "cpp"`,
+  `method = "dopri5"`; D-021). The pure-R backend stays available as the
+  readable reference (`backend = "R"`). The C++ backend needs 'deSolve' only
+  if a day falls back to `lsoda` (or for a deSolve `method`).
+* Documentation: solver description in `?simulate_ode` and the model
+  specification (section 10), C++ coding conventions, README, benchmarks
+  (24 years of a two-genotype release model in about 1 s).
+* New manually triggered `sanitizers` workflow: tests with AddressSanitizer
+  and UndefinedBehaviorSanitizer for the C++ code.
 * Internal model view (`R/model-view.R`, `src/model_view.h`): everything the
   C++ backend needs, flattened once per simulation with 0-based indices,
   column-major matrices and inverse adult sub-stage widths, and validated on

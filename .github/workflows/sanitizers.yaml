@@ -1,0 +1,57 @@
+# AddressSanitizer and UndefinedBehaviorSanitizer checks of the C++ code
+# (D-021). R CMD check runs the tests under R-devel built with both
+# sanitizers (rocker/r-devel-san). Manual trigger only, before releases or
+# after larger changes to src/: dependencies are compiled from source with the
+# sanitizers, which takes 20-40 minutes.
+on:
+  workflow_dispatch:
+
+name: sanitizers
+
+permissions: read-all
+
+jobs:
+  sanitizers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    container:
+      image: rocker/r-devel-san:latest
+    env:
+      # R itself does not free everything at exit, so leak detection is off
+      ASAN_OPTIONS: "detect_leaks=0"
+      UBSAN_OPTIONS: "print_stacktrace=1"
+      _R_CHECK_FORCE_SUGGESTS_: "false"
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          RDsan -q -e 'options(repos = c(CRAN = "https://cloud.r-project.org"));
+            install.packages(c("Rcpp", "testthat", "deSolve", "MGDrivE"), Ncpus = 4)'
+
+      - name: Build and check with sanitizers
+        shell: bash
+        run: |
+          set -o pipefail
+          RDsan CMD build --no-build-vignettes --no-manual .
+          RDsan CMD check --no-manual --ignore-vignettes SGDrivE_*.tar.gz 2>&1 | tee check.log
+
+      - name: Fail on sanitizer reports in SGDrivE's code
+        if: always()
+        shell: bash
+        run: |
+          grep -rn "runtime error\|ERROR: AddressSanitizer" SGDrivE.Rcheck check.log || true
+          if grep -rqE "ERROR: AddressSanitizer|(backend_info|dopri5|dopri5_test|model_view|rates|simulate|RcppExports)\.(cpp|h):[0-9]+:[0-9]+: runtime error" SGDrivE.Rcheck check.log; then
+            echo "Sanitizer errors found in SGDrivE's C++ code"
+            exit 1
+          fi
+
+      - name: Upload check results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sanitizers-check
+          path: |
+            check.log
+            SGDrivE.Rcheck/

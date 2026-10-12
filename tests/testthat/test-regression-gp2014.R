@@ -28,7 +28,7 @@ test_that("R backend: gp2014 matches the legacy ODE over 1960 (relative error < 
   ref <- readRDS(test_path("fixtures", "gp2014_mcallen_ode_tight_3yr.rds"))
   wx <- sg_forcing(sg_example_weather(), gp, start = "1960-01-01", end = "1960-12-31")
   m <- sg_model(gp, wild, wx)
-  sim <- simulate_ode(m, rtol = 1e-7, atol = 1e-9)
+  sim <- simulate_ode(m, backend = "R", rtol = 1e-7, atol = 1e-9)
   ref <- ref[seq_len(wx$n_days), ]
   expect_identical(sim$date[-1], as.Date(ref$date))
   err <- max_rel_error(legacy_totals(sim), ref)
@@ -60,7 +60,7 @@ test_that("R backend: gp2014 matches the legacy ODE over 1960-1983 (slow)", {
   ref <- readRDS(ref_file)
   wx <- sg_forcing(sg_example_weather(), gp)
   m <- sg_model(gp, wild, wx)
-  sim <- simulate_ode(m, rtol = 1e-8, atol = 1e-10)
+  sim <- simulate_ode(m, backend = "R", rtol = 1e-8, atol = 1e-10)
   expect_identical(nrow(ref), wx$n_days)
   err <- max_rel_error(legacy_totals(sim), ref)
   expect_true(all(err < 1e-6), label = paste(names(err), signif(err, 3), collapse = ", "))

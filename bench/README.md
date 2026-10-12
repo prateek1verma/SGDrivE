@@ -21,12 +21,13 @@ At rtol 1e-8, atol 1e-10:
 
 | Scenario | States | R (s) | C++ (s) | Speed-up |
 |---|---|---|---|---|
-| wild, gp2014 preset, 1 year | 150 | 7.83 | 0.21 | 38x |
-| wild, defaults, 1 year | 49 | 3.15 | 0.04 | 73x |
-| SIT W/S, weekly releases, 1 year | 118 | 2.48 | 0.06 | 41x |
-| Mendelian (3 genotypes), 1 year | 207 | 4.03 | 0.13 | 30x |
-| homing drive (10 genotypes), 90 days | 1390 | 2.23 | 0.18 | 12x |
-| wild, gp2014 preset, 24 years | 150 | about 480 | 4.50 | about 100x |
+| wild, gp2014 preset, 1 year | 150 | 8.07 | 0.21 | 38x |
+| wild, defaults, 1 year | 49 | 3.23 | 0.04 | 74x |
+| SIT W/S, weekly releases, 1 year | 118 | 2.56 | 0.06 | 42x |
+| Mendelian (3 genotypes), 1 year | 207 | 4.18 | 0.14 | 30x |
+| homing drive (10 genotypes), 90 days | 1390 | 2.36 | 0.18 | 13x |
+| wild, gp2014 preset, 24 years | 150 | about 480 | 4.77 | about 100x |
+| SIT W/S, weekly releases, 24 years | 118 | not run | 1.20 | |
 
 The backends agree to about 1e-8 (relative). The C++ kernel costs about the
 same per state in every scenario (17-18 ns per state and evaluation); the

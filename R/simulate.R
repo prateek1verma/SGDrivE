@@ -7,10 +7,10 @@
 #' @param init Initial state: an `sg_state` object from [sg_init()] built for
 #'   this model (default: `sg_init(model)`), or a numeric vector of length
 #'   `model$n_states`.
-#' @param backend `"cpp"`: the compiled C++ rate kernel and day loop
-#'   (milestone M3). `"R"`: the pure-R reference implementation (milestone
-#'   M2), slower but easy to read; the two agree to within the integration
-#'   tolerance.
+#' @param backend `"cpp"` (default): the compiled C++ rate kernel and day
+#'   loop, 12 to 70 times faster than the R backend. `"R"`: the pure-R
+#'   reference implementation, slow but easy to read, used to test the C++
+#'   code. The two agree to within the integration tolerance.
 #' @param method Integration method. `"dopri5"` (C++ backend only) is the
 #'   package's own Dormand-Prince 5(4) integrator, run entirely in C++. Any
 #'   method of [deSolve::ode()] can be used with either backend: `"lsoda"`,
@@ -23,7 +23,8 @@
 #'   the last day). Counters and diagnostics are always daily.
 #' @param stiff_fallback Only for `method = "dopri5"`: if `TRUE` (default), a
 #'   day on which the explicit integrator detects stiffness (or fails) is
-#'   integrated again with `"lsoda"` (needs 'deSolve'), using the C++ rates.
+#'   integrated again with `"lsoda"`, using the C++ rates. This needs the
+#'   'deSolve' package, but only when such a day occurs.
 #'   If `FALSE`, stiff days are integrated with Dormand-Prince regardless
 #'   (accurate but slow), and a failure is an error.
 #'
@@ -77,11 +78,11 @@
 #'   mod <- sg_model(p, sg_cube(MGDrivE::cubeMendelian()), wx)
 #'   sim <- simulate_ode(mod)
 #'   sim
-#'   # the compiled backend gives the same result, faster
-#'   sim_cpp <- simulate_ode(mod, backend = "cpp")
-#'   max(abs(sim_cpp$state - sim$state)) / max(sim$state)
+#'   # the pure-R reference backend gives the same result, more slowly
+#'   sim_r <- simulate_ode(mod, backend = "R")
+#'   max(abs(sim_r$state - sim$state)) / max(sim$state)
 #' }
-simulate_ode <- function(model, init = NULL, backend = "R", method = NULL,
+simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
                          rtol = 1e-8, atol = 1e-10, output_every = 1L,
                          stiff_fallback = TRUE) {
   if (!inherits(model, "sg_model")) {
@@ -101,14 +102,7 @@ simulate_ode <- function(model, init = NULL, backend = "R", method = NULL,
   if (!is.logical(stiff_fallback) || length(stiff_fallback) != 1L || is.na(stiff_fallback)) {
     .sg_stop("`stiff_fallback` must be TRUE or FALSE.")
   }
-  needs_desolve <- method != "dopri5" || stiff_fallback
-  if (needs_desolve && !requireNamespace("deSolve", quietly = TRUE)) {
-    .sg_stop(
-      "Method \"", method, "\"", if (method == "dopri5") " with stiff_fallback = TRUE",
-      " needs the 'deSolve' package: install.packages(\"deSolve\")",
-      if (method == "dopri5") " (or set stiff_fallback = FALSE)", "."
-    )
-  }
+  if (method != "dopri5") .sg_need_desolve(paste0("Method \"", method, "\""))
   x0 <- .sg_check_init(model, init)
   tol_ok <- is.numeric(rtol) && is.numeric(atol) && length(rtol) == 1L &&
     length(atol) == 1L && rtol > 0 && atol > 0
@@ -186,7 +180,7 @@ simulate_ode <- function(model, init = NULL, backend = "R", method = NULL,
         fallback_days = sum(res$diag$fallback), run_time = run_time,
         model_hash = model$meta$hash,
         package_version = as.character(utils::packageVersion("SGDrivE")),
-        desolve_version = if (requireNamespace("deSolve", quietly = TRUE)) {
+        desolve_version = if (.sg_has_desolve()) {
           as.character(utils::packageVersion("deSolve"))
         } else {
           NA_character_
@@ -294,6 +288,9 @@ print.sg_sim <- function(x, ...) {
         ". Use stiff_fallback = TRUE or a stiff deSolve method such as \"lsoda\"."
       )
     }
+    .sg_need_desolve(paste0(
+      "Day ", d, " (", format(ctx$model$forcing$dates[d]), ") is stiff; its fallback"
+    ), " (or set stiff_fallback = FALSE)")
     # x is the state at the start of day d, after its releases
     res$diag$max_rate[d] <- ctx$max_rate(d, x)
     step <- .sg_desolve_day(ctx, x, d, "lsoda")
@@ -307,6 +304,13 @@ print.sg_sim <- function(x, ...) {
   }
   res
 }
+
+.sg_need_desolve <- function(what, alternative = "") {
+  if (!.sg_has_desolve()) {
+    .sg_stop(what, " needs the 'deSolve' package: install.packages(\"deSolve\")", alternative, ".")
+  }
+}
+.sg_has_desolve <- function() requireNamespace("deSolve", quietly = TRUE)
 
 # Maximum number of Dormand-Prince steps per day.
 .sg_dopri5_max_steps <- 1e5

@@ -227,10 +227,31 @@ Release sizes may be given per km² and are converted with A.
 
 ## 10. Solvers
 
-**ODE.** Dormand–Prince RK45 with adaptive steps, integrated one day at a
-time so the daily forcing is constant within each call; releases applied
-between days. A pure-R `deSolve` path calling the same rate function is kept
-for cross-checks.
+**ODE** (`simulate_ode()`, D-019, D-021). The model is integrated one day at
+a time, from t = d − 1 to t = d, with that day's forcing held constant, so the
+change of weather at midnight is an exact breakpoint. Releases are added to
+the state at the start of their day, before it is integrated. The counters
+(S-flows: eggs laid, matings, emergences, deaths) are integrated alongside the
+states and reset each day, giving exact daily totals.
+
+* **C++ backend** (default). The day loop runs in C++ with the package's own
+  Dormand–Prince 5(4) integrator (Hairer's DOPRI5: PI step-size control with
+  β = 0.04, starting-step estimate, error norm
+  sqrt(mean((err_j / (atol + rtol·max(|y_j|, |y_new_j|)))²)), first same as
+  last). Hairer's stiffness test estimates h|λ| from the last two stages at
+  every accepted step; if it exceeds 3.25 on 15 steps of a day, that day is
+  integrated again from its start with `lsoda` driven by the C++ rates, and
+  the C++ loop resumes on the next day. Default tolerances rtol = 1e-8,
+  atol = 1e-10.
+* **R backend.** The same equations in pure R (the readable reference and
+  test oracle), solved day by day with any `deSolve` method (default
+  `lsoda`). Any `deSolve` method can also be driven by the C++ rates.
+
+The two backends agree to within the integration tolerance (tested to 1e-8 at
+rtol = 1e-10 over many scenarios), and both reproduce the legacy Gutierrez &
+Ponti (2014) ODE to 1e-6. Over 24 years of McAllen weather the model was
+never stiff with the defaults or the gp2014 preset; artificial stiffness
+needs extreme settings such as near-instant mating (ν ≥ 10⁴ d⁻¹).
 
 **Chain-binomial (time step dt, rates fixed within the step).**
 
