@@ -81,7 +81,7 @@ mod
 #>   male chain: [0, 202.8) dd: 10
 #>   node area 1 km^2; wounds H = 5 per node; mating "rate"; search competitors "searching_females"
 #>   releases: 20 events on 20 days (days 60 to 193), 10,000 individuals
-#>   hash: a5844ca5f27e0c07362d7651d7b9b72a
+#>   hash: f057a3f76040568befa4ee309ec70ba9
 ```
 
 ## Simulating (milestones M2 and M3)

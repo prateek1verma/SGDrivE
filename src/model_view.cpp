@@ -101,6 +101,7 @@ ModelView::ModelView(const Rcpp::List& view) {
   mating_instant = get_int(view, "mating_instant") == 1;
   search_all_adults = get_int(view, "search_all_adults") == 1;
   larval_per_wound = get_int(view, "larval_per_wound") == 1;
+  oviposition_batches = get_int(view, "oviposition_batches") == 1;
 
   X_E = get_double(view, "X_E");
   tau_L = get_double(view, "tau_L");
@@ -117,6 +118,8 @@ ModelView::ModelView(const Rcpp::List& view) {
   H = get_double(view, "H");
   h_M = get_double(view, "h_M");
   h_M_param = get_double(view, "h_M_param");
+  clutch_size = get_double(view, "clutch_size");
+  if (clutch_size < 0) Rcpp::stop("model view: clutch_size must be >= 0");
 
   inv_w_f = get_doubles(view, "inv_w_f", static_cast<R_xlen_t>(n_A) * n_g);
   inv_w_m = get_doubles(view, "inv_w_m", static_cast<R_xlen_t>(n_A) * n_g);

@@ -3,7 +3,7 @@
     Code
       print(sg_params(n_A = 8))
     Output
-      <sg_params> preset "default": 42 parameters, 1 differ from the defaults (*)
+      <sg_params> preset "default": 44 parameters, 1 differ from the defaults (*)
       
       temperature
           T_L                 14.5                 degC                  GP2014
@@ -54,6 +54,8 @@
           H                   5                    wounds km^-2          GP2014
           sigma0              1                    -                     adapted
           search_denominator  "searching_females"  -                     adapted
+          oviposition         "batches"            -                     adapted
+          clutch_size         NA                   eggs                  adapted
       
       mating
           nu                  0.693147             d^-1                  G2019

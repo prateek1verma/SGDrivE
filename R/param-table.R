@@ -226,6 +226,26 @@
       ),
       type = "choice", choices = "searching_females|all_adults"
     ),
+    .prow("oviposition", "batches", "reproduction", "-", "adapted", "S17",
+      paste(
+        "Egg laying in the chain-binomial solver: \"batches\" (default;",
+        "Poisson numbers of oviposition events, each of clutch_size eggs on",
+        "average) or \"eggs\" (Poisson numbers of single eggs). Same mean;",
+        "batches give the larger variance of real egg masses. The ODE is not",
+        "affected. D-024."
+      ),
+      type = "choice", choices = "batches|eggs"
+    ),
+    .prow("clutch_size", NA_real_, "reproduction", "eggs", "adapted", "S17",
+      paste(
+        "Mean eggs per oviposition event. NA (default): R * phi_ov, the eggs",
+        "a female lays in one day at the day's temperature (one wound found",
+        "per day, as in Gutierrez & Ponti). When set, events occur at",
+        "R * phi_ov * Psi / clutch_size per egg-laying female per day, so",
+        "mean egg production is unchanged. D-024."
+      ),
+      lower = 0, bounds = "(]", allow_na = TRUE
+    ),
 
     # ---- mating -------------------------------------------------------------
     .prow("nu", log(2), "mating", "d^-1", "G2019", "S12",

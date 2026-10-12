@@ -129,14 +129,26 @@
   unm <- matrix(x[s$idx$U], n_a, n_g)
   fem <- array(x[s$idx$F], c(n_a, n_g, n_g)) # [substage, mate, genotype]
 
-  # ---- eggs (S17): Poisson per female x mate pair, split over offspring ---
+  # ---- eggs (S17), per female x mate pair, split over offspring genotypes:
+  # oviposition events (batches, D-024) then viable eggs, or single eggs ----
+  batches <- p$oviposition == "batches"
+  factor <- .sg_batch_factor(p, info$phi_ov) # events per wound found
+  clutch <- if (is.na(p$clutch_size)) p$R * info$phi_ov else p$clutch_size
   eggs <- numeric(n_g)
+  n_batches <- 0
   for (g in seq_len(n_g)) {
     for (m in seq_len(n_g)) {
       tgm <- s$egg_tensor[(g - 1L) * n_g + m, ]
       tot <- sum(tgm)
-      if (tot <= 0) next
-      n_eggs <- draw$pois(p$R * info$phi_ov * a$psi * a$w_lay[m, g] * tot * dt)
+      if (batches) {
+        nb <- draw$pois(a$psi * factor * a$w_lay[m, g] * dt)
+        n_batches <- n_batches + nb
+        if (nb == 0 || tot <= 0) next
+        n_eggs <- draw$pois(nb * clutch * tot)
+      } else {
+        if (tot <= 0) next
+        n_eggs <- draw$pois(p$R * info$phi_ov * a$psi * a$w_lay[m, g] * tot * dt)
+      }
       eggs <- eggs + draw$multinom(n_eggs, tgm / tot)
     }
   }
@@ -281,7 +293,7 @@
 
   flows <- c(
     eggs,
-    a$psi * sum(a$w_lay) * dt, # egg_batches: expected value (D-022)
+    if (batches) n_batches else a$psi * sum(a$w_lay) * factor * dt, # egg_batches
     sum(me$out), sum(ml$out), sum(em_m), sum(em_f),
     sum(mp$out) - sum(em_m) - sum(em_f),
     as.vector(t(matings)),
@@ -292,14 +304,15 @@
   list(x = out, flows = flows)
 }
 
-# Day loop of the reference chain-binomial solver (tests only): releases at
-# the start of each day, then 1/dt steps with the day's forcing. In
-# stochastic mode the initial state and the releases are first rounded
-# without bias (initial state, then releases in event order).
-.sg_cb_run_r <- function(model, init = NULL, dt = 0.1, stochastic = TRUE, n_days = NULL) {
-  s <- .sg_reference_setup(model)
-  steps <- round(1 / dt)
-  if (steps < 1L || abs(steps * dt - 1) > 1e-9) {
+# Inputs of a chain-binomial run, shared by the R and C++ drivers so that
+# both consume random numbers identically: steps per day, initial state and
+# release counts (rounded without bias when stochastic: initial state, then
+# releases in event order) and the matrix of individuals released per day
+# and block.
+.sg_cb_inputs <- function(model, init, dt, stochastic, n_days) {
+  dt_ok <- is.numeric(dt) && length(dt) == 1L && dt > 0
+  steps <- if (dt_ok) round(1 / dt) else 0
+  if (!dt_ok || steps < 1L || abs(steps * dt - 1) > 1e-9) {
     .sg_stop("`dt` must divide one day into a whole number of steps.")
   }
   if (is.null(n_days)) n_days <- model$forcing$n_days
@@ -309,6 +322,22 @@
     x <- .sg_cb_round(x)
     rel$count <- .sg_cb_round(rel$count)
   }
+  released <- matrix(0, n_days, 4L, dimnames = list(NULL, c("E", "P", "M", "U")))
+  rel_block <- substr(sg_state_names(model)[rel$index], 1L, 1L)
+  for (j in which(rel$day <= n_days)) {
+    released[rel$day[j], rel_block[j]] <- released[rel$day[j], rel_block[j]] + rel$count[j]
+  }
+  list(steps = steps, n_days = n_days, x = x, rel = rel, released = released)
+}
+
+# Day loop of the reference chain-binomial solver (tests only): releases at
+# the start of each day, then 1/dt steps with the day's forcing.
+.sg_cb_run_r <- function(model, init = NULL, dt = 0.1, stochastic = TRUE, n_days = NULL) {
+  s <- .sg_reference_setup(model)
+  inp <- .sg_cb_inputs(model, init, dt, stochastic, n_days)
+  n_days <- inp$n_days
+  x <- inp$x
+  rel <- inp$rel
   draw <- .sg_cb_draws(stochastic)
   state <- matrix(NA_real_, n_days + 1L, s$n_states,
     dimnames = list(NULL, sg_state_names(model))
@@ -317,16 +346,10 @@
   counters <- matrix(0, n_days, length(s$counter_names),
     dimnames = list(NULL, s$counter_names)
   )
-  blocks <- c("E", "P", "M", "U")
-  released <- matrix(0, n_days, 4L, dimnames = list(NULL, blocks))
-  rel_block <- substr(sg_state_names(model)[rel$index], 1L, 1L)
   for (d in seq_len(n_days)) {
-    for (j in which(rel$day == d)) {
-      x[rel$index[j]] <- x[rel$index[j]] + rel$count[j]
-      released[d, rel_block[j]] <- released[d, rel_block[j]] + rel$count[j]
-    }
+    for (j in which(rel$day == d)) x[rel$index[j]] <- x[rel$index[j]] + rel$count[j]
     info <- .sg_cb_day_r(d, s, dt)
-    for (k in seq_len(steps)) {
+    for (k in seq_len(inp$steps)) {
       r <- .sg_cb_step_r(x, info, s, dt, draw)
       x <- r$x
       counters[d, ] <- counters[d, ] + r$flows
@@ -334,7 +357,25 @@
     state[d + 1L, ] <- x
   }
   list(
-    day = 0:n_days, state = state, counters = counters, releases = released,
+    day = 0:n_days, state = state, counters = counters, releases = inp$released,
     dt = dt, stochastic = stochastic
+  )
+}
+
+# The same run with the C++ step and day loop (src/cb_step.cpp), returning
+# the same structure (states of every day) plus the extinction day.
+.sg_cb_run_cpp <- function(model, init = NULL, dt = 0.1, stochastic = TRUE, n_days = NULL) {
+  inp <- .sg_cb_inputs(model, init, dt, stochastic, n_days)
+  view <- .sg_model_view(model)
+  res <- sg_cb_run_cpp(
+    view, inp$x, as.numeric(inp$rel$count), dt, stochastic, inp$n_days,
+    rep(TRUE, inp$n_days)
+  )
+  state <- rbind(inp$x, res$states)
+  dimnames(state) <- list(NULL, sg_state_names(model))
+  colnames(res$counters) <- attr(view, "counter_names")
+  list(
+    day = 0:inp$n_days, state = state, counters = res$counters, releases = inp$released,
+    dt = dt, stochastic = stochastic, extinct_day = res$extinct_day, days_run = res$days_run
   )
 }

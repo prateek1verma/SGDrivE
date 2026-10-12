@@ -261,7 +261,8 @@ void RateKernel::eval(int day, const double* y, double* dydt, double* counters) 
     last_e += egg[g * nE + (nE - 1)];
     last_l += lar[g * nL + (nL - 1)];
   }
-  counters[c++] = psi * a.sum_w;   // egg_batches
+  // egg_batches: oviposition events per day (D-024)
+  counters[c++] = psi * a.sum_w * (v.clutch_size > 0 ? v.R * r.phi_ov / v.clutch_size : 1.0);
   counters[c++] = q_e * last_e;    // larvae_in
   counters[c++] = q_l * last_l;    // pupae_in
   counters[c++] = sum_in_m;        // emerged_male

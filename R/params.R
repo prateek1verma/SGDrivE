@@ -181,6 +181,9 @@ sg_params <- function(..., preset = c("default", "gp2014")) {
   if (v$larval_dd == "none" && v$gamma_L > 0) {
     .sg_warn("gamma_L = ", v$gamma_L, " has no effect unless larval_dd = \"per_wound\".")
   }
+  if (v$oviposition == "eggs" && !is.na(v$clutch_size)) {
+    .sg_warn("clutch_size has no effect unless oviposition = \"batches\".")
+  }
   if (v$mating == "instant" && v$X_rec > 0) {
     .sg_warn("With mating = \"instant\" females mate at emergence; X_rec is ignored.")
   }

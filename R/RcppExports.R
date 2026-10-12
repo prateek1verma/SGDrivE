@@ -5,6 +5,14 @@ sg_backend_info_cpp <- function() {
     .Call(`_SGDrivE_sg_backend_info_cpp`)
 }
 
+sg_cb_step_cpp <- function(view, day, dt, x, stochastic) {
+    .Call(`_SGDrivE_sg_cb_step_cpp`, view, day, dt, x, stochastic)
+}
+
+sg_cb_run_cpp <- function(view, x0, rel_count, dt, stochastic, n_days, record) {
+    .Call(`_SGDrivE_sg_cb_run_cpp`, view, x0, rel_count, dt, stochastic, n_days, record)
+}
+
 sg_chain_advance_cpp <- function(q, last, dt, average = FALSE, mu = 0.0) {
     .Call(`_SGDrivE_sg_chain_advance_cpp`, q, last, dt, average, mu)
 }

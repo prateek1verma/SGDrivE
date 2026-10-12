@@ -14,8 +14,9 @@ wx_all <- sg_example_weather()
 
 sit_raw <- sg_test_cube_sit(residual = 0.1)
 sit_raw$eta[, "S"] <- 0.5
-mk <- function(p, cube, releases = NULL, start = "1971-05-01", end = "1971-06-29") {
-  sg_model(p, cube, sg_forcing(wx_all, p, start, end), releases)
+mk <- function(p, cube, releases = NULL, start = "1971-05-01", end = "1971-06-29",
+               area = 1) {
+  sg_model(p, cube, sg_forcing(wx_all, p, start, end), releases, area = area)
 }
 flow_error <- function(r) {
   k <- r$counters
@@ -85,9 +86,15 @@ test_that("stochastic runs give whole, non-negative counts with exact flow accou
 })
 
 test_that("the mean of a stochastic step is the deterministic step", {
-  for (mating in c("rate", "instant")) {
-    p <- sg_params(mating = mating, larval_dd = "per_wound", gamma_L = 0.01)
-    m <- mk(p, sg_cube(sit_raw))
+  settings <- list(
+    list(mating = "rate", oviposition = "batches"),
+    list(mating = "instant", oviposition = "eggs"),
+    list(mating = "rate", oviposition = "batches", clutch_size = 250)
+  )
+  for (st in settings) {
+    mating <- paste(unlist(st), collapse = " ")
+    p <- do.call(sg_params, c(st, list(larval_dd = "per_wound", gamma_L = 0.01)))
+    m <- mk(p, sg_cube(sit_raw), area = 1000) # wounds do not limit laying
     s <- setup(m)
     set.seed(5)
     x <- round(stats::runif(m$n_states, 0, 200))
@@ -101,9 +108,36 @@ test_that("the mean of a stochastic step is the deterministic step", {
     z <- (rowMeans(runs)[ok] - det[ok]) / se[ok]
     expect_lt(max(abs(z)), 5, label = paste(mating, "max |z|"))
     expect_lt(mean(abs(z) > 2), 0.15)
-    # entries that never vary are exact: egg_batches (an expectation) or rare
+    # entries that never vary: egg_batches with oviposition = "eggs" (an
+    # expectation) or rare events
     expect_true(all(abs(rowMeans(runs)[!ok] - det[!ok]) < 0.05 * pmax(1, det[!ok])))
   }
+})
+
+test_that("batches give the variance of egg masses, single eggs Poisson variance", {
+  m_of <- function(...) mk(sg_params(...), sg_cube(sg_test_cube_wild()), area = 1000)
+  egg_var_ratio <- function(m) {
+    s <- setup(m)
+    x <- numeric(m$n_states)
+    x[sg_state_index(m, "F")] <- 30 # all classes, laying ones included
+    x[sg_state_index(m, "M")] <- 10
+    info <- day_info(20, s, 0.1)
+    set.seed(9)
+    e <- replicate(1500, step(x, info, s, 0.1, draws(TRUE))$flows[["eggs_laid[W]"]])
+    det <- step(x, info, s, 0.1, draws(FALSE))$flows[["eggs_laid[W]"]]
+    expect_equal(mean(e), det, tolerance = 0.08)
+    list(ratio = stats::var(e) / mean(e), clutch = 90 * info$phi_ov)
+  }
+  single <- egg_var_ratio(m_of(oviposition = "eggs"))
+  expect_gt(single$ratio, 0.85)
+  expect_lt(single$ratio, 1.15)
+  b <- egg_var_ratio(m_of())
+  # compound Poisson: variance / mean = 1 + clutch size (here R * phi_ov)
+  expect_gt(b$ratio / (1 + b$clutch), 0.75)
+  expect_lt(b$ratio / (1 + b$clutch), 1.25)
+  b300 <- egg_var_ratio(m_of(clutch_size = 300))
+  expect_gt(b300$ratio / 301, 0.75)
+  expect_lt(b300$ratio / 301, 1.25)
 })
 
 test_that("unbiased rounding, empty populations and sex-linked cubes", {

@@ -307,9 +307,8 @@ and needs 'deSolve' only when a fallback day occurs.
 7. **Integers.** Non-integer initial states and releases are rounded
    without bias in each replicate (floor plus a Bernoulli draw on the
    fraction). Counts are stored as doubles (exact integers to 2^53). Flow
-   accounting is an exact integer identity. The `egg_batches` counter is
-   recorded as its expected value (eggs are Poisson; clutch structure is
-   not modelled in v0.1).
+   accounting is an exact integer identity. Egg laying: see D-024 (batches
+   by default; the original Poisson single eggs remain an option).
 8. **Output.** `simulate_cb()` returns an `sg_sim_cb` object: states
    [output day, state, replicate] or block x genotype totals (`keep`),
    daily counters per replicate, releases, extinction day per replicate
@@ -343,6 +342,29 @@ and needs 'deSolve' only when a fallback day occurs.
    Same in the ODE and the chain-binomial solver.
 2. **g_find counts all mature males equally**, not weighted by eta:
    g_find = M_bar / (h_M A + M_bar).
+
+---
+
+## D-024 Oviposition in batches in the chain-binomial solver (Accepted, 2026-10-12)
+
+Screwworm females lay egg masses at wounds, not single eggs. In the
+chain-binomial solver, egg laying is by default (`oviposition = "batches"`)
+a two-level draw for each female x mate genotype pair in a step:
+oviposition events ~ Poisson(Psi f W dt), then viable eggs ~ Poisson(events
+x clutch x sum_k T) split over offspring genotypes. With `clutch_size = NA`
+(default) a batch is R phi_ov eggs, the eggs a female lays in a day at the
+day's temperature, and f = 1: Gutierrez & Ponti's Psi is the probability of
+finding a wound per day, as in their egg-batch output. With `clutch_size`
+set, f = R phi_ov / clutch_size. The mean egg production, and so the ODE and
+the deterministic map, are unchanged; the variance of egg numbers grows from
+the mean (Poisson single eggs, `oviposition = "eggs"`, the original D-022
+choice, kept for comparison with MGDrivE-style models) to about
+(1 + clutch) x mean. This matters in small populations (extinction
+probability, time to eradication, genetic drift through sibships) and not
+for large ones. The `egg_batches` counter becomes a count of events
+(including those of sterile-mated females, whose eggs are not viable); in
+the ODE its rate is Psi f W. Not modelled: the regular laying cycle of each
+female, and aggregation of several females in one wound. Amends D-022 item 7.
 
 ---
 

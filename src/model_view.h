@@ -30,10 +30,12 @@ struct ModelView {
 
   // options
   bool mating_instant, search_all_adults, larval_per_wound;
+  bool oviposition_batches;  // chain-binomial egg laying in batches (D-024)
 
   // scalar parameters (counts per node where relevant)
   double X_E, tau_L, X_P, R, a_s, sigma0, nu, mu_L0, gamma_L, mu_W, mu_b_F, mu_b_M;
   double H, h_M, h_M_param;
+  double clutch_size;  // mean eggs per batch; 0 = R * phi_ov (D-024)
 
   // adult chains (S6, D-018)
   std::vector<double> inv_w_f, inv_w_m;  // [n_A, n_g]; 0 for classes never reached

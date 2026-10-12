@@ -53,6 +53,12 @@
   )
 }
 
+# Oviposition events per wound found (D-024): 1 when a batch is the day's
+# eggs (clutch_size = NA), otherwise R * phi_ov / clutch_size.
+.sg_batch_factor <- function(p, phi_ov) {
+  if (is.na(p$clutch_size)) 1 else p$R * phi_ov / p$clutch_size
+}
+
 # Names of the cumulative counters (rates per day in the rate function).
 .sg_counter_names <- function(geno) {
   pairs <- paste0(rep(geno, each = length(geno)), "|", rep(geno, times = length(geno)))
@@ -233,7 +239,7 @@
   matings <- (colSums(mating_flux) + in_f_mated) * pi_gm
   counters <- c(
     unname(births),
-    psi * sum(w_lay),
+    psi * sum(w_lay) * .sg_batch_factor(p, phi_ov), # egg_batches
     q_e * sum(egg[s$n_E, ]),
     q_l * sum(lar[s$n_L, ]),
     sum(in_m), sum(in_f), emergence_deaths,

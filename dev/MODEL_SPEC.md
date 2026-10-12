@@ -289,12 +289,23 @@ probability Ā_{1,out} of leaving again being kept in sub-stage l. Arrivals of
 a step are added at its end.
 
 **(S17) Eggs.** For each female × mate genotype pair (g, m), with
-T[g,m,k] = s_g · ih[g,m,k] · τ[g,m,k] (S9):
+T[g,m,k] = s_g · ih[g,m,k] · τ[g,m,k] (S9). With `oviposition = "batches"`
+(default, D-024):
 
-    N_{g,m}         ~ Poisson(R φ_ov Ψ W_{g,m} Σ_k T[g,m,k] dt)
+    B_{g,m}         ~ Poisson(Ψ f W_{g,m} dt)                     oviposition events
+    N_{g,m}         ~ Poisson(B_{g,m} · C · Σ_k T[g,m,k])          viable eggs
     (N_{g,m,k})_k   ~ Multinomial(N_{g,m}; T[g,m,·] / Σ_k T[g,m,k])
 
-The eggs arrive in the egg chain of genotype k.
+with clutch size C = R φ_ov and f = 1 when `clutch_size` is NA (a batch is
+the eggs of one day; Ψ is the daily probability of finding a wound), or
+C = `clutch_size` and f = R φ_ov / C. With `oviposition = "eggs"`:
+
+    N_{g,m}         ~ Poisson(R φ_ov Ψ W_{g,m} Σ_k T[g,m,k] dt)
+
+then the same split. Both have mean R φ_ov Ψ W_{g,m} Σ_k T dt (S9); batches
+raise the variance to about (1 + C) times the mean. The eggs arrive in the
+egg chain of genotype k. The egg_batches counter counts events B (ODE rate
+Ψ f Σ W).
 
 **(S18) Mating** (before ageing; unmated and mated females share age chain
 and hazard, so the order does not bias ageing or survival):
@@ -318,7 +329,7 @@ only when no compatible male is present).
 the rest die at emergence. Survivors arrive in the adult chains (S16, S18).
 
 **Order of draws in a step.** Aggregates (S15); eggs (S17, pairs (g, m) with
-m fastest); mating (S18, genotype then sub-stage); chain moves (S16) block by
+m fastest: events, then eggs, then split); mating (S18, genotype then sub-stage); chain moves (S16) block by
 block (E, L, P, M, U, F) and compartment by compartment in state order;
 emergence (S19, by genotype); arrivals block by block in state order (eggs
 by genotype, larvae, pupae, males; then females by genotype: death, mating,

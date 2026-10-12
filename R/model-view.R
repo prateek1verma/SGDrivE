@@ -38,11 +38,13 @@
     mating_instant = as.integer(p$mating == "instant"),
     search_all_adults = as.integer(p$search_denominator == "all_adults"),
     larval_per_wound = as.integer(p$larval_dd == "per_wound"),
+    oviposition_batches = as.integer(p$oviposition == "batches"),
     # scalar parameters (counts per node where relevant)
     X_E = p$X_E, tau_L = p$tau_L, X_P = p$X_P, R = p$R, a_s = p$a_s,
     sigma0 = p$sigma0, nu = p$nu, mu_L0 = -log(p$s_L), gamma_L = p$gamma_L,
     mu_W = p$mu_W, mu_b_F = p$mu_b_F, mu_b_M = p$mu_b_M,
     H = s$counts$H, h_M = s$counts$h_M, h_M_param = p$h_M,
+    clutch_size = if (is.na(p$clutch_size)) 0 else p$clutch_size,
     # adult chains: [substage, genotype], column-major
     inv_w_f = inv_width(s$w_f), inv_w_m = inv_width(s$w_m),
     last_f = as.integer(s$last_f), last_m = as.integer(s$last_m),

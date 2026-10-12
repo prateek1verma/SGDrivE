@@ -19,6 +19,17 @@
   stochastic step. Time-step study (`bench/m4_dt_convergence.R`): placing
   arrivals at their expected position within the step brings the error at
   dt = 0.1 from 3-5% to below 0.6% in every block; default dt = 0.1.
+* Egg laying in batches (D-024): new parameters `oviposition` ("batches",
+  default, or "eggs") and `clutch_size` (default R * phi_ov, the eggs of one
+  day). In the chain-binomial solver, oviposition events are drawn first
+  and eggs per event after, which keeps the mean (and the ODE) but gives
+  the variance of real egg masses; the `egg_batches` counter counts events.
+* C++ chain-binomial step and day loop (`src/cb_step.h`, `src/cb_step.cpp`):
+  identical, draw for draw, to the R reference with the same seed, and its
+  deterministic map to 1e-12. Releases at the start of their day, exact
+  integer flow accounting, early stop once a population is extinct with no
+  releases left. About 0.06 s per simulated year for a two-genotype release
+  model, nearly independent of population size.
 
 ## Milestone M3: C++ backend
 
