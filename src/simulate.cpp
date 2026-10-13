@@ -89,7 +89,7 @@ double sg_kernel_max_rate_cpp(SEXP ptr, int day, const Rcpp::NumericVector& x) {
 // the last completed day (or, if the loop stopped on day d, the state at the
 // start of day d after its releases) and stopped_day (0 if all days were
 // completed) with stop_status (1 too many steps, 2 step size too small,
-// 3 stiff).
+// 3 stiff, 4 non-finite state).
 // [[Rcpp::export]]
 Rcpp::List sg_ode_run_cpp(SEXP ptr, const Rcpp::NumericVector& x0, int day_from, int day_to,
                           double rtol, double atol, const Rcpp::LogicalVector& record,
@@ -134,9 +134,12 @@ Rcpp::List sg_ode_run_cpp(SEXP ptr, const Rcpp::NumericVector& x0, int day_from,
     };
     const sgdrive::Dopri5Stats st = solver.integrate(rhs, d - 1.0, static_cast<double>(d),
                                                      y.data(), opt);
-    if (st.status != 0) {
+    // a solution that is not finite stops the run (status 4; defensive: the
+    // error control rejects such steps)
+    const bool finite = std::all_of(y.begin(), y.end(), [](double v) { return std::isfinite(v); });
+    if (st.status != 0 || !finite) {
       stopped_day = d;  // x holds the state at the start of day d, after releases
-      stop_status = st.status;
+      stop_status = st.status != 0 ? st.status : 4;
       break;
     }
     std::copy(y.begin(), y.begin() + n, x.begin());

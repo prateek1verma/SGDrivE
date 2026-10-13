@@ -301,20 +301,27 @@ void RateKernel::eval(int day, const double* y, double* dydt, double* counters) 
 double RateKernel::max_rate(int day, const double* y) {
   const ModelView& v = mv_;
   const DayRates r = day_rates(day);
-  double sum_l = 0.0;
-  const double* lar = y + v.offsets[kL];
-  for (int i = 0; i < v.n_g * v.n_L; ++i) sum_l += lar[i];
-  const double mu_l = larval_hazard(sum_l);
+  aggregate(r, y);  // larval crowding, male availability (S7, S12)
+  const Aggregates& a = agg_;
   const double dx = r.dx, mu_f = r.mu_f, mu_m = r.mu_m;
-  double best = std::max({r.q_e + r.mu_e, r.q_l + mu_l, r.q_p + r.mu_p});
-  double max_iw_f = -1.0, max_iw_m = -1.0;
-  for (double iw : v.inv_w_f) {
-    if (iw > 0) max_iw_f = std::max(max_iw_f, iw);
+  double best = std::max({r.q_e + r.mu_e, r.q_l + a.mu_l, r.q_p + r.mu_p});
+  // unmated females: ageing, death and mating (D-026); mated females age and
+  // die at the same rates without mating, so they never exceed this
+  for (int g = 0; g < v.n_g; ++g) {
+    for (int s = 0; s < v.n_A; ++s) {
+      const double iw = v.inv_w_f[static_cast<std::size_t>(g) * v.n_A + s];
+      if (iw <= 0) continue;
+      double nu_s = 0.0;
+      if (a.mate_ok[g]) {
+        nu_s = v.mating_instant ? v.nu * a.g_find : v.nu * v.receptive[s] * a.g_find;
+      }
+      best = std::max(best, dx * iw + mu_f + nu_s);
+    }
   }
+  double max_iw_m = -1.0;
   for (double iw : v.inv_w_m) {
     if (iw > 0) max_iw_m = std::max(max_iw_m, iw);
   }
-  if (max_iw_f > 0) best = std::max(best, dx * max_iw_f + mu_f);
   if (max_iw_m > 0) best = std::max(best, dx * max_iw_m + mu_m);
   return best;
 }

@@ -23,6 +23,20 @@
   table. Colours are colour-blind friendly: Okabe-Ito by default,
   ColorBrewer (`palette = "brewer"`) or viridis; ColorBrewer Paired for 9 to
   12 series.
+* `check_model()`: model size and options, the fastest sub-stage rate and
+  the mating rate, R0 over the forcing (days with R0 > 1, longest run),
+  genotypes that can never lay, mate or mature, sterile releases, and the
+  seasonal low of the wild population (ODE after a burn-in) with a warning
+  when stochastic runs may go extinct by chance.
+* `sg_r0()`: eggs per egg at low density of a wild-type population at
+  constant temperatures. `sg_flow_balance()`: the flow balance of any
+  simulation between output days.
+* The solver diagnostic `max_rate` includes the mating rate of unmated
+  females (O-007).
+* Runtime guards: a deSolve day that does not reach its end (lsoda can
+  return its starting values with a success code when its step size
+  underflows) or a non-finite state stops the ODE with the day; a
+  non-finite or negative count or flow stops a chain-binomial run.
 
 ## Milestone M4: chain-binomial stochastic solver
 

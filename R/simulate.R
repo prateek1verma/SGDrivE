@@ -52,7 +52,8 @@
 #' detected (`lsoda`: finished on its stiff method; Dormand-Prince: Hairer's
 #' test; `NA` for other methods), whether the day was integrated by the
 #' `lsoda` fallback (steps and evaluations are then those of `lsoda`), the
-#' largest rate (transfer plus mortality) of any compartment, and the smallest
+#' largest rate of any compartment (transfer plus mortality, plus mating for
+#' unmated females; D-026), and the smallest
 #' state value. Values slightly below zero (round-off near extinction) are
 #' reported, not removed.
 #'
@@ -260,7 +261,7 @@ print.sg_sim <- function(x, ...) {
 # are integrated with lsoda using the C++ rates, then the C++ loop resumes.
 .sg_run_dopri5 <- function(res, ctx, x, ptr, stiff_fallback) {
   record <- seq_len(ctx$n_days) %in% ctx$out_days
-  status_text <- c("too many steps", "step size too small", "stiff")
+  status_text <- c("too many steps", "step size too small", "stiff", "non-finite state")
   d <- 1L
   while (d <= ctx$n_days) {
     r <- sg_ode_run_cpp(
@@ -281,6 +282,12 @@ print.sg_sim <- function(x, ...) {
     x <- r$x
     if (r$stopped_day == 0L) break
     d <- r$stopped_day
+    if (r$stop_status == 4L) {
+      .sg_stop(
+        "The solution became non-finite on day ", d, " (", format(ctx$model$forcing$dates[d]),
+        "); check the parameters."
+      )
+    }
     if (!stiff_fallback) {
       .sg_stop(
         "The Dormand-Prince integration failed on day ", d, " (",
@@ -321,13 +328,21 @@ print.sg_sim <- function(x, ...) {
     y = c(x, numeric(ctx$n_c)), times = c(d - 1, d), func = ctx$func,
     parms = list(day = d), method = method, rtol = ctx$rtol, atol = ctx$atol
   )
-  if (nrow(sol) < 2L || anyNA(sol[2L, -1L])) {
+  ist <- attr(sol, "istate")
+  rst <- attr(sol, "rstate")
+  # deSolve does not always flag a failure: it may return a negative code,
+  # missing values, or (lsoda, when the step size underflows) a success code
+  # with the starting values, having reached an earlier time (rstate[3])
+  failed <- nrow(sol) < 2L || any(!is.finite(sol[2L, -1L])) ||
+    (!is.null(ist) && !is.na(ist[1L]) && ist[1L] < 0) ||
+    (method == "lsoda" && length(rst) >= 3L && is.finite(rst[3L]) && rst[3L] < d - 1e-9)
+  if (failed) {
     .sg_stop(
-      "The integration failed on day ", d, " (", format(ctx$model$forcing$dates[d]), ")."
+      "The integration failed on day ", d, " (", format(ctx$model$forcing$dates[d]), "): ",
+      "the solution may have become non-finite or grown without bound; check the parameters."
     )
   }
   y <- unname(sol[2L, -1L])
-  ist <- attr(sol, "istate")
   list(
     x = y[seq_len(ctx$n)], counters = y[ctx$n + seq_len(ctx$n_c)],
     steps = ist[2L], evaluations = ist[3L],
@@ -374,14 +389,24 @@ print.sg_sim <- function(x, ...) {
   as.numeric(sg_init(model, "state", state = init))
 }
 
-# Largest total rate (transfer + mortality) of any compartment that is in use.
+# Largest total rate (transfer + mortality, and mating for unmated females;
+# D-026) of any compartment that is in use.
 .sg_max_rate <- function(day, x, setup) {
   a <- .sg_rates_r(day, x, setup, aux = TRUE)$aux
-  q_f <- a$q_f[is.finite(setup$w_f)]
+  p <- setup$p
+  nu_i <- if (p$mating == "instant") {
+    rep(p$nu * a$g_find, setup$n_A)
+  } else {
+    p$nu * setup$receptive * a$g_find
+  }
+  mate_ok <- rowSums(a$pi) > 0
+  # unmated females [substage, genotype]: ageing, death and mating
+  u_rate <- a$q_f + a$mu[["F"]] + outer(nu_i, as.numeric(mate_ok))
+  u_rate <- u_rate[is.finite(setup$w_f)]
   q_m <- a$q_m[is.finite(setup$w_m)]
   max(
     a$q[["E"]] + a$mu[["E"]], a$q[["L"]] + a$mu[["L"]], a$q[["P"]] + a$mu[["P"]],
-    if (length(q_f)) max(q_f) + a$mu[["F"]] else 0,
+    if (length(u_rate)) max(u_rate) else 0,
     if (length(q_m)) max(q_m) + a$mu[["M"]] else 0
   )
 }

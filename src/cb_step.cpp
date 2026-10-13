@@ -222,6 +222,15 @@ Rcpp::List sg_cb_run_cpp(const Rcpp::List& view, const Rcpp::NumericVector& x0,
       for (int c = 0; c < nc; ++c) counters(d - 1, c) += flows[c];
     }
     days_run = d;
+    bool valid = true;
+    for (double v : x) valid = valid && std::isfinite(v) && !(stochastic && v < 0.0);
+    for (int c = 0; c < nc; ++c) valid = valid && std::isfinite(counters(d - 1, c));
+    if (!valid) {
+      Rcpp::stop(
+          "chain-binomial run: a count or flow became non-finite or negative on day %d; check "
+          "the parameters",
+          d);
+    }
     if (record[d - 1]) {
       for (int i = 0; i < n; ++i) states(row, i) = x[i];
       state_days[row++] = d;

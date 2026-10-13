@@ -38,6 +38,11 @@ reference:
       - sg_allele_freq
       - sg_females
       - sg_cases
+  - title: Checks
+    contents:
+      - check_model
+      - sg_r0
+      - sg_flow_balance
   - title: Plots
     contents:
       - plot.sg_sim

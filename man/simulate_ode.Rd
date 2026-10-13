@@ -89,7 +89,8 @@ by old age), giving daily totals used for flow accounting and outputs.
 detected (\code{lsoda}: finished on its stiff method; Dormand-Prince: Hairer's
 test; \code{NA} for other methods), whether the day was integrated by the
 \code{lsoda} fallback (steps and evaluations are then those of \code{lsoda}), the
-largest rate (transfer plus mortality) of any compartment, and the smallest
+largest rate of any compartment (transfer plus mortality, plus mating for
+unmated females; D-026), and the smallest
 state value. Values slightly below zero (round-off near extinction) are
 reported, not removed.
 }

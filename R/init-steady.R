@@ -85,26 +85,12 @@
 .sg_init_equilibrium <- function(model, temperature) {
   ok <- is.numeric(temperature) && length(temperature) == 1L && is.finite(temperature)
   if (!ok) .sg_stop("method = \"equilibrium\" needs a single `temperature` (degC).")
-  cb <- model$cube
-  w <- cb$wild_type
-  if (length(w) != 1L || cb$ih[w, w, w] < 1 - 1e-12 || cb$phi[[w]] <= 0 || cb$phi[[w]] >= 1) {
-    .sg_stop(
-      "method = \"equilibrium\" needs a single wild-type genotype that produces both sexes ",
-      "and breeds true (wild x wild gives only wild type); this cube has wild type(s) ",
-      .sg_wrap_names(w), ". Use method = \"burn_in\" instead."
-    )
-  }
-  s <- .sg_reference_setup(model)
+  w <- .sg_wild_setup(model, "method = \"equilibrium\"")
+  s <- w$s
   p <- s$p
-  f <- .sg_constant_forcing(model$params, temperature)
-  gi <- match(w, s$geno)
-  t_ww <- s$egg_tensor[(gi - 1L) * s$n_g + gi, gi]
-  rates <- list(
-    dx = f$dx, q_e = s$n_E * f$dx_egg / p$X_E, mu_e = f$mu_E,
-    q_l = s$n_L / p$tau_L, q_p = s$n_P * f$dx / p$X_P,
-    mu_p = f$mu_T + p$mu_W * (1 - f$moisture),
-    mu_f = f$mu_T + p$mu_b_F, mu_m = f$mu_T + p$mu_b_M, phi_ov = f$phi_ov
-  )
+  gi <- w$gi
+  t_ww <- w$t_ww
+  rates <- .sg_constant_rates(s, .sg_constant_forcing(model$params, temperature))
   per_b <- .sg_eq_given_b(1, s, gi, rates, crowd = FALSE)
   r0 <- p$R * rates$phi_ov * t_ww * per_b$W * p$sigma0 # eggs per egg at low density
   nonlinear <- (p$larval_dd == "per_wound" && s$counts$H > 0 && p$gamma_L > 0) || p$h_M > 0
@@ -154,6 +140,43 @@
     psi <- psi_of(eq$N_s)
   }
   list(x = eq$x, info = list(temperature = temperature, R0 = r0, psi = psi, eggs_per_day = b))
+}
+
+# The wild-type genotype of a model for equilibrium and R0 calculations: one
+# wild type that produces both sexes and breeds true.
+.sg_wild_setup <- function(model, what) {
+  cb <- model$cube
+  w <- cb$wild_type
+  if (length(w) != 1L || cb$ih[w, w, w] < 1 - 1e-12 || cb$phi[[w]] <= 0 || cb$phi[[w]] >= 1) {
+    .sg_stop(
+      what, " needs a single wild-type genotype that produces both sexes ",
+      "and breeds true (wild x wild gives only wild type); this cube has wild type(s) ",
+      .sg_wrap_names(w), "."
+    )
+  }
+  s <- .sg_reference_setup(model)
+  gi <- match(w, s$geno)
+  list(s = s, gi = gi, t_ww = s$egg_tensor[(gi - 1L) * s$n_g + gi, gi])
+}
+
+# Rates of the equilibrium calculation from one day's forcing values.
+.sg_constant_rates <- function(s, f) {
+  p <- s$p
+  list(
+    dx = f$dx, q_e = s$n_E * f$dx_egg / p$X_E, mu_e = f$mu_E,
+    q_l = s$n_L / p$tau_L, q_p = s$n_P * f$dx / p$X_P,
+    mu_p = f$mu_T + p$mu_W * (1 - f$moisture),
+    mu_f = f$mu_T + p$mu_b_F, mu_m = f$mu_T + p$mu_b_M, phi_ov = f$phi_ov
+  )
+}
+
+# Eggs per egg at low density (R0) of the wild type for given rates: the
+# lifetime egg production of an egg's female descendants with wound search at
+# its low-density value sigma0 (no crowding; mating as soon as males exist).
+.sg_r0_of <- function(w, rates) {
+  p <- w$s$p
+  per_b <- .sg_eq_given_b(1, w$s, w$gi, rates, crowd = FALSE)
+  p$R * rates$phi_ov * w$t_ww * per_b$W * p$sigma0
 }
 
 # Forcing values at a constant temperature (after five days, so that the
