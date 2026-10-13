@@ -86,8 +86,29 @@ boundary.
 * Validate inputs in R, before any C++ call.
 * Error messages say what is wrong, where, and how to fix it, e.g.
   `"cube$ih slices must sum to 1 over offspring genotypes; slice [AA, Aa, ] sums to 0.97."`
-* Warnings are for valid but risky settings (e.g. a large chain-binomial step).
-* Functions never modify their inputs and never use global state.
+* Warnings are for valid but risky settings (e.g. a parameter that has no
+  effect with the chosen options).
+* Functions never modify their inputs and never use global state; the only
+  exception is R's random-number state (next section).
+
+## Random numbers
+
+* All random draws use R's own generator: `stats::rbinom`/`rpois` in R and
+  the same Rmath functions (`R::rbinom`, `R::rpois`) in C++, called only
+  inside an Rcpp function (its `RNGScope` handles the generator state). No
+  other generator, no C++ threads; parallel runs use R processes.
+* The order of draws in a chain-binomial step is part of the specification
+  (`dev/MODEL_SPEC.md`, section 10). Any change to the step goes into the R
+  reference step (`R/cb-reference.R`) and the C++ step (`src/cb_step.h`)
+  together and must keep the draw-for-draw test (`test-cb-cpp.R`) passing;
+  multinomials are sequential conditional binomials in category order.
+* Replicates run on their own L'Ecuyer-CMRG streams (`.sg_with_stream()`).
+  A function that uses random numbers draws its seed from the session's
+  generator only when the user gives none, and restores the session's
+  generator kind and state afterwards.
+* Stochastic tests fix the seed and test distributions (means, variances,
+  frequencies) with bounds of about five standard errors, or compare with
+  the deterministic map (draws replaced by expectations).
 
 ## Comments and documentation
 
@@ -110,9 +131,9 @@ boundary.
 | `sg_tol_ode` | 1e-6 | two solvers of the same model (C++ vs pure-R reference), relative |
 | `sg_tol_reference` | 1e-2 | agreement with the legacy Gutierrez & Ponti R translations |
 
-* Stochastic tests fix the seed with `withr::local_seed()` or `set.seed()`
-  and test distributional properties, not exact draws, unless testing
-  reproducibility.
+* Stochastic tests fix the seed with `set.seed()` and test distributional
+  properties, not exact draws, unless testing reproducibility or R/C++
+  equality (see Random numbers).
 * Slow tests (> 5 s) are skipped on CRAN with `skip_on_cran()`.
 
 ## Version control

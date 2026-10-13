@@ -31,6 +31,7 @@ reference:
   - title: Simulation
     contents:
       - simulate_ode
+      - simulate_cb
   - title: Backend
     contents:
       - sg_backend_info

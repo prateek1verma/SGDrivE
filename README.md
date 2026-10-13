@@ -15,12 +15,12 @@ World screwworm (*Cochliomyia hominivorax*) under genetic control: the
 sterile insect technique (SIT), precision-guided SIT (pgSIT),
 female-specific RIDL (fsRIDL) and gene drives.
 
-> **Status: under development (milestone M3, C++ ODE solver,
+> **Status: under development (milestone M4, stochastic solver,
 > complete).** The package builds models and solves them
-> deterministically with a compiled C++ solver, checked against a pure-R
-> reference solver and the legacy Gutierrez & Ponti (2014) model. The
-> stochastic solver follows in milestone M4. Do not use it for analysis
-> yet.
+> deterministically (ODE) and stochastically (chain-binomial) with
+> compiled C++ solvers, checked against pure-R reference solvers and the
+> legacy Gutierrez & Ponti (2014) model. Checks, summaries and
+> calibration follow in milestone M5. Do not use it for analysis yet.
 
 ## Planned model (v0.1)
 
@@ -84,7 +84,7 @@ mod
 #>   hash: f057a3f76040568befa4ee309ec70ba9
 ```
 
-## Simulating (milestones M2 and M3)
+## Deterministic simulation (milestones M2 and M3)
 
 ``` r
 sim <- simulate_ode(mod) # compiled C++ solver (default)
@@ -93,7 +93,7 @@ sim
 #>   final totals: E 0.49452, L 0.30710, P 0.67484, M 0.47005, U 0.01378, F 0.45628
 #>   eggs laid 2669.2; adults emerged 1229.2; released 10000
 #>   solver: 17 steps/day (max 60), stiffness detected on 0 of 731 days, 0 integrated by the lsoda fallback, largest rate 13.5 per day, min state 0
-#>   run time 0.77 s
+#>   run time 0.27 s
 ```
 
 `simulate_ode()` integrates the model one day at a time with a
@@ -108,6 +108,48 @@ genotype, `"gp2014"` preset) to a relative error below 10^-6 over
 1960-1983 at McAllen, Texas. The C++ solver takes about 4.5 s for those
 24 years, and about 1 s for 24 years of a two-genotype sterile-male
 release model (benchmarks in [`bench/`](bench/README.md)).
+
+## Stochastic simulation (milestone M4)
+
+Counts are whole individuals per node, so the node area matters: with
+the defaults (1 km^2, 5 wounds per km^2) a McAllen population falls
+below one individual in most winters. Here a 1000 km^2 node starts from
+a one-year burn-in of the ODE over the weather before the start date:
+
+``` r
+mod_1000 <- sg_model(p, cube, wx, rel, area = 1000)
+init <- sg_init(mod_1000, "burn_in", weather = sg_example_weather())
+sim_cb <- simulate_cb(mod_1000, init, n_rep = 10, seed = 1, keep = "totals")
+sim_cb
+#> <sg_sim_cb> 10 replicates x 731 days (1971-01-01 to 1972-12-31), dt = 0.1 day, eggs in batches
+#>   final totals, mean [min, max] over replicates:
+#>     E 522.6 [409, 641]
+#>     L 318.5 [274, 439]
+#>     P 681.8 [635, 736]
+#>     M 473.6 [421, 531]
+#>     U 14 [8, 17]
+#>     F 444.9 [424, 464]
+#>   extinct: 0 of 10 replicates
+#>   wild type eliminated: 0 of 10 replicates
+#>   eggs laid 2,668,864 and released 10,000 per replicate (mean)
+#>   seed 1; run time 3.27 s
+```
+
+`simulate_cb()` divides each day into steps (0.1 day by default). Within
+a step, individuals move along their sub-stage chains with the exact
+probabilities of the chain over the step, die, mate, lay eggs and
+emerge, with binomial, multinomial and Poisson draws; eggs are laid in
+batches, as egg masses, by default. The mean of a step is within about
+0.5% of the ODE. Each replicate has its own random-number stream, so it
+is the same whether it runs alone, among others or in parallel
+(`parallel = TRUE`). A two-genotype release model takes about 0.06 s per
+simulated year and replicate, nearly independent of the number of
+individuals. `extinct_day` and `wild_extinct_day` report when the
+population, or its wild type, is gone.
+
+For constant-temperature scenarios,
+`sg_init(model, "equilibrium", temperature = 27)` gives the closed-form
+equilibrium of a wild-type population.
 
 The McAllen cold-stress index reproduces the values published by
 Gutierrez & Ponti (2014) and Gutierrez et al. (2019):
@@ -128,7 +170,7 @@ ci[ci$year %in% c(1971, 1979), c("year", "mu_cold")]
 | M1 ✔ | Inputs: parameters, inheritance cubes, weather forcing, releases, model assembly |
 | M2 ✔ | Reference genotype-resolved ODE in pure R |
 | M3 ✔ | C++ rate kernel and ODE solver |
-| M4 | C++ chain-binomial stochastic solver |
+| M4 ✔ | C++ chain-binomial stochastic solver |
 | M5 | Checks, summaries, calibration and plots |
 | M6 | Scientific validation |
 | M7 | Documentation and v0.1.0 release |

@@ -1,7 +1,10 @@
 # SGDrivE 0.0.0.9000
 
-## Milestone M4: chain-binomial stochastic solver (in progress)
+## Milestone M4: chain-binomial stochastic solver
 
+* Documentation: README section on stochastic simulation, random-number
+  conventions (`dev/CONVENTIONS.md`), `simulate_cb()` in the reference
+  index.
 * Design of the chain-binomial solver (D-022; model specification S15-S19):
   exact moves along sub-stage chains within a step, mating before ageing,
   a canonical order of random draws shared by an R reference and the C++

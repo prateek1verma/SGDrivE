@@ -23,11 +23,12 @@ screwworm (*Cochliomyia hominivorax*) under genetic control: the sterile insect
 technique (SIT), precision-guided SIT (pgSIT), female-specific RIDL (fsRIDL)
 and gene drives.
 
-> **Status: under development (milestone M3, C++ ODE solver, complete).**
-> The package builds models and solves them deterministically with a compiled
-> C++ solver, checked against a pure-R reference solver and the legacy
-> Gutierrez & Ponti (2014) model. The stochastic solver follows in milestone
-> M4. Do not use it for analysis yet.
+> **Status: under development (milestone M4, stochastic solver, complete).**
+> The package builds models and solves them deterministically (ODE) and
+> stochastically (chain-binomial) with compiled C++ solvers, checked against
+> pure-R reference solvers and the legacy Gutierrez & Ponti (2014) model.
+> Checks, summaries and calibration follow in milestone M5. Do not use it for
+> analysis yet.
 
 ## Planned model (v0.1)
 
@@ -76,7 +77,7 @@ mod <- sg_model(p, cube, wx, rel, area = 1)
 mod
 ```
 
-## Simulating (milestones M2 and M3)
+## Deterministic simulation (milestones M2 and M3)
 
 ```{r simulate, eval = requireNamespace("MGDrivE", quietly = TRUE)}
 sim <- simulate_ode(mod) # compiled C++ solver (default)
@@ -96,6 +97,35 @@ at McAllen, Texas. The C++ solver takes about 4.5 s for those 24 years, and
 about 1 s for 24 years of a two-genotype sterile-male release model
 (benchmarks in [`bench/`](bench/README.md)).
 
+## Stochastic simulation (milestone M4)
+
+Counts are whole individuals per node, so the node area matters: with the
+defaults (1 km^2, 5 wounds per km^2) a McAllen population falls below one
+individual in most winters. Here a 1000 km^2 node starts from a one-year
+burn-in of the ODE over the weather before the start date:
+
+```{r stochastic, eval = requireNamespace("MGDrivE", quietly = TRUE)}
+mod_1000 <- sg_model(p, cube, wx, rel, area = 1000)
+init <- sg_init(mod_1000, "burn_in", weather = sg_example_weather())
+sim_cb <- simulate_cb(mod_1000, init, n_rep = 10, seed = 1, keep = "totals")
+sim_cb
+```
+
+`simulate_cb()` divides each day into steps (0.1 day by default). Within a
+step, individuals move along their sub-stage chains with the exact
+probabilities of the chain over the step, die, mate, lay eggs and emerge, with
+binomial, multinomial and Poisson draws; eggs are laid in batches, as egg
+masses, by default. The mean of a step is within about 0.5% of the ODE.
+Each replicate has its own random-number stream, so it is the same whether
+it runs alone, among others or in parallel (`parallel = TRUE`). A two-genotype
+release model takes about 0.06 s per simulated year and replicate, nearly
+independent of the number of individuals. `extinct_day` and
+`wild_extinct_day` report when the population, or its wild type, is gone.
+
+For constant-temperature scenarios, `sg_init(model, "equilibrium",
+temperature = 27)` gives the closed-form equilibrium of a wild-type
+population.
+
 The McAllen cold-stress index reproduces the values published by Gutierrez &
 Ponti (2014) and Gutierrez et al. (2019):
 
@@ -112,7 +142,7 @@ ci[ci$year %in% c(1971, 1979), c("year", "mu_cold")]
 | M1 ✔ | Inputs: parameters, inheritance cubes, weather forcing, releases, model assembly |
 | M2 ✔ | Reference genotype-resolved ODE in pure R |
 | M3 ✔ | C++ rate kernel and ODE solver |
-| M4 | C++ chain-binomial stochastic solver |
+| M4 ✔ | C++ chain-binomial stochastic solver |
 | M5 | Checks, summaries, calibration and plots |
 | M6 | Scientific validation |
 | M7 | Documentation and v0.1.0 release |

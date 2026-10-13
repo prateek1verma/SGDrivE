@@ -15,8 +15,9 @@ Source tags: **[GP2014]** Gutierrez & Ponti (2014) paper or Pascal code;
 * One node (area A km²); one host class. Array dimensions for node and host
   class exist but have length 1 (D-009, CONVENTIONS).
 * Any MGDrivE v1 inheritance cube, used unchanged.
-* Deterministic ODE and stochastic chain-binomial solvers sharing one C++ rate
-  kernel (D-010).
+* Deterministic ODE (`simulate_ode()`) and stochastic chain-binomial
+  (`simulate_cb()`) solvers sharing one C++ rate kernel (D-010, D-021,
+  D-022).
 * Daily weather input; temperature-dependent terms precomputed per day and
   held constant within each day.
 * Not in v0.1: movement, host/wound dynamics, larval transport, explicit
