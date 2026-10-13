@@ -16,6 +16,11 @@
   into fertile ones and their eggs (zero-truncated Poisson), an exact
   refinement that keeps the egg distribution, so random draws differ from
   earlier versions for the same seed.
+* Plots with ggplot2 (suggested package): `plot()` methods for ODE and
+  chain-binomial simulations return ggplot objects of totals by stage or
+  genotype, allele frequencies, female classes or cases, with stochastic
+  replicates drawn as separate lines; `sg_plot_data()` returns the plotted
+  table.
 
 ## Milestone M4: chain-binomial stochastic solver
 

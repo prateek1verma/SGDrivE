@@ -132,7 +132,7 @@ sim_cb
 #>   extinct: 0 of 10 replicates
 #>   wild type eliminated: 0 of 10 replicates
 #>   eggs laid 2,674,116 and released 10,000 per replicate (mean)
-#>   seed 1; run time 3.34 s
+#>   seed 1; run time 3.32 s
 ```
 
 `simulate_cb()` divides each day into steps (0.1 day by default). Within

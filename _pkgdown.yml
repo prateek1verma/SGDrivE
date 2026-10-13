@@ -38,6 +38,10 @@ reference:
       - sg_allele_freq
       - sg_females
       - sg_cases
+  - title: Plots
+    contents:
+      - plot.sg_sim
+      - sg_plot_data
   - title: Backend
     contents:
       - sg_backend_info
