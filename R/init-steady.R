@@ -9,7 +9,7 @@
 # weather is either taken from `weather` (the calendar years before the start
 # date) or, without it, the model's first 365 days of forcing repeated (the
 # same season, one year later).
-.sg_init_burn_in <- function(model, x_start, years, weather) {
+.sg_init_burn_in <- function(model, x_start, years, weather, check_start = TRUE) {
   ok <- is.numeric(years) && length(years) == 1L && is.finite(years) && years >= 1 &&
     years == round(years)
   if (!ok) .sg_stop("`years` must be a whole number >= 1.")
@@ -41,12 +41,15 @@
   }
   x <- run(x_start)
   # how much the result still depends on the starting state: the same
-  # burn-in from a start ten times larger
-  x10 <- run(10 * x_start)
-  effect <- max(abs(x10 - x)) / max(max(abs(x)), .Machine$double.xmin)
+  # burn-in from a start ten times larger (skipped by internal callers)
+  effect <- NA_real_
+  if (check_start) {
+    x10 <- run(10 * x_start)
+    effect <- max(abs(x10 - x)) / max(max(abs(x)), .Machine$double.xmin)
+  }
   if (sum(x) == 0) {
     .sg_warn("The population died out during the burn-in; the initial state is empty.")
-  } else if (effect > 1e-3) {
+  } else if (!is.na(effect) && effect > 1e-3) {
     .sg_warn(sprintf(
       "After %d year(s) of burn-in the state still depends on the starting state (%.2g); %s",
       as.integer(years), effect, "use more years."

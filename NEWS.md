@@ -33,6 +33,12 @@
   simulation between output days.
 * The solver diagnostic `max_rate` includes the mating rate of unmated
   females (O-007).
+* `calibrate_H()`: the wound density at which a summary of the population
+  (by default the mean adult density over the model's forcing period, per
+  km^2) equals a target. Without an Allee effect or releases the population
+  is exactly proportional to H, so two model runs suffice (closed form);
+  otherwise a root search on log H. Returns the calibrated parameters and
+  model.
 * Runtime guards: a deSolve day that does not reach its end (lsoda can
   return its starting values with a success code when its step size
   underflows) or a non-finite state stops the ODE with the day; a
