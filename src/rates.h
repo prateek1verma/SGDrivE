@@ -27,6 +27,8 @@ struct DayRates {
   double phi_ov = 0.0;  // oviposition scalar
   double q_e = 0.0, q_l = 0.0, q_p = 0.0;  // juvenile transfer rates per sub-stage
   double mu_p = 0.0, mu_f = 0.0, mu_m = 0.0;  // pupal, female and male hazards
+  double clutch = 0.0;        // mean eggs per oviposition event (D-024)
+  double batch_factor = 1.0;  // oviposition events per wound found (D-024)
 };
 
 // Quantities that depend on the state (S7 larval crowding, S8, S9, S12).
@@ -69,9 +71,14 @@ class RateKernel {
 
   const ModelView& view() const { return mv_; }
 
+  // Viable eggs per egg for each female x mate pair, sum_k s ih tau
+  // ([n_g * n_g], m fastest).
+  const std::vector<double>& pair_viability() const { return pair_viability_; }
+
  private:
   const ModelView& mv_;
   Aggregates agg_;
+  std::vector<double> pair_viability_;
   // working arrays of eval() (sizes in comments)
   std::vector<double> in_m_, in_f_, in_u_, in_f_mated_;  // [n_g]
   std::vector<double> mating_flux_;  // [n_A * n_g]: [substage, genotype]

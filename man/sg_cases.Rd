@@ -2,7 +2,7 @@
 % Please edit documentation in R/outputs.R
 \name{sg_cases}
 \alias{sg_cases}
-\title{Case proxy: newly infested wounds}
+\title{Case proxy: wounds newly infested with viable eggs}
 \usage{
 sg_cases(
   sim,
@@ -24,20 +24,26 @@ cases per host.}
 }
 \value{
 A data frame with columns \code{period} (first day), \code{days},
-\code{replicate} (stochastic runs only), \code{events} (oviposition events per
-km^2 or node), \code{wound_fraction} (events per available wound and day:
-the mean daily fraction of wounds newly infested) and, with
+\code{replicate} (stochastic runs only), \code{cases} (per km^2 or node), \code{events}
+(all oviposition events, also those with no viable egg),
+\code{wound_fraction} (cases per available wound and day: the mean daily
+fraction of wounds newly infested with viable eggs) and, with
 \code{host_density}, \code{cases_per_host}.
 }
 \description{
-Oviposition events (egg batches) by period: each is a wound newly infested
-with eggs, the model's proxy for myiasis cases (D-026).
+Myiasis cases by period: oviposition events (egg batches) that contain at
+least one viable egg (D-026). Eggs of females mated to sterile males cannot
+hatch, so their oviposition is not a case.
 }
 \details{
-Events come from the \code{egg_batches} counter: in the ODE the rate
-Psi f W integrated over each day, in stochastic runs the number of
-oviposition events. They include events of females mated to sterile
-males, whose eggs are not viable.
+Cases come from the \code{fertile_batches} counter: a batch of C eggs
+(the clutch size, R phi_ov by default) laid by a female of genotype g
+mated to a male of genotype m holds at least one viable egg with
+probability 1 - exp(-C v), where v is the viable fraction of the cross's
+eggs (sum over offspring of s ih tau). In the ODE this gives the daily
+rate; in stochastic runs batches are drawn and those with viable eggs
+counted (whole numbers). Cases are counted at oviposition; viable eggs
+that later die of temperature are not removed.
 }
 \examples{
 if (requireNamespace("MGDrivE", quietly = TRUE)) {

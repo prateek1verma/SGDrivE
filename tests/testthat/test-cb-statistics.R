@@ -64,6 +64,27 @@ test_that("matings with a male genotype are binomial thinning of the virgins", {
   expect_equal(stats::var(y), 2000 * pr * (1 - pr), tolerance = 0.06)
 })
 
+test_that("fertile batches and their eggs: the refinement keeps compound-Poisson eggs", {
+  # a cross with 10% viable eggs and clutches of 20: lambda = 2 viable eggs
+  # per batch, so batches without a viable egg are common (exp(-2))
+  raw <- sg_test_cube_sit(residual = 0.1)
+  pp <- sg_params(clutch_size = 20)
+  m <- sg_model(pp, sg_cube(raw), sg_forcing(wx_all, pp, "1971-06-01", "1971-06-30"), area = 1000)
+  x <- numeric(m$n_states)
+  x[sg_state_index(m, "F", genotype = "W", mate = "S", substage = 5:10)] <- 2000
+  set.seed(10)
+  r <- step_rep(m, x, 40000)
+  batches <- r[, "egg_batches"]
+  fertile <- r[, "fertile_batches"]
+  eggs <- r[, "eggs_laid[W]"]
+  lambda <- 20 * 0.1
+  expect_equal(mean(fertile) / mean(batches), 1 - exp(-lambda), tolerance = 0.01)
+  expect_equal(mean(eggs), mean(batches) * lambda, tolerance = 0.01)
+  expect_equal(stats::var(eggs) / mean(eggs), 1 + lambda, tolerance = 0.05)
+  expect_true(all(eggs >= fertile)) # every fertile batch has a viable egg
+  expect_true(all(eggs[fertile == 0] == 0))
+})
+
 test_that("the replicate mean converges to the deterministic map and the ODE", {
   skip_on_cran()
   err <- vapply(c(10, 10000), function(area) {

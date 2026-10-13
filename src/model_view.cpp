@@ -82,7 +82,7 @@ ModelView::ModelView(const Rcpp::List& view) {
   }
   // counters: eggs_laid[k] (n_g), 6 flow totals, matings[g|m] (n_g^2),
   // 6 deaths by block, 3 deaths by old age (see .sg_counter_names())
-  if (n_counters != n_g + n_g * n_g + 15) {
+  if (n_counters != n_g + n_g * n_g + 16) {
     Rcpp::stop("model view: n_counters = %d does not match n_g = %d", n_counters, n_g);
   }
 

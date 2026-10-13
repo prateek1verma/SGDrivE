@@ -6,10 +6,16 @@
   `sg_totals()` (by stage, sex, genotype and mate genotype, per node or per
   km^2), `as.data.frame()` methods (long tables), `sg_allele_freq()`,
   `sg_females()` (all, unmated, mated, wild type, egg-laying and
-  fertile-equivalent females) and `sg_cases()` (oviposition events, the
-  case proxy, by day, week, month or year, with the daily fraction of wounds
-  newly infested and cases per host). Simulations now store the model
-  information these need.
+  fertile-equivalent females) and `sg_cases()` (the case proxy by day, week,
+  month or year, with the daily fraction of wounds newly infested and cases
+  per host). Simulations now store the model information these need.
+* Cases are wounds newly infested with viable eggs: an oviposition event
+  counts when its batch holds at least one viable egg, so females mated to
+  sterile males cause no cases (D-026). New counter `fertile_batches` in
+  both solvers; in the chain-binomial step each pair's batches are split
+  into fertile ones and their eggs (zero-truncated Poisson), an exact
+  refinement that keeps the egg distribution, so random draws differ from
+  earlier versions for the same seed.
 
 ## Milestone M4: chain-binomial stochastic solver
 

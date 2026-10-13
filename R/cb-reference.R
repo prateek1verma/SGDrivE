@@ -24,13 +24,39 @@
     return(list(
       binom = function(n, p) n * p,
       pois = function(lambda) lambda,
-      multinom = function(n, prob) n * prob
+      multinom = function(n, prob) n * prob,
+      ztp_sum = function(n, lambda) n * lambda / -expm1(-lambda)
     ))
   }
   binom <- function(n, p) as.numeric(stats::rbinom(1L, n, p))
+  pois <- function(lambda) as.numeric(stats::rpois(1L, lambda))
   list(
     binom = binom,
-    pois = function(lambda) as.numeric(stats::rpois(1L, lambda)),
+    pois = pois,
+    # Total of n zero-truncated Poisson(lambda) numbers: the eggs of n
+    # batches known to hold at least one egg (D-026). Above lambda = 30 the
+    # truncation changes probabilities by less than 1e-13, so one Poisson
+    # draw is used; otherwise each batch by inversion (as in C++).
+    ztp_sum = function(n, lambda) {
+      if (lambda > 30) {
+        return(pois(n * lambda))
+      }
+      k_max <- ceiling(lambda + 12 * sqrt(lambda) + 30)
+      total <- 0
+      for (i in seq_len(n)) {
+        u <- stats::runif(1L) * -expm1(-lambda)
+        p <- exp(-lambda) * lambda
+        cum <- p
+        k <- 1
+        while (u > cum && k < k_max) {
+          k <- k + 1
+          p <- p * lambda / k
+          cum <- cum + p
+        }
+        total <- total + k
+      }
+      total
+    },
     # sequential conditional binomials in category order (D-022); the sums
     # of the remaining probabilities are accumulated in double precision from
     # the last category, as in C++
@@ -130,22 +156,30 @@
   fem <- array(x[s$idx$F], c(n_a, n_g, n_g)) # [substage, mate, genotype]
 
   # ---- eggs (S17), per female x mate pair, split over offspring genotypes:
-  # oviposition events (batches, D-024) then viable eggs, or single eggs ----
+  # oviposition events (batches, D-024), those with at least one viable egg
+  # (fertile, the case proxy; D-026), their viable eggs; or single eggs ----
   batches <- p$oviposition == "batches"
   factor <- .sg_batch_factor(p, info$phi_ov) # events per wound found
-  clutch <- if (is.na(p$clutch_size)) p$R * info$phi_ov else p$clutch_size
+  clutch <- .sg_clutch(p, info$phi_ov)
   eggs <- numeric(n_g)
   n_batches <- 0
+  n_fertile <- 0
+  expected_fertile <- 0
   for (g in seq_len(n_g)) {
     for (m in seq_len(n_g)) {
       tgm <- s$egg_tensor[(g - 1L) * n_g + m, ]
       tot <- sum(tgm)
+      share <- .sg_fertile_share(tot, clutch)
       if (batches) {
         nb <- draw$pois(a$psi * factor * a$w_lay[m, g] * dt)
         n_batches <- n_batches + nb
-        if (nb == 0 || tot <= 0) next
-        n_eggs <- draw$pois(nb * clutch * tot)
+        if (nb == 0 || share <= 0) next
+        nf <- draw$binom(nb, share)
+        n_fertile <- n_fertile + nf
+        if (nf == 0) next
+        n_eggs <- draw$ztp_sum(nf, clutch * tot)
       } else {
+        expected_fertile <- expected_fertile + a$w_lay[m, g] * share
         if (tot <= 0) next
         n_eggs <- draw$pois(p$R * info$phi_ov * a$psi * a$w_lay[m, g] * tot * dt)
       }
@@ -294,6 +328,7 @@
   flows <- c(
     eggs,
     if (batches) n_batches else a$psi * sum(a$w_lay) * factor * dt, # egg_batches
+    if (batches) n_fertile else a$psi * factor * expected_fertile * dt, # fertile_batches
     sum(me$out), sum(ml$out), sum(em_m), sum(em_f),
     sum(mp$out) - sum(em_m) - sum(em_f),
     as.vector(t(matings)),

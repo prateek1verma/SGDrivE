@@ -177,10 +177,11 @@ sg_females <- function(sim, per = c("node", "km2")) {
   cbind(.sg_time_columns(sim), out)
 }
 
-#' Case proxy: newly infested wounds
+#' Case proxy: wounds newly infested with viable eggs
 #'
-#' Oviposition events (egg batches) by period: each is a wound newly infested
-#' with eggs, the model's proxy for myiasis cases (D-026).
+#' Myiasis cases by period: oviposition events (egg batches) that contain at
+#' least one viable egg (D-026). Eggs of females mated to sterile males cannot
+#' hatch, so their oviposition is not a case.
 #'
 #' @param sim A simulation from [simulate_ode()] or [simulate_cb()].
 #' @param period `"day"`, `"week"` (seven-day blocks from the first day),
@@ -188,14 +189,19 @@ sg_females <- function(sim, per = c("node", "km2")) {
 #' @param per `"km2"` (per km^2, default) or `"node"`.
 #' @param host_density Optional density of hosts (animals per km^2); adds
 #'   cases per host.
-#' @details Events come from the `egg_batches` counter: in the ODE the rate
-#'   Psi f W integrated over each day, in stochastic runs the number of
-#'   oviposition events. They include events of females mated to sterile
-#'   males, whose eggs are not viable.
+#' @details Cases come from the `fertile_batches` counter: a batch of C eggs
+#'   (the clutch size, R phi_ov by default) laid by a female of genotype g
+#'   mated to a male of genotype m holds at least one viable egg with
+#'   probability 1 - exp(-C v), where v is the viable fraction of the cross's
+#'   eggs (sum over offspring of s ih tau). In the ODE this gives the daily
+#'   rate; in stochastic runs batches are drawn and those with viable eggs
+#'   counted (whole numbers). Cases are counted at oviposition; viable eggs
+#'   that later die of temperature are not removed.
 #' @return A data frame with columns `period` (first day), `days`,
-#'   `replicate` (stochastic runs only), `events` (oviposition events per
-#'   km^2 or node), `wound_fraction` (events per available wound and day:
-#'   the mean daily fraction of wounds newly infested) and, with
+#'   `replicate` (stochastic runs only), `cases` (per km^2 or node), `events`
+#'   (all oviposition events, also those with no viable egg),
+#'   `wound_fraction` (cases per available wound and day: the mean daily
+#'   fraction of wounds newly infested with viable eggs) and, with
 #'   `host_density`, `cases_per_host`.
 #' @export
 #' @examples
@@ -216,8 +222,13 @@ sg_cases <- function(sim, period = c("day", "week", "month", "year"), per = c("k
   }
   info <- .sg_sim_info(sim)
   k <- sim$counters
-  ev <- if (length(dim(k)) == 3L) k[, "egg_batches", ] else k[, "egg_batches", drop = FALSE]
-  ev <- matrix(ev, nrow = dim(k)[1L])
+  if (!"fertile_batches" %in% dimnames(k)[[2L]]) {
+    .sg_stop("This simulation was made by an older version of SGDrivE; run it again.")
+  }
+  column <- function(name) {
+    v <- if (length(dim(k)) == 3L) k[, name, ] else k[, name]
+    matrix(v, nrow = dim(k)[1L])
+  }
   dates <- sim$date[-1L]
   key <- switch(EXPR = period,
     day = format(dates),
@@ -227,17 +238,18 @@ sg_cases <- function(sim, period = c("day", "week", "month", "year"), per = c("k
   )
   groups <- unique(key)
   agg <- outer(key, groups, `==`) * 1
-  totals <- t(agg) %*% ev # [period, replicate], per node
+  cases <- t(agg) %*% column("fertile_batches") # [period, replicate], per node
+  events <- t(agg) %*% column("egg_batches")
   days <- colSums(agg)
   wounds <- info$H * info$area # wounds per node
   scale <- if (per == "km2") 1 / info$area else 1
-  out <- lapply(seq_len(ncol(totals)), function(r) {
+  out <- lapply(seq_len(ncol(cases)), function(r) {
     d <- data.frame(
       period = as.Date(dates[match(groups, key)]), days = as.integer(days),
-      events = totals[, r] * scale,
-      wound_fraction = if (wounds > 0) totals[, r] / (wounds * days) else NA_real_
+      cases = cases[, r] * scale, events = events[, r] * scale,
+      wound_fraction = if (wounds > 0) cases[, r] / (wounds * days) else NA_real_
     )
-    if (!is.null(host_density)) d$cases_per_host <- totals[, r] / info$area / host_density
+    if (!is.null(host_density)) d$cases_per_host <- cases[, r] / info$area / host_density
     if (inherits(sim, "sg_sim_cb")) d <- cbind(d[1:2], replicate = r, d[-(1:2)])
     d
   })

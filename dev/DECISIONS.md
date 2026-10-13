@@ -400,11 +400,22 @@ User decisions for milestone M5:
 1. **Plots** use ggplot2 throughout, as a suggested package: `plot()`
    methods return ggplot objects (an error with an install hint when ggplot2
    is missing); the plotted data are also available as tables.
-2. **Case proxy**: oviposition events (egg batches), i.e. wounds newly
-   infested with eggs, per km^2 and period, with cases per host when the
-   user gives a host density, and the daily fraction of available wounds
-   newly infested. Events of females mated to sterile males are included
-   (their eggs are not viable).
+2. **Case proxy**: wounds newly infested with viable eggs, per km^2 and
+   period, with cases per host when the user gives a host density, and the
+   daily fraction of available wounds newly infested. (Amended in WP2 at the
+   user's request: a female mated to a sterile male lays eggs that cannot
+   hatch and causes no myiasis case.) An oviposition event is a case when its
+   batch holds at least one viable egg: probability 1 - exp(-C v_gm) for a
+   batch of C eggs (clutch size, D-024) and cross viability v_gm = sum_k s ih
+   tau. New counter `fertile_batches` (ODE rate Psi f sum W_gm (1 -
+   exp(-C v_gm))); in the chain-binomial step the batches of each pair are
+   split into fertile ones ~ Binomial(batches, 1 - exp(-C v)) whose eggs are
+   zero-truncated Poisson sums, an exact refinement that leaves the egg
+   distribution unchanged. Cases are counted at oviposition; viable eggs
+   that later die of temperature are not removed. Planned replicate summary
+   bands, extinction confidence intervals and time-to-eradication
+   statistics were dropped (user decision): users analyse the raw
+   replicate outputs.
 3. **Calibration** (`calibrate_H()`): by default the wound density H is set
    so that the mean adult density over a reference year equals a target
    (adults per km^2, a required argument). With h_M = 0 and no releases all

@@ -59,12 +59,22 @@
   if (is.na(p$clutch_size)) 1 else p$R * phi_ov / p$clutch_size
 }
 
+# Mean eggs per oviposition event (D-024): R * phi_ov unless clutch_size is set.
+.sg_clutch <- function(p, phi_ov) {
+  if (is.na(p$clutch_size)) p$R * phi_ov else p$clutch_size
+}
+
+# Share of oviposition events with at least one viable egg (D-026): a batch
+# of `clutch` eggs, each viable with probability `viability` (sum over
+# offspring of s ih tau for the female x mate pair).
+.sg_fertile_share <- function(viability, clutch) -expm1(-clutch * viability)
+
 # Names of the cumulative counters (rates per day in the rate function).
 .sg_counter_names <- function(geno) {
   pairs <- paste0(rep(geno, each = length(geno)), "|", rep(geno, times = length(geno)))
   c(
     paste0("eggs_laid[", geno, "]"),
-    "egg_batches", "larvae_in", "pupae_in", "emerged_male", "emerged_female",
+    "egg_batches", "fertile_batches", "larvae_in", "pupae_in", "emerged_male", "emerged_female",
     "emergence_deaths",
     paste0("matings[", pairs, "]"),
     "deaths_E", "deaths_L", "deaths_P", "deaths_M", "deaths_U", "deaths_F",
@@ -235,11 +245,16 @@
   deriv[s$idx$F] <- as.vector(d_f)
 
   # ---- counters (rates per day) -------------------------------------------------
+  # egg-laying females weighted by the share of their batches with a viable
+  # egg (D-026)
+  share <- .sg_fertile_share(rowSums(s$egg_tensor), .sg_clutch(p, phi_ov))
+  fertile_w <- sum(as.vector(w_lay) * share)
   # matings[g, m]: virgins of genotype g mating males of genotype m
   matings <- (colSums(mating_flux) + in_f_mated) * pi_gm
   counters <- c(
     unname(births),
     psi * sum(w_lay) * .sg_batch_factor(p, phi_ov), # egg_batches
+    psi * .sg_batch_factor(p, phi_ov) * fertile_w, # fertile_batches
     q_e * sum(egg[s$n_E, ]),
     q_l * sum(lar[s$n_L, ]),
     sum(in_m), sum(in_f), emergence_deaths,

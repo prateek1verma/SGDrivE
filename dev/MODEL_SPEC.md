@@ -294,8 +294,15 @@ T[g,m,k] = s_g · ih[g,m,k] · τ[g,m,k] (S9). With `oviposition = "batches"`
 (default, D-024):
 
     B_{g,m}         ~ Poisson(Ψ f W_{g,m} dt)                     oviposition events
-    N_{g,m}         ~ Poisson(B_{g,m} · C · Σ_k T[g,m,k])          viable eggs
+    B⁺_{g,m}        ~ Binomial(B_{g,m}, 1 − e^{−λ_{g,m}})          events with a viable egg (cases)
+    N_{g,m}         = sum of B⁺_{g,m} zero-truncated Poisson(λ_{g,m})   viable eggs
     (N_{g,m,k})_k   ~ Multinomial(N_{g,m}; T[g,m,·] / Σ_k T[g,m,k])
+
+with λ_{g,m} = C v_{g,m}, v_{g,m} = Σ_k T[g,m,k] (D-026). This is an exact
+refinement of N_{g,m} ~ Poisson(B_{g,m} λ_{g,m}): the egg distribution is
+unchanged. For λ > 30 the zero-truncated sum is drawn as one
+Poisson(B⁺ λ) (truncation below 1e-13), otherwise batch by batch by
+inversion.
 
 with clutch size C = R φ_ov and f = 1 when `clutch_size` is NA (a batch is
 the eggs of one day; Ψ is the daily probability of finding a wound), or
@@ -306,7 +313,9 @@ C = `clutch_size` and f = R φ_ov / C. With `oviposition = "eggs"`:
 then the same split. Both have mean R φ_ov Ψ W_{g,m} Σ_k T dt (S9); batches
 raise the variance to about (1 + C) times the mean. The eggs arrive in the
 egg chain of genotype k. The egg_batches counter counts events B (ODE rate
-Ψ f Σ W).
+Ψ f Σ W) and the fertile_batches counter events B⁺ (ODE rate
+Ψ f Σ W_{g,m} (1 − e^{−λ_{g,m}})), the case proxy; with `oviposition =
+"eggs"` both are recorded as expected values.
 
 **(S18) Mating** (before ageing; unmated and mated females share age chain
 and hazard, so the order does not bias ageing or survival):
@@ -330,7 +339,7 @@ only when no compatible male is present).
 the rest die at emergence. Survivors arrive in the adult chains (S16, S18).
 
 **Order of draws in a step.** Aggregates (S15); eggs (S17, pairs (g, m) with
-m fastest: events, then eggs, then split); mating (S18, genotype then sub-stage); chain moves (S16) block by
+m fastest: events, fertile events, then eggs, then split); mating (S18, genotype then sub-stage); chain moves (S16) block by
 block (E, L, P, M, U, F) and compartment by compartment in state order;
 emergence (S19, by genotype); arrivals block by block in state order (eggs
 by genotype, larvae, pupae, males; then females by genotype: death, mating,
@@ -398,7 +407,7 @@ follow in M5.
 | Totals (`sg_totals()`, `as.data.frame()`) | Counts summed over sub-stages by stage (E, L, P, M, U, F), sex, genotype and mate genotype; per node or per km² (÷ A) |
 | Allele frequencies (`sg_allele_freq()`) | Σ_g N_g a_{g,ℓ} / Σ_{g,ℓ} N_g a_{g,ℓ} over the chosen stages, with a_{g,ℓ} the copies of allele ℓ in genotype g (single-letter alleles in genotype names by default) |
 | Female classes (`sg_females()`) | All adult females U + F; wild type: genotype in the cube's wild type; egg-laying: W = Σ_{g,m} W_{g,m} (S8); fertile-equivalent: Σ_{g,m} F_{g,m} v_{g,m} / v_ref with v_{g,m} = Σ_k T[g,m,k] and v_ref its largest value over wild-type pairs |
-| Case proxy (`sg_cases()`) | Oviposition events (egg_batches counter, S17): wounds newly infested with eggs, per km² and period; daily wound fraction = events / (H A days); cases per host = events per km² / host density |
+| Case proxy (`sg_cases()`) | Oviposition events with at least one viable egg (fertile_batches counter, S17): wounds newly infested with viable eggs, per km² and period; females mated to sterile males cause no cases; daily wound fraction = cases / (H A days); cases per host = cases per km² / host density. All oviposition events (egg_batches) are also reported. |
 
 ## 13. Parameters
 

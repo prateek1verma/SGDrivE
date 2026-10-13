@@ -123,16 +123,16 @@ sim_cb <- simulate_cb(mod_1000, init, n_rep = 10, seed = 1, keep = "totals")
 sim_cb
 #> <sg_sim_cb> 10 replicates x 731 days (1971-01-01 to 1972-12-31), dt = 0.1 day, eggs in batches
 #>   final totals, mean [min, max] over replicates:
-#>     E 522.6 [409, 641]
-#>     L 318.5 [274, 439]
-#>     P 681.8 [635, 736]
-#>     M 473.6 [421, 531]
-#>     U 14 [8, 17]
-#>     F 444.9 [424, 464]
+#>     E 533 [339, 674]
+#>     L 325 [283, 395]
+#>     P 692.7 [636, 739]
+#>     M 466.3 [420, 493]
+#>     U 13.3 [7, 19]
+#>     F 454 [424, 492]
 #>   extinct: 0 of 10 replicates
 #>   wild type eliminated: 0 of 10 replicates
-#>   eggs laid 2,668,864 and released 10,000 per replicate (mean)
-#>   seed 1; run time 3.27 s
+#>   eggs laid 2,674,116 and released 10,000 per replicate (mean)
+#>   seed 1; run time 3.34 s
 ```
 
 `simulate_cb()` divides each day into steps (0.1 day by default). Within

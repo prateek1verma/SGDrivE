@@ -33,6 +33,27 @@ namespace sgdrive {
 struct RandomDraws {
   double binom(double n, double p) { return (n == 0.0 || p == 0.0) ? 0.0 : R::rbinom(n, p); }
   double pois(double lambda) { return lambda <= 0.0 ? 0.0 : R::rpois(lambda); }
+  // Total of n zero-truncated Poisson(lambda) numbers (eggs of n batches with
+  // at least one egg; D-026): one Poisson draw above lambda = 30, where the
+  // truncation is below 1e-13, otherwise each batch by inversion (as in R).
+  double ztp_sum(double n, double lambda) {
+    if (lambda > 30.0) return pois(n * lambda);
+    const double k_max = std::ceil(lambda + 12.0 * std::sqrt(lambda) + 30.0);
+    double total = 0.0;
+    for (double i = 0.0; i < n; i += 1.0) {
+      const double u = R::runif(0.0, 1.0) * -std::expm1(-lambda);
+      double p = std::exp(-lambda) * lambda;
+      double cum = p;
+      double k = 1.0;
+      while (u > cum && k < k_max) {
+        k += 1.0;
+        p = p * lambda / k;
+        cum = cum + p;
+      }
+      total += k;
+    }
+    return total;
+  }
   // Multinomial as sequential conditional binomials in category order; the
   // remaining probabilities are summed from the last category (as in R).
   void multinom(double n, const double* prob, int k, double* out, double* rest) {
@@ -54,6 +75,7 @@ struct RandomDraws {
 struct ExpectedDraws {
   double binom(double n, double p) { return n * p; }
   double pois(double lambda) { return lambda; }
+  double ztp_sum(double n, double lambda) { return n * lambda / -std::expm1(-lambda); }
   void multinom(double n, const double* prob, int k, double* out, double*) {
     for (int j = 0; j < k; ++j) out[j] = n * prob[j];
   }
@@ -164,27 +186,29 @@ void CbStepper::step(double* x, double* flows, D& draws) {
   double* n_u = nx_.data() + v.offsets[kU];
   double* n_f = nx_.data() + v.offsets[kF];
 
-  // ---- eggs (S17): oviposition events then viable eggs, or single eggs ------
+  // ---- eggs (S17): oviposition events, those with at least one viable egg
+  // (fertile, the case proxy; D-026) and their viable eggs, or single eggs --
   const bool batches = v.oviposition_batches;
-  const double factor = v.clutch_size > 0 ? v.R * r_.phi_ov / v.clutch_size : 1.0;
-  const double clutch = v.clutch_size > 0 ? v.clutch_size : v.R * r_.phi_ov;
+  const double factor = r_.batch_factor, clutch = r_.clutch;
   std::fill(eggs_.begin(), eggs_.end(), 0.0);
-  double n_batches = 0.0;
+  double n_batches = 0.0, n_fertile = 0.0, expected_fertile = 0.0;
   const int n_cross = ng * ng;
   for (int g = 0; g < ng; ++g) {
     for (int m = 0; m < ng; ++m) {
       const int pair = g * ng + m;
-      double tot = 0.0;
-      for (int k = 0; k < ng; ++k) {
-        tot += v.egg_tensor[static_cast<std::size_t>(k) * n_cross + pair];
-      }
+      const double tot = kernel_.pair_viability()[pair];
+      const double share = -std::expm1(-clutch * tot);
       double n_eggs;
       if (batches) {
         const double nb = draws.pois(a.psi * factor * a.w_lay[pair] * dt);
         n_batches += nb;
-        if (nb == 0.0 || tot <= 0.0) continue;
-        n_eggs = draws.pois(nb * clutch * tot);
+        if (nb == 0.0 || share <= 0.0) continue;
+        const double nf = draws.binom(nb, share);
+        n_fertile += nf;
+        if (nf == 0.0) continue;
+        n_eggs = draws.ztp_sum(nf, clutch * tot);
       } else {
+        expected_fertile += a.w_lay[pair] * share;
         if (tot <= 0.0) continue;
         n_eggs = draws.pois(v.R * r_.phi_ov * a.psi * a.w_lay[pair] * tot * dt);
       }
@@ -302,6 +326,7 @@ void CbStepper::step(double* x, double* flows, D& draws) {
   int c = 0;
   for (int k = 0; k < ng; ++k) flows[c++] = eggs_[k];
   flows[c++] = batches ? n_batches : a.psi * a.sum_w * factor * dt;  // egg_batches
+  flows[c++] = batches ? n_fertile : a.psi * factor * expected_fertile * dt;  // fertile_batches
   double sum_out_e = 0.0, sum_out_l = 0.0;
   for (int g = 0; g < ng; ++g) {
     sum_out_e += out_e_[g];

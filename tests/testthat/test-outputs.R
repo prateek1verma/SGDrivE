@@ -102,23 +102,56 @@ test_that("female classes: identities, wild type and fertility weights", {
   expect_equal(sg_females(sim, per = "km2")$females, f$females / 10)
 })
 
-test_that("cases: oviposition events by period, wound fraction and cases per host", {
+test_that("cases: fertile oviposition events by period, wound fraction, cases per host", {
   daily <- sg_cases(sim, per = "node")
+  expect_equal(daily$cases, unname(sim$counters[, "fertile_batches"]))
   expect_equal(daily$events, unname(sim$counters[, "egg_batches"]))
-  expect_equal(daily$wound_fraction, daily$events / (5 * 10))
+  expect_true(all(daily$cases <= daily$events + 1e-12))
+  expect_equal(daily$wound_fraction, daily$cases / (5 * 10))
   km2 <- sg_cases(sim)
-  expect_equal(km2$events, daily$events / 10)
+  expect_equal(km2$cases, daily$cases / 10)
   weeks <- sg_cases(sim, period = "week", host_density = 20)
   expect_identical(weeks$days, c(7L, 7L, 7L, 7L, 3L))
-  expect_equal(sum(weeks$events), sum(km2$events))
-  expect_equal(weeks$cases_per_host, weeks$events / 20)
+  expect_equal(sum(weeks$cases), sum(km2$cases))
+  expect_equal(weeks$cases_per_host, weeks$cases / 20)
   month <- sg_cases(sim, period = "month")
   expect_identical(nrow(month), 1L)
   expect_identical(month$period, as.Date("1971-05-01"))
   cc <- sg_cases(cb, period = "year", per = "node")
   expect_identical(cc$replicate, 1:2)
-  expect_equal(cc$events, unname(colSums(cb$counters[, "egg_batches", ])))
-  expect_true(all(cc$events == round(cc$events))) # whole events
+  expect_equal(cc$cases, unname(colSums(cb$counters[, "fertile_batches", ])))
+  expect_true(all(cc$cases == round(cc$cases))) # whole cases
+})
+
+test_that("females mated to sterile males lay eggs but cause no cases", {
+  raw <- sg_test_cube_sit(residual = 0) # crosses with S males give no viable eggs
+  ms <- sg_model(p, sg_cube(raw), wx, area = 1)
+  x <- numeric(ms$n_states)
+  laying <- 5:10
+  x[sg_state_index(ms, "F", genotype = "W", mate = "S", substage = laying)] <- 20
+  only_sterile <- simulate_ode(ms, init = x)
+  day1 <- sg_cases(only_sterile, per = "node")[1, ]
+  expect_gt(day1$events, 0)
+  expect_identical(day1$cases, 0)
+  x2 <- x
+  x2[sg_state_index(ms, "F", genotype = "W", mate = "W", substage = laying)] <- 20
+  half <- sg_cases(simulate_ode(ms, init = x2), per = "node")[1, ]
+  expect_equal(half$cases / half$events, 0.5, tolerance = 1e-6) # wild-mated half
+  # residual fertility 1e-8: essentially no cases; a cross with half the
+  # viable eggs: still nearly every batch is a case
+  for (v in c(1e-8, 0.5)) {
+    rv <- sg_test_cube_sit(residual = v)
+    mv <- sg_model(p, sg_cube(rv), wx, area = 1)
+    xv <- numeric(mv$n_states)
+    xv[sg_state_index(mv, "F", genotype = "W", mate = "S", substage = laying)] <- 20
+    d1 <- sg_cases(simulate_ode(mv, init = xv), per = "node")[1, ]
+    if (v < 1e-6) expect_lt(d1$cases / d1$events, 1e-5) else expect_gt(d1$cases / d1$events, 0.99)
+  }
+  # stochastic: sterile-mated females' batches are never cases
+  set.seed(4)
+  r <- asNamespace("SGDrivE")$.sg_cb_run_cpp(sg_model(p, sg_cube(raw), wx, area = 100), x * 100)
+  expect_gt(sum(r$counters[1:3, "egg_batches"]), 0)
+  expect_identical(sum(r$counters[1:3, "fertile_batches"]), 0)
 })
 
 test_that("output functions check their input", {

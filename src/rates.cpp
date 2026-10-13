@@ -21,6 +21,11 @@ RateKernel::RateKernel(const ModelView& mv)
   agg_.m_bar.assign(ng, 0.0);
   agg_.pi.assign(ng * ng, 0.0);
   agg_.mate_ok.assign(ng, 0);
+  const std::size_t n_cross = ng * ng;
+  pair_viability_.assign(n_cross, 0.0);
+  for (std::size_t pair = 0; pair < n_cross; ++pair) {
+    for (std::size_t k = 0; k < ng; ++k) pair_viability_[pair] += mv.egg_tensor[k * n_cross + pair];
+  }
 }
 
 double RateKernel::larval_hazard(double sum_l) const {
@@ -45,6 +50,9 @@ DayRates RateKernel::day_rates(int day) const {
   r.mu_p = v.mu_T[d] + v.mu_W * (1.0 - v.moisture[d]);
   r.mu_f = v.mu_T[d] + v.mu_b_F;
   r.mu_m = v.mu_T[d] + v.mu_b_M;
+  // oviposition events (D-024): a batch is the day's eggs unless clutch_size is set
+  r.clutch = v.clutch_size > 0 ? v.clutch_size : v.R * r.phi_ov;
+  r.batch_factor = v.clutch_size > 0 ? v.R * r.phi_ov / v.clutch_size : 1.0;
   return r;
 }
 
@@ -261,8 +269,14 @@ void RateKernel::eval(int day, const double* y, double* dydt, double* counters) 
     last_e += egg[g * nE + (nE - 1)];
     last_l += lar[g * nL + (nL - 1)];
   }
-  // egg_batches: oviposition events per day (D-024)
-  counters[c++] = psi * a.sum_w * (v.clutch_size > 0 ? v.R * r.phi_ov / v.clutch_size : 1.0);
+  // egg_batches: oviposition events per day (D-024); fertile_batches: those
+  // with at least one viable egg, the case proxy (D-026)
+  counters[c++] = psi * a.sum_w * r.batch_factor;
+  double fertile = 0.0;
+  for (int pair = 0; pair < ng * ng; ++pair) {
+    fertile += a.w_lay[pair] * -std::expm1(-r.clutch * pair_viability_[pair]);
+  }
+  counters[c++] = psi * r.batch_factor * fertile;
   counters[c++] = q_e * last_e;    // larvae_in
   counters[c++] = q_l * last_l;    // pupae_in
   counters[c++] = sum_in_m;        // emerged_male
