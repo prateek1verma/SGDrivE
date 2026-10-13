@@ -399,7 +399,9 @@ Extends D-020 (added in M4-WP4 at the user's request):
 User decisions for milestone M5:
 1. **Plots** use ggplot2 throughout, as a suggested package: `plot()`
    methods return ggplot objects (an error with an install hint when ggplot2
-   is missing); the plotted data are also available as tables.
+   is missing); the plotted data are also available as tables. Colours are
+   colour-blind friendly (user request, WP4): Okabe-Ito by default,
+   ColorBrewer Dark2 or Paired (9 to 12 series), viridis beyond.
 2. **Case proxy**: wounds newly infested with viable eggs, per km^2 and
    period, with cases per host when the user gives a host density, and the
    daily fraction of available wounds newly infested. (Amended in WP2 at the

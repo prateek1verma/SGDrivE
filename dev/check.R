@@ -11,7 +11,10 @@ if (!nzchar(Sys.which("pandoc")) && dir.exists(rstudio_pandoc)) {
 devtools::document(".")
 devtools::build_readme(".", quiet = TRUE)
 # lintr resolves internal functions in the installed package, so install the
-# current source first (CI does the same).
+# current source first (CI does the same). Remove compiled objects first:
+# devtools::load_all() leaves unoptimised (-O0) objects in src/, which an
+# install from the source folder would otherwise reuse.
+pkgbuild::clean_dll(".")
 devtools::install(".", quick = TRUE, upgrade = FALSE, quiet = TRUE)
 lints <- lintr::lint_package(".")
 print(lints)

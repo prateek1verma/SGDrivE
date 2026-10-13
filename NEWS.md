@@ -1,7 +1,10 @@
 # SGDrivE 0.0.0.9000
 
-## Milestone M5: checks, outputs, calibration and plots (in progress)
+## Milestone M5: checks, outputs, calibration and plots
 
+* Documentation: README section on outputs, plots, checks and calibration
+  (with a figure), plotting conventions, ROADMAP and model specification
+  updated.
 * Output tables for ODE and chain-binomial simulations (D-026):
   `sg_totals()` (by stage, sex, genotype and mate genotype, per node or per
   km^2), `as.data.frame()` methods (long tables), `sg_allele_freq()`,

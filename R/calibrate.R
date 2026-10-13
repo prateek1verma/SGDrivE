@@ -45,7 +45,8 @@
 #'   # simulate with the calibrated model
 #'   sim <- simulate_ode(cal$model, init = sg_init(cal$model, "burn_in"))
 #' }
-calibrate_H <- function(model, target, stat = c("mean", "peak", "min", "quantile"),
+# The name keeps the model symbol H (D-026), hence the nolint.
+calibrate_H <- function(model, target, stat = c("mean", "peak", "min", "quantile"), # nolint
                         stages = "adults", period = NULL, prob = 0.5, years = 1L,
                         weather = NULL, tol = 1e-8) {
   if (!inherits(model, "sg_model")) {
@@ -60,11 +61,14 @@ calibrate_H <- function(model, target, stat = c("mean", "peak", "min", "quantile
   }
   .sg_expand_stages(stages)
   days <- .sg_calib_days(model, period)
-  if (model$counts$H <= 0) .sg_stop("The model has no wounds (H = 0); give a positive H to start from.")
+  if (model$counts$H <= 0) {
+    .sg_stop("The model has no wounds (H = 0); give a positive H to start from.")
+  }
 
-  evaluations <- 0L
+  runs <- new.env(parent = emptyenv()) # counts model runs across value_at() calls
+  runs$n <- 0L
   value_at <- function(h) {
-    evaluations <<- evaluations + 1L
+    runs$n <- runs$n + 1L
     .sg_calib_value(.sg_model_with_h(model, h), stages, days, stat, prob, years, weather)
   }
   h0 <- model$params$H
@@ -113,7 +117,7 @@ calibrate_H <- function(model, target, stat = c("mean", "peak", "min", "quantile
     list(
       H = h, params = calibrated$params, model = calibrated, target = target,
       achieved = achieved, stat = stat, stages = stages, method = method,
-      evaluations = evaluations
+      evaluations = runs$n
     ),
     class = "sg_calibration"
   )

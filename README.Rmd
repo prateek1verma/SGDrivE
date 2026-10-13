@@ -7,7 +7,9 @@ output: github_document
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>"
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%"
 )
 ```
 
@@ -23,12 +25,13 @@ screwworm (*Cochliomyia hominivorax*) under genetic control: the sterile insect
 technique (SIT), precision-guided SIT (pgSIT), female-specific RIDL (fsRIDL)
 and gene drives.
 
-> **Status: under development (milestone M4, stochastic solver, complete).**
-> The package builds models and solves them deterministically (ODE) and
-> stochastically (chain-binomial) with compiled C++ solvers, checked against
-> pure-R reference solvers and the legacy Gutierrez & Ponti (2014) model.
-> Checks, summaries and calibration follow in milestone M5. Do not use it for
-> analysis yet.
+> **Status: under development (milestone M5, outputs, checks and
+> calibration, complete).** The package builds models, solves them
+> deterministically (ODE) and stochastically (chain-binomial) with compiled
+> C++ solvers checked against pure-R reference solvers and the legacy
+> Gutierrez & Ponti (2014) model, and provides output tables, plots, model
+> checks and calibration. Scientific validation follows in milestone M6. Do
+> not use it for analysis yet.
 
 ## Planned model (v0.1)
 
@@ -126,6 +129,44 @@ For constant-temperature scenarios, `sg_init(model, "equilibrium",
 temperature = 27)` gives the closed-form equilibrium of a wild-type
 population.
 
+## Outputs, plots, checks and calibration (milestone M5)
+
+`check_model()` reports a model's size, its fastest processes, the season in
+which a wild population can grow (R0, eggs per egg at low density, from
+`sg_r0()`), configuration problems and, for stochastic runs, whether the
+population is large enough to persist:
+
+```{r check, eval = requireNamespace("MGDrivE", quietly = TRUE)}
+check_model(mod_1000)
+```
+
+The wound density sets the population size. `calibrate_H()` finds the
+density that gives a target, by default the mean adult density over the
+model's forcing period:
+
+```{r calibrate, eval = requireNamespace("MGDrivE", quietly = TRUE)}
+wx_1971 <- sg_forcing(sg_example_weather(), p, start = "1971-01-01", end = "1971-12-31")
+cal <- calibrate_H(sg_model(p, cube, wx_1971), target = 100) # adults per km^2
+cal
+```
+
+Output tables work the same for deterministic and stochastic results:
+`sg_totals()` (by stage, sex, genotype and mate), `sg_allele_freq()`,
+`sg_females()` (including females weighted by the fertility of their mate)
+and `sg_cases()`, the case proxy: wounds newly infested with viable eggs, so
+that females mated to sterile males cause no cases.
+
+```{r outputs, eval = requireNamespace("MGDrivE", quietly = TRUE)}
+head(sg_cases(sim, period = "month", host_density = 20))
+```
+
+`plot()` draws any of these with ggplot2 in colour-blind-friendly colours;
+stochastic replicates are separate lines:
+
+```{r plot, fig.height = 3.5, eval = requireNamespace("MGDrivE", quietly = TRUE) && requireNamespace("ggplot2", quietly = TRUE)}
+plot(sim_cb, "cases", period = "month")
+```
+
 The McAllen cold-stress index reproduces the values published by Gutierrez &
 Ponti (2014) and Gutierrez et al. (2019):
 
@@ -143,7 +184,7 @@ ci[ci$year %in% c(1971, 1979), c("year", "mu_cold")]
 | M2 ✔ | Reference genotype-resolved ODE in pure R |
 | M3 ✔ | C++ rate kernel and ODE solver |
 | M4 ✔ | C++ chain-binomial stochastic solver |
-| M5 | Checks, summaries, calibration and plots |
+| M5 ✔ | Checks, summaries, calibration and plots |
 | M6 | Scientific validation |
 | M7 | Documentation and v0.1.0 release |
 

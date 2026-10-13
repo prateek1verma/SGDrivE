@@ -15,12 +15,13 @@ World screwworm (*Cochliomyia hominivorax*) under genetic control: the
 sterile insect technique (SIT), precision-guided SIT (pgSIT),
 female-specific RIDL (fsRIDL) and gene drives.
 
-> **Status: under development (milestone M4, stochastic solver,
-> complete).** The package builds models and solves them
+> **Status: under development (milestone M5, outputs, checks and
+> calibration, complete).** The package builds models, solves them
 > deterministically (ODE) and stochastically (chain-binomial) with
-> compiled C++ solvers, checked against pure-R reference solvers and the
-> legacy Gutierrez & Ponti (2014) model. Checks, summaries and
-> calibration follow in milestone M5. Do not use it for analysis yet.
+> compiled C++ solvers checked against pure-R reference solvers and the
+> legacy Gutierrez & Ponti (2014) model, and provides output tables,
+> plots, model checks and calibration. Scientific validation follows in
+> milestone M6. Do not use it for analysis yet.
 
 ## Planned model (v0.1)
 
@@ -93,7 +94,7 @@ sim
 #>   final totals: E 0.49452, L 0.30710, P 0.67484, M 0.47005, U 0.01378, F 0.45628
 #>   eggs laid 2669.2; adults emerged 1229.2; released 10000
 #>   solver: 17 steps/day (max 60), stiffness detected on 0 of 731 days, 0 integrated by the lsoda fallback, largest rate 13.5 per day, min state 0
-#>   run time 0.91 s
+#>   run time 0.63 s
 ```
 
 `simulate_ode()` integrates the model one day at a time with a
@@ -132,7 +133,7 @@ sim_cb
 #>   extinct: 0 of 10 replicates
 #>   wild type eliminated: 0 of 10 replicates
 #>   eggs laid 2,674,116 and released 10,000 per replicate (mean)
-#>   seed 1; run time 9.38 s
+#>   seed 1; run time 7.86 s
 ```
 
 `simulate_cb()` divides each day into steps (0.1 day by default). Within
@@ -150,6 +151,65 @@ population, or its wild type, is gone.
 For constant-temperature scenarios,
 `sg_init(model, "equilibrium", temperature = 27)` gives the closed-form
 equilibrium of a wild-type population.
+
+## Outputs, plots, checks and calibration (milestone M5)
+
+`check_model()` reports a model’s size, its fastest processes, the
+season in which a wild population can grow (R0, eggs per egg at low
+density, from `sg_r0()`), configuration problems and, for stochastic
+runs, whether the population is large enough to persist:
+
+``` r
+check_model(mod_1000)
+#> <sg_check>
+#>   model: 3 genotype(s), 207 states, 731 days (1971-01-01 to 1972-12-31), node 1000 km^2, 5000 wounds
+#>   releases: 20 event(s), 10000 individuals
+#>   options: mating "rate", eggs in batches, search "searching_females", larval crowding "none", eggs at ambient temperature
+#>   fastest sub-stage: 13.5 per day (1972-02-06); mating rate 0.693 per day (0.067 per step)
+#>   R0 (eggs per egg at low density): 0 to 276; above 1 on 624 days (longest run 256); 230 at the mean temperature
+#>   wild population (ODE after a one-year burn-in): 1.05e+03 to 5.99e+04 individuals per node
+#>   memory per stochastic replicate: 1.38 MB (states) or 0.269 MB (totals)
+#>   no problems found
+```
+
+The wound density sets the population size. `calibrate_H()` finds the
+density that gives a target, by default the mean adult density over the
+model’s forcing period:
+
+``` r
+wx_1971 <- sg_forcing(sg_example_weather(), p, start = "1971-01-01", end = "1971-12-31")
+cal <- calibrate_H(sg_model(p, cube, wx_1971), target = 100) # adults per km^2
+cal
+#> <sg_calibration>
+#>   H = 18.4955 wounds per km^2 (proportional, 2 model runs)
+#>   mean of adults per km^2: target 100, achieved 100 (relative difference 4.8e-13)
+```
+
+Output tables work the same for deterministic and stochastic results:
+`sg_totals()` (by stage, sex, genotype and mate), `sg_allele_freq()`,
+`sg_females()` (including females weighted by the fertility of their
+mate) and `sg_cases()`, the case proxy: wounds newly infested with
+viable eggs, so that females mated to sterile males cause no cases.
+
+``` r
+head(sg_cases(sim, period = "month", host_density = 20))
+#>       period days     cases    events wound_fraction cases_per_host
+#> 1 1971-01-01   31 0.6592521 0.6592525    0.004253240     0.03296261
+#> 2 1971-02-01   28 0.5011765 0.5011818    0.003579832     0.02505883
+#> 3 1971-03-01   31 1.0191002 1.0191603    0.006574840     0.05095501
+#> 4 1971-04-01   30 1.1347996 1.1347996    0.007565330     0.05673998
+#> 5 1971-05-01   31 1.7375602 1.7375602    0.011210066     0.08687801
+#> 6 1971-06-01   30 1.9400709 1.9400709    0.012933806     0.09700354
+```
+
+`plot()` draws any of these with ggplot2 in colour-blind-friendly
+colours; stochastic replicates are separate lines:
+
+``` r
+plot(sim_cb, "cases", period = "month")
+```
+
+<img src="man/figures/README-plot-1.png" alt="" width="100%" />
 
 The McAllen cold-stress index reproduces the values published by
 Gutierrez & Ponti (2014) and Gutierrez et al. (2019):
@@ -171,7 +231,7 @@ ci[ci$year %in% c(1971, 1979), c("year", "mu_cold")]
 | M2 ✔ | Reference genotype-resolved ODE in pure R |
 | M3 ✔ | C++ rate kernel and ODE solver |
 | M4 ✔ | C++ chain-binomial stochastic solver |
-| M5 | Checks, summaries, calibration and plots |
+| M5 ✔ | Checks, summaries, calibration and plots |
 | M6 | Scientific validation |
 | M7 | Documentation and v0.1.0 release |
 

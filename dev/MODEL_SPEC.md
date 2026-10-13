@@ -409,6 +409,15 @@ follow in M5.
 | Female classes (`sg_females()`) | All adult females U + F; wild type: genotype in the cube's wild type; egg-laying: W = Σ_{g,m} W_{g,m} (S8); fertile-equivalent: Σ_{g,m} F_{g,m} v_{g,m} / v_ref with v_{g,m} = Σ_k T[g,m,k] and v_ref its largest value over wild-type pairs |
 | Case proxy (`sg_cases()`) | Oviposition events with at least one viable egg (fertile_batches counter, S17): wounds newly infested with viable eggs, per km² and period; females mated to sterile males cause no cases; daily wound fraction = cases / (H A days); cases per host = cases per km² / host density. All oviposition events (egg_batches) are also reported. |
 
+**Checks and calibration.** R0 (`sg_r0()`, `check_model()`) is the eggs per
+egg at low density of the wild type at the day's or a constant temperature:
+R φ_ov T_ww Ψ₀ W(1), with Ψ₀ = σ₀ and W(1) the egg-laying females per unit
+egg input from the chain steady state (section 11). `calibrate_H()` sets H so
+that a summary of the ODE population after a burn-in (default: mean adult
+density per km² over the forcing period) equals a target; without an Allee
+effect or releases all equations are homogeneous of degree one in (state, H),
+so the population is proportional to H and H* = H · target / value.
+
 ## 13. Parameters
 
 The authoritative list of parameters, with names, defaults, allowed ranges,

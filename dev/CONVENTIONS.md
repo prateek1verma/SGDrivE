@@ -110,6 +110,18 @@ boundary.
   frequencies) with bounds of about five standard errors, or compare with
   the deterministic map (draws replaced by expectations).
 
+## Plots
+
+* Plots use ggplot2 (a suggested package): functions return ggplot objects
+  and stop with an install hint when ggplot2 is missing; the plotted data are
+  available as tables (`sg_plot_data()`).
+* Colours must be readable by colour-blind readers: Okabe-Ito by default,
+  ColorBrewer (Dark2, or Paired for 9 to 12 series) or viridis. Never a
+  rainbow palette.
+* Stochastic replicates are drawn as separate lines, not summarised.
+* Aesthetics are built from symbols (no `.data` pronoun), so the package does
+  not depend on rlang.
+
 ## Comments and documentation
 
 * Every exported function has roxygen documentation: purpose, every argument
