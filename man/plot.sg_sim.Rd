@@ -13,6 +13,7 @@
   period = "week",
   host_density = NULL,
   replicates = NULL,
+  palette = c("okabe_ito", "brewer", "viridis"),
   ...
 )
 
@@ -24,6 +25,7 @@
   period = "week",
   host_density = NULL,
   replicates = NULL,
+  palette = c("okabe_ito", "brewer", "viridis"),
   ...
 )
 }
@@ -48,6 +50,12 @@ adults otherwise.}
 
 \item{replicates}{For stochastic runs: which replicates to draw (default
 all).}
+
+\item{palette}{Colour palette, all suitable for colour-blind readers:
+\code{"okabe_ito"} (default; Okabe & Ito 2008, up to 8 series), \code{"brewer"}
+(ColorBrewer Dark2, up to 8 series) or \code{"viridis"} (any number). With 9
+to 12 series both \code{"okabe_ito"} and \code{"brewer"} use ColorBrewer Paired,
+with more than 12 viridis.}
 
 \item{...}{Not used.}
 }

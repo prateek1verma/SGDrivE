@@ -20,7 +20,9 @@
   chain-binomial simulations return ggplot objects of totals by stage or
   genotype, allele frequencies, female classes or cases, with stochastic
   replicates drawn as separate lines; `sg_plot_data()` returns the plotted
-  table.
+  table. Colours are colour-blind friendly: Okabe-Ito by default,
+  ColorBrewer (`palette = "brewer"`) or viridis; ColorBrewer Paired for 9 to
+  12 series.
 
 ## Milestone M4: chain-binomial stochastic solver
 

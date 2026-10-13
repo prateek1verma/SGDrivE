@@ -46,6 +46,37 @@ test_that("every plot type builds for deterministic and stochastic runs", {
   expect_match(g$labels$title, "eggs")
 })
 
+# ColorBrewer palettes (as given by RColorBrewer, used by ggplot2 via scales)
+dark2 <- c("#1B9E77", "#D95F02", "#7570B3", "#E7298A", "#66A61E", "#E6AB02", "#A6761D", "#666666")
+paired <- c(
+  "#A6CEE3", "#1F78B4", "#B2DF8A", "#33A02C", "#FB9A99", "#E31A1C",
+  "#FDBF6F", "#FF7F00", "#CAB2D6", "#6A3D9A", "#FFFF99", "#B15928"
+)
+
+test_that("colour-blind-friendly palettes, with ColorBrewer Paired for many series", {
+  skip_if_not_installed("ggplot2")
+  colours <- function(g) unique(ggplot2::ggplot_build(g)$data[[1]]$colour)
+  oi <- colours(plot(sim, "stages")) # six stages
+  expect_true(all(toupper(oi) %in% ns$.sg_okabe_ito))
+  expect_length(oi, 6)
+  br <- colours(plot(sim, "stages", palette = "brewer"))
+  expect_true(all(toupper(br) %in% dark2))
+  vi <- colours(plot(sim, "stages", palette = "viridis"))
+  expect_length(vi, 6)
+  expect_false(any(toupper(vi) %in% ns$.sg_okabe_ito))
+  skip_if_not_installed("MGDrivE")
+  # ten genotypes: more than eight colours, so ColorBrewer Paired is used
+  mh <- sg_model(p, sg_cube(MGDrivE::cubeHomingDrive()), wx)
+  equal <- stats::setNames(rep(1, 10), mh$cube$genotypes)
+  sh <- simulate_ode(mh, init = sg_init(mh, genotypes = equal))
+  for (pal in c("okabe_ito", "brewer")) {
+    many <- colours(plot(sh, "genotypes", palette = pal))
+    expect_length(many, 10)
+    expect_true(all(toupper(many) %in% paired))
+  }
+  expect_error(plot(sim, palette = "rainbow"), "must be one of")
+})
+
 test_that("plots need ggplot2 and valid arguments", {
   local_mocked_bindings(.sg_has_ggplot2 = function() FALSE)
   expect_error(plot(sim), "install.packages\\(\"ggplot2\"\\)")

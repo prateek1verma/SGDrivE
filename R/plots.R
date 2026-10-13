@@ -21,6 +21,11 @@
 #' @param host_density For `"cases"`: hosts per km^2; plots cases per host.
 #' @param replicates For stochastic runs: which replicates to draw (default
 #'   all).
+#' @param palette Colour palette, all suitable for colour-blind readers:
+#'   `"okabe_ito"` (default; Okabe & Ito 2008, up to 8 series), `"brewer"`
+#'   (ColorBrewer Dark2, up to 8 series) or `"viridis"` (any number). With 9
+#'   to 12 series both `"okabe_ito"` and `"brewer"` use ColorBrewer Paired,
+#'   with more than 12 viridis.
 #' @param ... Not used.
 #' @return A ggplot object (add layers, scales or themes with `+`). The
 #'   plotted data are returned by [sg_plot_data()].
@@ -42,16 +47,18 @@
 #' }
 plot.sg_sim <- function(x, what = c("stages", "genotypes", "alleles", "females", "cases"),
                         stages = NULL, per = c("km2", "node"), period = "week",
-                        host_density = NULL, replicates = NULL, ...) {
-  .sg_plot(x, what, stages, per, period, host_density, replicates)
+                        host_density = NULL, replicates = NULL,
+                        palette = c("okabe_ito", "brewer", "viridis"), ...) {
+  .sg_plot(x, what, stages, per, period, host_density, replicates, palette)
 }
 
 #' @rdname plot.sg_sim
 #' @export
 plot.sg_sim_cb <- function(x, what = c("stages", "genotypes", "alleles", "females", "cases"),
                            stages = NULL, per = c("km2", "node"), period = "week",
-                           host_density = NULL, replicates = NULL, ...) {
-  .sg_plot(x, what, stages, per, period, host_density, replicates)
+                           host_density = NULL, replicates = NULL,
+                           palette = c("okabe_ito", "brewer", "viridis"), ...) {
+  .sg_plot(x, what, stages, per, period, host_density, replicates, palette)
 }
 
 #' Data behind a simulation plot
@@ -142,7 +149,9 @@ sg_plot_data <- function(sim, what = c("stages", "genotypes", "alleles", "female
 
 .sg_has_ggplot2 <- function() requireNamespace("ggplot2", quietly = TRUE)
 
-.sg_plot <- function(sim, what, stages, per, period, host_density, replicates) {
+.sg_plot <- function(sim, what, stages, per, period, host_density, replicates,
+                     palette = "okabe_ito") {
+  palette <- .sg_match_choice(palette, c("okabe_ito", "brewer", "viridis"), "palette")
   if (!.sg_has_ggplot2()) {
     .sg_stop("Plots need the 'ggplot2' package: install.packages(\"ggplot2\").")
   }
@@ -164,10 +173,33 @@ sg_plot_data <- function(sim, what = c("stages", "genotypes", "alleles", "female
       title = attr(d, "title"),
       subtitle = if (stochastic) sprintf("%d replicate%s", n_rep, if (n_rep == 1L) "" else "s")
     ) +
+    .sg_colour_scale(palette, length(unique(d$series))) +
     ggplot2::theme_minimal() +
     ggplot2::guides(
       colour = if (one_series) "none" else ggplot2::guide_legend(override.aes = list(alpha = 1))
     )
+}
+
+# Okabe & Ito (2008) colour-blind-safe palette, yellow last (low contrast on
+# white).
+.sg_okabe_ito <- c(
+  "#000000", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#CC79A7", "#F0E442"
+)
+
+# Discrete colour scale for n series from a colour-blind-friendly palette:
+# Okabe-Ito or ColorBrewer Dark2 up to 8 series, ColorBrewer Paired for 9 to
+# 12 (viridis tells many categories apart poorly), viridis beyond.
+.sg_colour_scale <- function(palette, n) {
+  if (palette != "viridis" && n <= 8L) {
+    if (palette == "okabe_ito") {
+      return(ggplot2::scale_colour_manual(values = unname(.sg_okabe_ito[seq_len(n)])))
+    }
+    return(ggplot2::scale_colour_brewer(palette = "Dark2"))
+  }
+  if (palette != "viridis" && n <= 12L) {
+    return(ggplot2::scale_colour_brewer(palette = "Paired"))
+  }
+  ggplot2::scale_colour_viridis_d(end = 0.9)
 }
 
 # Rename a long table's grouping column to `series` and its value column to
