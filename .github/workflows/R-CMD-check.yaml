@@ -32,6 +32,11 @@ jobs:
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       R_KEEP_PKG_SOURCE: yes
+      # R 4.1's default toolchain keeps debug symbols in the compiled library
+      # (about 5.2 MB of Rcpp template code), just above R CMD check's 5 MB
+      # size threshold; newer R versions build it smaller. Raise the
+      # threshold for that job only, so the others still flag real growth.
+      _R_CHECK_PKG_SIZES_THRESHOLD_: ${{ matrix.config.r == '4.1' && '10' || '5' }}
 
     steps:
       - uses: actions/checkout@v5
