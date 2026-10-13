@@ -1,5 +1,16 @@
 # SGDrivE 0.0.0.9000
 
+## Milestone M5: checks, outputs, calibration and plots (in progress)
+
+* Output tables for ODE and chain-binomial simulations (D-026):
+  `sg_totals()` (by stage, sex, genotype and mate genotype, per node or per
+  km^2), `as.data.frame()` methods (long tables), `sg_allele_freq()`,
+  `sg_females()` (all, unmated, mated, wild type, egg-laying and
+  fertile-equivalent females) and `sg_cases()` (oviposition events, the
+  case proxy, by day, week, month or year, with the daily fraction of wounds
+  newly infested and cases per host). Simulations now store the model
+  information these need.
+
 ## Milestone M4: chain-binomial stochastic solver
 
 * Documentation: README section on stochastic simulation, random-number

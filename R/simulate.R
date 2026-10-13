@@ -178,7 +178,7 @@ simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
         output_every = as.integer(output_every),
         stiff_fallback = method == "dopri5" && stiff_fallback,
         fallback_days = sum(res$diag$fallback), run_time = run_time,
-        model_hash = model$meta$hash,
+        model_hash = model$meta$hash, info = .sg_output_info(model),
         package_version = as.character(utils::packageVersion("SGDrivE")),
         desolve_version = if (.sg_has_desolve()) {
           as.character(utils::packageVersion("deSolve"))

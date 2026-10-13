@@ -394,10 +394,42 @@ Extends D-020 (added in M4-WP4 at the user's request):
 
 ---
 
+## D-026 Outputs, checks, calibration and plots for M5 (Accepted, 2026-10-12)
+
+User decisions for milestone M5:
+1. **Plots** use ggplot2 throughout, as a suggested package: `plot()`
+   methods return ggplot objects (an error with an install hint when ggplot2
+   is missing); the plotted data are also available as tables.
+2. **Case proxy**: oviposition events (egg batches), i.e. wounds newly
+   infested with eggs, per km^2 and period, with cases per host when the
+   user gives a host density, and the daily fraction of available wounds
+   newly infested. Events of females mated to sterile males are included
+   (their eggs are not viable).
+3. **Calibration** (`calibrate_H()`): by default the wound density H is set
+   so that the mean adult density over a reference year equals a target
+   (adults per km^2, a required argument). With h_M = 0 and no releases all
+   equations are homogeneous of degree one in (state, H), so after a burn-in
+   populations are exactly proportional to H (verified: 10.000000 times the
+   adults at 10 times H) and the calibration is closed form; otherwise a
+   one-dimensional root search.
+4. **O-007 resolved**: the largest-rate diagnostic includes the mating rate
+   nu g_find, and `check_model()` reports it separately.
+
+Output definitions (WP1): long tables by stage (eggs, larvae, pupae, males,
+unmated females, mated females), sex (juveniles "unsexed"), genotype and
+mate genotype; allele frequencies from single-letter alleles in genotype
+names by default (or a user allele table); female classes (all, unmated,
+mated, wild type, egg-laying, and fertile-equivalent: mated females weighted
+by the viability of their cross relative to wild type x wild type).
+Simulations store the information these need (`meta$info`: area, H,
+genotypes, wild type, laying classes, cross viabilities).
+
+---
+
 ## Open questions
 
 | ID | Question | Current assumption |
 |---|---|---|
 | O-006 (resolved by D-021) | Integrator for the C++ ODE backend (M3) | M2 diagnostics (1 year, McAllen): `lsoda` never switched to its stiff method; largest rate 13 per day with defaults and 40 per day under "gp2014", about 40-95 steps per day. 24-year gp2014 run (M2-WP5): stiff method on 2 of 8766 days, largest rate 43.3 per day, 93 steps per day. An explicit adaptive Runge-Kutta (Dormand-Prince) is expected to suffice; artificial stiffness arises only for extreme settings such as nu = 1000. Stress tests (M2-WP6): weekly sterile releases of 10x-1000x the wild males leave the largest rate unchanged with no stiff days; larval crowding with 1e6 released eggs raises it from 4.9 to 30.7 per day, still without stiff days. M3 should still include a stiffness check (Hairer's Dormand-Prince test) with a warning or fallback to a stiff method, and reuse tests/testthat/test-stress.R against the C++ solver |
-| O-007 | Should the largest-rate diagnostic (`max_rate`) include the effective mating rate ν·g_find? It currently counts transfer and mortality only, so stiffness caused by fast mating (found in M3-WP4: ν = 1e5, h_M = 1e5, large male release) is not visible in it | Unchanged (transfer + mortality), pending the user's decision |
+| O-007 (resolved by D-026) | Should the largest-rate diagnostic (`max_rate`) include the effective mating rate ν·g_find? It currently counts transfer and mortality only, so stiffness caused by fast mating (found in M3-WP4: ν = 1e5, h_M = 1e5, large male release) is not visible in it | Unchanged (transfer + mortality), pending the user's decision |
 | O-004 | Suspected `calcOmega` argument misuse in the legacy parameter table (0.4767 and 0.0740 look like reductions; `calcOmega` expects the fraction retained) | To be checked before building SIT cubes in M6 |

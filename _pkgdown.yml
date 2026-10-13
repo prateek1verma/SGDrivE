@@ -32,6 +32,12 @@ reference:
     contents:
       - simulate_ode
       - simulate_cb
+  - title: Outputs
+    contents:
+      - sg_totals
+      - sg_allele_freq
+      - sg_females
+      - sg_cases
   - title: Backend
     contents:
       - sg_backend_info

@@ -175,7 +175,7 @@ simulate_cb <- function(model, init = NULL, n_rep = 1L, dt = 0.1, output_every =
     output_every = as.integer(output_every), seed = rng$seed,
     streams = do.call(cbind, rng$streams), parallel = parallel, run_time = run_time,
     oviposition = p$oviposition, clutch_size = p$clutch_size, mating = p$mating,
-    model_hash = model$meta$hash,
+    model_hash = model$meta$hash, info = .sg_output_info(model),
     package_version = as.character(utils::packageVersion("SGDrivE")), init = x0
   )
   structure(out, class = "sg_sim_cb")

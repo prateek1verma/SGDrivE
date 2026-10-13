@@ -391,7 +391,16 @@ follow in M5.
   effect (g_find depends on M̄) B* is found by a one-dimensional root
   search, taking the upper (stable) root.
 
-## 12. Parameters
+## 12. Outputs (D-026)
+
+| Output | Definition |
+|---|---|
+| Totals (`sg_totals()`, `as.data.frame()`) | Counts summed over sub-stages by stage (E, L, P, M, U, F), sex, genotype and mate genotype; per node or per km² (÷ A) |
+| Allele frequencies (`sg_allele_freq()`) | Σ_g N_g a_{g,ℓ} / Σ_{g,ℓ} N_g a_{g,ℓ} over the chosen stages, with a_{g,ℓ} the copies of allele ℓ in genotype g (single-letter alleles in genotype names by default) |
+| Female classes (`sg_females()`) | All adult females U + F; wild type: genotype in the cube's wild type; egg-laying: W = Σ_{g,m} W_{g,m} (S8); fertile-equivalent: Σ_{g,m} F_{g,m} v_{g,m} / v_ref with v_{g,m} = Σ_k T[g,m,k] and v_ref its largest value over wild-type pairs |
+| Case proxy (`sg_cases()`) | Oviposition events (egg_batches counter, S17): wounds newly infested with eggs, per km² and period; daily wound fraction = events / (H A days); cases per host = events per km² / host density |
+
+## 13. Parameters
 
 The authoritative list of parameters, with names, defaults, allowed ranges,
 units, sources and the equations that use them, is the parameter table in
