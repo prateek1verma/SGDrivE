@@ -1,5 +1,14 @@
 # SGDrivE 0.0.0.9000
 
+## Scenario scripts
+
+* New folder `inst/scenarios/` (installed; `system.file("scenarios",
+  package = "SGDrivE")`) with short user-style scripts for scientific testing
+  and future tutorials. First script: `01_wild_type_dynamics.R`, a wild-type
+  population at McAllen, Texas (model check, burn-in, deterministic and
+  stochastic runs, plots, R0 by temperature).
+* `SGDrivE.Rproj` RStudio project file for local development.
+
 ## Milestone M5: checks, outputs, calibration and plots
 
 * Documentation: README section on outputs, plots, checks and calibration
