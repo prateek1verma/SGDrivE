@@ -57,7 +57,9 @@ test_that("no equilibrium where the population cannot persist", {
 
 test_that("the equilibrium needs a single wild type that breeds true", {
   m <- sg_model(sg_params(), cube3, sg_forcing(const_weather(25), sg_params()))
-  expect_error(sg_init(m, "equilibrium"), "single `temperature`")
+  # constant forcing: the temperature defaults to the forcing's
+  expect_identical(sg_init(m, "equilibrium"), sg_init(m, "equilibrium", temperature = 25))
+  expect_error(sg_init(m, "equilibrium", temperature = c(20, 25)), "single `temperature`")
   skip_if_not_installed("MGDrivE")
   wx25 <- sg_forcing(const_weather(25), sg_params())
   ms <- sg_model(sg_params(), sg_cube(MGDrivE::cubeXShredderY()), wx25)
@@ -96,4 +98,74 @@ test_that("burn-in inputs are checked", {
   expect_error(sg_init(short, "burn_in", years = 0, weather = wx_all), "whole number >= 1")
   expect_error(sg_init(short, "burn_in", years = 1.5, weather = wx_all), "whole number >= 1")
   expect_s3_class(sg_init(short, "burn_in", weather = wx_all), "sg_state")
+})
+
+# ---- population size from adult_females (D-028) ------------------------------
+
+adult_females_of <- function(m, x) sum(x[c(sg_state_index(m, "U"), sg_state_index(m, "F"))])
+
+test_that("sg_constant_weather() gives one temperature on consecutive days", {
+  wx <- sg_constant_weather(20, days = 10, start = "2005-03-01")
+  expect_named(wx, c("date", "tmean"))
+  expect_identical(wx$date, as.Date("2005-03-01") + 0:9)
+  expect_true(all(wx$tmean == 20))
+  f <- sg_forcing(wx, sg_params())
+  expect_identical(ns$.sg_forcing_constant_temp(f, sg_params()), 20)
+  expect_null(ns$.sg_forcing_constant_temp(sg_forcing(wx_all[1:40, ], sg_params()), sg_params()))
+  expect_error(sg_constant_weather(c(20, 21)), "single finite number")
+  expect_error(sg_constant_weather(20, days = 0), "whole number >= 1")
+  expect_error(sg_constant_weather(20, start = "not a date"), "single date")
+})
+
+test_that("adult_females sets the area so the equilibrium holds that many females", {
+  p <- sg_params()
+  f <- sg_forcing(sg_constant_weather(20, days = 60), p)
+  m <- sg_model(p, cube3, f, adult_females = 1000)
+  e <- sg_init(m, "equilibrium") # temperature taken from the forcing
+  expect_identical(attr(e, "equilibrium")$temperature, 20)
+  expect_equal(adult_females_of(m, e), 1000, tolerance = 1e-10)
+  # densities stay as given; only the area (and so the wound count) changes
+  unit <- sg_model(p, cube3, f)
+  density <- adult_females_of(unit, sg_init(unit, "equilibrium"))
+  expect_equal(m$area, 1000 / density, tolerance = 1e-12)
+  expect_identical(m$params$wound_density, p$wound_density)
+  expect_equal(m$counts$H, p$wound_density * m$area, tolerance = 1e-12)
+  expect_identical(m$meta$adult_females$temperature, 20)
+  expect_true(any(grepl("area chosen for 1000 adult females", capture.output(print(m)))))
+  # the ODE stays at the equilibrium
+  fem <- sg_females(simulate_ode(m, e))$females
+  expect_lt(max(abs(fem - 1000)), 1e-6)
+})
+
+test_that("adult_females is exact with larval crowding and an Allee effect", {
+  p <- sg_params(
+    larval_crowding_mode = "per_wound", larval_crowding_coef = 0.05,
+    male_density_half_mating = 0.5
+  )
+  m <- sg_model(p, cube3, sg_forcing(sg_constant_weather(22), p), adult_females = 250)
+  expect_equal(adult_females_of(m, sg_init(m, "equilibrium")), 250, tolerance = 1e-8)
+})
+
+test_that("adult_females and the equilibrium default are checked", {
+  p <- sg_params()
+  f20 <- sg_forcing(sg_constant_weather(20, days = 30), p)
+  varying <- sg_forcing(wx_all[1:40, ], p)
+  expect_error(sg_model(p, cube3, f20, area = 2, adult_females = 10), "not both")
+  expect_error(sg_model(p, cube3, f20, adult_females = -1), "single positive number")
+  expect_error(sg_model(p, cube3, varying, adult_females = 10), "one constant temperature")
+  expect_error(
+    sg_model(p, cube3, sg_forcing(sg_constant_weather(15, days = 30), p), adult_females = 10),
+    "no wild-type population persists at 15 degC"
+  )
+  expect_error(sg_init(sg_model(p, cube3, varying), "equilibrium"), "needs a `temperature`")
+  # drought stress the equilibrium would miss makes the forcing not constant
+  wet <- transform(sg_constant_weather(20, days = 30), rain = 0)
+  pd <- sg_params(pupa_drought_mortality = 0.1)
+  expect_error(sg_model(pd, cube3, sg_forcing(wet, pd), adult_females = 10), "one constant")
+})
+
+test_that("calibrating the wound density drops the adult_females note", {
+  p <- sg_params()
+  m <- sg_model(p, cube3, sg_forcing(sg_constant_weather(20), p), adult_females = 1000)
+  expect_null(ns$.sg_model_with_h(m, 10)$meta$adult_females)
 })

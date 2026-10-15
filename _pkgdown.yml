@@ -18,6 +18,7 @@ reference:
       - temperature_functions
       - sg_cold_index
       - sg_example_weather
+      - sg_constant_weather
       - sg_read_ghcn
       - sg_fill_weather
   - title: Releases

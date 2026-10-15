@@ -44,6 +44,8 @@
 #' @param weather For `"burn_in"`: optional daily weather (as for
 #'   [sg_forcing()]) covering the `years` before the model's start date.
 #' @param temperature For `"equilibrium"`: constant temperature (degC).
+#'   Default: the temperature of the model's forcing, when it is constant
+#'   (e.g. from [sg_constant_weather()]).
 #'
 #' @details
 #' Weights are applied block by block, honouring each genotype's biology:
@@ -76,6 +78,12 @@
 #'   sg_init(mod) # wild type only
 #'   sg_init(mod, "hardy_weinberg", alleles = c(A = 0.7, a = 0.3))
 #'   sg_init(mod, "equilibrium", temperature = 27) # wild type at 27 degC
+#'   # with constant weather the temperature is taken from the forcing
+#'   mod_20 <- sg_model(
+#'     p, sg_cube(MGDrivE::cubeMendelian()),
+#'     sg_forcing(sg_constant_weather(20, days = 30), p)
+#'   )
+#'   sg_init(mod_20, "equilibrium")
 #'   # a year of burn-in over the weather before the start date
 #'   wx <- sg_example_weather()
 #'   mod_71 <- sg_model(
@@ -107,6 +115,15 @@ sg_init <- function(model,
       start <- .sg_init_constant(model, .sg_init_values(values, per, model$area), weights)
       .sg_init_burn_in(model, start, years, weather)
     } else {
+      if (is.null(temperature)) {
+        temperature <- .sg_forcing_constant_temp(model$forcing, model$params)
+        if (is.null(temperature)) {
+          .sg_stop(
+            "method = \"equilibrium\" needs a `temperature` (degC): the model's forcing ",
+            "does not have one constant temperature."
+          )
+        }
+      }
       .sg_init_equilibrium(model, temperature)
     }
     x <- res$x

@@ -1,5 +1,18 @@
 # SGDrivE 0.0.0.9000
 
+## Constant temperature and fixed population size
+
+* `sg_constant_weather()` gives daily weather with one temperature, for
+  simulations at a fixed temperature.
+* `sg_model(adult_females = )` chooses the node area so that the wild-type
+  equilibrium at the forcing's constant temperature holds that many adult
+  females (D-028). Densities in the parameters are unchanged; the number of
+  wounds (hosts) in the node scales with the area. The equilibrium is exactly
+  proportional to the area, also with larval crowding or an Allee effect.
+* `sg_init(method = "equilibrium")` takes the temperature from the model's
+  forcing when it is constant.
+* New scenario script `inst/scenarios/02_constant_temperature.R`.
+
 ## Descriptive parameter names (breaking)
 
 * All parameters and several function arguments have descriptive names

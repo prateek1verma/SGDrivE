@@ -21,6 +21,13 @@
 #'   `oviposition_age_dd`, male segments by `male_mature_age_dd` (zero thresholds add no
 #'   segment); `print()` of a model shows the
 #'   segments.
+#' @param adult_females Optional number of adult females (unmated plus mated)
+#'   in the node at equilibrium. If given, the node area is chosen so that the
+#'   wild-type equilibrium at the forcing's constant temperature has this many
+#'   adult females (see Details). Give `area` or `adult_females`, not both.
+#'   Needs a forcing with one constant temperature, e.g. from
+#'   [sg_constant_weather()], and a cube with a single wild type that breeds
+#'   true.
 #'
 #' @details
 #' **Adult chains** (model specification S6, D-018). Each adult chain is split
@@ -41,6 +48,18 @@
 #'
 #' **Releases** enter the first sub-stage of their stage: eggs E, pupae P,
 #' adult males M and adult females U (unmated).
+#'
+#' **Population size from `adult_females`** (D-028). The parameters set the
+#' population density (per km^2); the node area sets how many individuals
+#' that is. With `adult_females`, the area is the target divided by the
+#' equilibrium density of adult females at the forcing's temperature (from
+#' [sg_init()] with `method = "equilibrium"`). Densities in `params`
+#' (`wound_density`, `male_density_half_mating`) stay as given, so the
+#' number of wounds (hosts) in the node, `wound_density` times the area,
+#' scales with the region. Every rate of the model depends on counts only
+#' through densities, so the equilibrium is exactly proportional to the
+#' area, also with larval crowding or an Allee effect. `print()` shows the
+#' area chosen.
 #'
 #' **Fingerprint.** `model$meta$hash` is an MD5 hash of all model inputs
 #' (parameters, cube, forcing, releases, area and adult chains), so two models
@@ -69,7 +88,7 @@
 #'   head(sg_state_names(mod))
 #' }
 sg_model <- function(params, cube, forcing, releases = NULL, area = 1,
-                     adult_segment_substages = NULL) {
+                     adult_segment_substages = NULL, adult_females = NULL) {
   if (!inherits(params, "sg_params")) {
     .sg_stop("`params` must be an sg_params object; create one with sg_params().")
   }
@@ -78,6 +97,23 @@ sg_model <- function(params, cube, forcing, releases = NULL, area = 1,
   }
   if (!inherits(forcing, "sg_forcing")) {
     .sg_stop("`forcing` must be an sg_forcing object; create one with sg_forcing().")
+  }
+  if (!is.null(adult_females)) {
+    if (!missing(area)) .sg_stop("Give `area` or `adult_females`, not both.")
+    ok <- is.numeric(adult_females) && length(adult_females) == 1L &&
+      is.finite(adult_females) && adult_females > 0
+    if (!ok) .sg_stop("`adult_females` must be a single positive number.")
+    # build at 1 km^2, find the equilibrium density, then rebuild at the area
+    # that holds `adult_females` (exact: the equilibrium scales with the area)
+    unit <- sg_model(params, cube, forcing, releases,
+      area = 1, adult_segment_substages = adult_segment_substages
+    )
+    sized <- .sg_area_for_females(unit, adult_females)
+    model <- sg_model(params, cube, forcing, releases,
+      area = sized$area, adult_segment_substages = adult_segment_substages
+    )
+    model$meta$adult_females <- sized
+    return(model)
   }
   area_ok <- is.numeric(area) && length(area) == 1L && is.finite(area) && area > 0
   if (!area_ok) {
@@ -250,6 +286,13 @@ print.sg_model <- function(x, ...) {
     "  node area %s km^2; wounds H = %s per node; mating \"%s\"; search competitors \"%s\"\n",
     format(x$area), format(x$counts$H), p$mating_mode, p$wound_competitors
   ))
+  sized <- x$meta$adult_females
+  if (!is.null(sized)) {
+    cat(sprintf(
+      "  area chosen for %s adult females at the %g degC equilibrium (%.4g per km^2)\n",
+      format(sized$adult_females), sized$temperature, sized$density
+    ))
+  }
   rel <- x$releases
   if (nrow(rel) > 0L) {
     cat(sprintf(

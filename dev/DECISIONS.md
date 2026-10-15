@@ -507,6 +507,29 @@ names. Decisions above this one use the former names.
 
 ---
 
+## D-028 Population size from a target number of adult females (Accepted, 2026-10-15)
+
+For scenarios at a constant temperature the user wants a fixed population
+size (e.g. 1000 adult females) without scaling by hand in the script.
+`sg_model(adult_females = n)` sets the node area A = n / d, where d is the
+equilibrium density of adult females (U + F, per km^2) of the wild type at
+the forcing's constant temperature (D-025). The area is scaled rather than
+the wound density H because (1) the densities in the parameters, H in
+particular, are the calibrated biology (GP2014) and stay unchanged, so only
+the size of the region (and with it the number of hosts, H A) changes; and
+(2) every rate depends on counts only through densities (wounds, half-
+saturation h_M and larval crowding per wound are all scaled by A), so the
+equilibrium is exactly proportional to A for every model option, whereas
+scaling H is exact only without an Allee effect. The forcing must have one
+constant temperature (constant `tmean` and 5-day mean, and no drought stress
+the equilibrium would miss); for weather-driven runs, `area` or
+`calibrate_wound_density()` remain the tools. `sg_init(method =
+"equilibrium")` defaults to that temperature. The target is kept in
+`model$meta$adult_females` for `print()` and is dropped when the wound
+density is changed by calibration.
+
+---
+
 ## Open questions
 
 | ID | Question | Current assumption |

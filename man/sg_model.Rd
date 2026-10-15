@@ -10,7 +10,8 @@ sg_model(
   forcing,
   releases = NULL,
   area = 1,
-  adult_segment_substages = NULL
+  adult_segment_substages = NULL,
+  adult_females = NULL
 )
 }
 \arguments{
@@ -35,6 +36,14 @@ Female segments are delimited by \code{female_receptive_age_dd} and
 \code{oviposition_age_dd}, male segments by \code{male_mature_age_dd} (zero thresholds add no
 segment); \code{print()} of a model shows the
 segments.}
+
+\item{adult_females}{Optional number of adult females (unmated plus mated)
+in the node at equilibrium. If given, the node area is chosen so that the
+wild-type equilibrium at the forcing's constant temperature has this many
+adult females (see Details). Give \code{area} or \code{adult_females}, not both.
+Needs a forcing with one constant temperature, e.g. from
+\code{\link[=sg_constant_weather]{sg_constant_weather()}}, and a cube with a single wild type that breeds
+true.}
 }
 \value{
 An object of class \code{sg_model}: a list with \code{params}, \code{cube},
@@ -70,6 +79,18 @@ than computing positions by hand.
 
 \strong{Releases} enter the first sub-stage of their stage: eggs E, pupae P,
 adult males M and adult females U (unmated).
+
+\strong{Population size from \code{adult_females}} (D-028). The parameters set the
+population density (per km^2); the node area sets how many individuals
+that is. With \code{adult_females}, the area is the target divided by the
+equilibrium density of adult females at the forcing's temperature (from
+\code{\link[=sg_init]{sg_init()}} with \code{method = "equilibrium"}). Densities in \code{params}
+(\code{wound_density}, \code{male_density_half_mating}) stay as given, so the
+number of wounds (hosts) in the node, \code{wound_density} times the area,
+scales with the region. Every rate of the model depends on counts only
+through densities, so the equilibrium is exactly proportional to the
+area, also with larval crowding or an Allee effect. \code{print()} shows the
+area chosen.
 
 \strong{Fingerprint.} \code{model$meta$hash} is an MD5 hash of all model inputs
 (parameters, cube, forcing, releases, area and adult chains), so two models

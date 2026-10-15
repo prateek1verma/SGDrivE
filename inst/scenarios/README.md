@@ -24,6 +24,7 @@ source(system.file("scenarios", "01_wild_type_dynamics.R", package = "SGDrivE"),
 | Script | Scenario |
 |---|---|
 | `01_wild_type_dynamics.R` | Wild-type screwworm population at McAllen, Texas (1971-1972): model check, burn-in, deterministic and stochastic runs, plots of stages, females and cases, R0 by temperature |
+| `02_constant_temperature.R` | Wild-type population at a constant 20 degC in a region sized for 1000 adult females (`sg_model(adult_females = )`), started at equilibrium: deterministic and stochastic runs |
 
 ## Conventions
 

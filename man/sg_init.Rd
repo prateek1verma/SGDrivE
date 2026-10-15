@@ -68,7 +68,9 @@ type(s).}
 \item{weather}{For \code{"burn_in"}: optional daily weather (as for
 \code{\link[=sg_forcing]{sg_forcing()}}) covering the \code{years} before the model's start date.}
 
-\item{temperature}{For \code{"equilibrium"}: constant temperature (degC).}
+\item{temperature}{For \code{"equilibrium"}: constant temperature (degC).
+Default: the temperature of the model's forcing, when it is constant
+(e.g. from \code{\link[=sg_constant_weather]{sg_constant_weather()}}).}
 }
 \value{
 An object of class \code{sg_state}: a named numeric vector of length
@@ -106,6 +108,12 @@ if (requireNamespace("MGDrivE", quietly = TRUE)) {
   sg_init(mod) # wild type only
   sg_init(mod, "hardy_weinberg", alleles = c(A = 0.7, a = 0.3))
   sg_init(mod, "equilibrium", temperature = 27) # wild type at 27 degC
+  # with constant weather the temperature is taken from the forcing
+  mod_20 <- sg_model(
+    p, sg_cube(MGDrivE::cubeMendelian()),
+    sg_forcing(sg_constant_weather(20, days = 30), p)
+  )
+  sg_init(mod_20, "equilibrium")
   # a year of burn-in over the weather before the start date
   wx <- sg_example_weather()
   mod_71 <- sg_model(

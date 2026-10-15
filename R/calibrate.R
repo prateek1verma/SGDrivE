@@ -148,6 +148,7 @@ print.sg_calibration <- function(x, ...) {
   m <- model
   m$params <- stats::update(model$params, wound_density = h)
   m$counts$H <- h * model$area
+  m$meta$adult_females <- NULL # the area was chosen for the old wound density
   m$meta$hash <- .sg_model_hash(m)
   m
 }

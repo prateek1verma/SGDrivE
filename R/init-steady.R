@@ -85,10 +85,10 @@
 # R phi_ov T_ww Psi* W(1) = 1 gives Psi*, Psi* = sigma0 [1 - exp(-a_s dx H /
 # N_s*)] gives N_s*, and B* = N_s* / N_s(1). Otherwise B* is found by a
 # one-dimensional root search (the upper, stable root).
-.sg_init_equilibrium <- function(model, temperature) {
+.sg_init_equilibrium <- function(model, temperature, what = "method = \"equilibrium\"") {
   ok <- is.numeric(temperature) && length(temperature) == 1L && is.finite(temperature)
-  if (!ok) .sg_stop("method = \"equilibrium\" needs a single `temperature` (degC).")
-  w <- .sg_wild_setup(model, "method = \"equilibrium\"")
+  if (!ok) .sg_stop(what, " needs a single `temperature` (degC).")
+  w <- .sg_wild_setup(model, what)
   s <- w$s
   p <- s$p
   gi <- w$gi
@@ -167,6 +167,45 @@
   s <- .sg_reference_setup(model)
   gi <- match(w, s$geno)
   list(s = s, gi = gi, t_ww = s$egg_tensor[(gi - 1L) * s$n_g + gi, gi])
+}
+
+# The temperature of a forcing whose every day equals one constant-temperature
+# day (tmean and its 5-day mean constant, and no moisture stress that the
+# equilibrium would miss), or NULL.
+.sg_forcing_constant_temp <- function(forcing, params) {
+  t0 <- forcing$tmean[1L]
+  flat <- function(v) all(abs(v - t0) <= 1e-9 * max(1, abs(t0)))
+  dry <- params$pupa_drought_mortality > 0 && any(forcing$moisture < 1)
+  if (!flat(forcing$tmean) || !flat(forcing$tmean5) || dry) {
+    return(NULL)
+  }
+  t0
+}
+
+# Node area (km^2) at which the wild-type equilibrium at the forcing's constant
+# temperature holds `n` adult females (D-028). The model is homogeneous of
+# degree one in the state and the area, so the area is n divided by the
+# equilibrium density.
+.sg_area_for_females <- function(model, n) {
+  what <- "`adult_females`"
+  temperature <- .sg_forcing_constant_temp(model$forcing, model$params)
+  if (is.null(temperature)) {
+    .sg_stop(
+      what, " needs a forcing with one constant temperature, e.g. ",
+      "sg_forcing(sg_constant_weather(20), params); for varying weather set `area`, ",
+      "or calibrate the density with calibrate_wound_density()."
+    )
+  }
+  eq <- suppressMessages(.sg_init_equilibrium(model, temperature, what))
+  females <- sum(eq$x[c(sg_state_index(model, "U"), sg_state_index(model, "F"))])
+  if (!(females > 0)) {
+    .sg_stop(sprintf(
+      "%s cannot be reached: no wild-type population persists at %g degC (R0 = %.3g).",
+      what, temperature, eq$info$R0
+    ))
+  }
+  density <- females / model$area
+  list(adult_females = n, temperature = temperature, density = density, area = n / density)
 }
 
 # Rates of the equilibrium calculation from one day's forcing values.

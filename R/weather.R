@@ -1,3 +1,34 @@
+#' Constant weather
+#'
+#' Daily weather with the same mean temperature every day, for simulations at
+#' a fixed temperature.
+#'
+#' @param temperature Daily mean temperature (degrees Celsius).
+#' @param days Number of days (whole number >= 1).
+#' @param start First date (`Date` or `"YYYY-MM-DD"`).
+#' @return A data frame with columns `date` and `tmean`, for [sg_forcing()].
+#'   It has no `rain` column, so there is no moisture stress.
+#' @seealso [sg_forcing()], [sg_model()] (argument `adult_females`),
+#'   [sg_init()] (method `"equilibrium"`)
+#' @export
+#' @examples
+#' wx <- sg_constant_weather(20, days = 365)
+#' head(wx)
+#' f <- sg_forcing(wx, sg_params())
+#' f$dx[1] # degree-days per day at 20 degC
+sg_constant_weather <- function(temperature, days = 365L, start = "2001-01-01") {
+  ok <- is.numeric(temperature) && length(temperature) == 1L && is.finite(temperature)
+  if (!ok) .sg_stop("`temperature` must be a single finite number (degC).")
+  ok <- is.numeric(days) && length(days) == 1L && is.finite(days) && days >= 1 &&
+    days == round(days)
+  if (!ok) .sg_stop("`days` must be a whole number >= 1.")
+  start <- tryCatch(as.Date(start), error = function(e) NULL)
+  if (length(start) != 1L || is.na(start)) {
+    .sg_stop("`start` must be a single date (Date or \"YYYY-MM-DD\").")
+  }
+  data.frame(date = start + seq_len(days) - 1L, tmean = temperature)
+}
+
 #' Example weather: McAllen, Texas, 1960-1983
 #'
 #' Daily weather for McAllen, Texas (USA), from 1 January 1960 to 31 December
