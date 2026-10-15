@@ -31,202 +31,202 @@
 .sg_param_rows <- function() {
   list(
     # ---- temperature: Gutierrez & Ponti (2014) temperature functions ------
-    .prow("T_L", 14.5, "temperature", "degC", "GP2014", "S1, S4",
+    .prow("dev_temp_min", 14.5, "temperature", "degC", "GP2014", "S1, S4",
       "Lower developmental threshold temperature.",
-      lower = -10, upper = 40
+      lower = -10, upper = 40, symbol = "T_L"
     ),
-    .prow("T_U", 40.5, "temperature", "degC", "GP2014", "S1",
+    .prow("dev_temp_decline", 40.5, "temperature", "degC", "GP2014", "S1",
       paste(
         "Temperature at which the high-temperature decline of the",
         "development rate is centred (40 in the paper, 40.5 in the code)."
       ),
-      lower = 20, upper = 60
+      lower = 20, upper = 60, symbol = "T_U"
     ),
-    .prow("a_dev", 0.00065, "temperature", "h^-1 degC^-1", "GP2014", "S1",
+    .prow("dev_rate_slope", 0.00065, "temperature", "h^-1 degC^-1", "GP2014", "S1",
       "Initial slope of the development-rate curve r(T).",
       lower = 0, bounds = "(]", symbol = "a"
     ),
-    .prow("b_dev", 1.75, "temperature", "-", "GP2014", "S1",
+    .prow("dev_decline_steepness", 1.75, "temperature", "-", "GP2014", "S1",
       "Base of the high-temperature decline term of r(T).",
       lower = 1, bounds = "()", symbol = "b"
     ),
-    .prow("dx_floor", 0, "temperature", "-", "GP2014", "S1",
+    .prow("dev_rate_floor", 0, "temperature", "-", "GP2014", "S1",
       paste(
         "Floor on the daily development fraction 24 r(T). 0 stops",
-        "development below T_L; 0.01 reproduces the Pascal code's minimum of",
+        "development below dev_temp_min; 0.01 reproduces the Pascal code's minimum of",
         "0.61 dd per day."
       ),
-      lower = 0, upper = 1
+      lower = 0, upper = 1, symbol = "dx_floor"
     ),
-    .prow("T_opt", 27.2, "temperature", "degC", "GP2014", "S2, S3",
+    .prow("optimal_survival_temp", 27.2, "temperature", "degC", "GP2014", "S2, S3",
       "Temperature of minimum pupal/adult mortality and egg hatch failure.",
-      lower = 0, upper = 50
+      lower = 0, upper = 50, symbol = "T_opt"
     ),
-    .prow("TU_ovip", 43.5, "temperature", "degC", "GP2014", "S4",
+    .prow("oviposition_temp_max", 43.5, "temperature", "degC", "GP2014", "S4",
       "Upper temperature limit for oviposition.",
-      lower = 20, upper = 60
+      lower = 20, upper = 60, symbol = "TU_ovip"
     ),
-    .prow("egg_temperature", "ambient", "temperature", "-", "adapted", "S5",
+    .prow("egg_temp_source", "ambient", "temperature", "-", "adapted", "S5",
       paste(
         "Temperature used to age eggs: \"ambient\" (Gutierrez & Ponti code)",
-        "or \"host\" (constant T_host). D-014."
+        "or \"host\" (constant host_body_temp). D-014."
       ),
-      type = "choice", choices = "ambient|host"
+      type = "choice", choices = "ambient|host", symbol = "egg_temperature"
     ),
-    .prow("T_host", 38.5, "temperature", "degC", "GP2014", "S5",
-      "Host body temperature, used for eggs when egg_temperature = \"host\".",
-      lower = 20, upper = 50
+    .prow("host_body_temp", 38.5, "temperature", "degC", "GP2014", "S5",
+      "Host body temperature, used for eggs when egg_temp_source = \"host\".",
+      lower = 20, upper = 50, symbol = "T_host"
     ),
 
     # ---- development: mean stage durations ---------------------------------
-    .prow("X_pre", 61, "development", "dd", "GP2014", "S1",
+    .prow("dd_scale_preoviposition", 61, "development", "dd", "GP2014", "S1",
       paste(
         "Pre-oviposition period of Adams (1979), used to scale the daily",
-        "degree-day increment dx. The egg-laying age itself is X_ovi."
+        "degree-day increment dx. The egg-laying age itself is oviposition_age_dd."
       ),
-      lower = 0, bounds = "(]"
+      lower = 0, bounds = "(]", symbol = "X_pre"
     ),
-    .prow("X_E", 10, "development", "dd", "GP2014", "S5",
+    .prow("egg_duration_dd", 10, "development", "dd", "GP2014", "S5",
       "Mean egg stage duration (Pascal code; 8.64 dd in the paper).",
-      lower = 0, bounds = "(]"
+      lower = 0, bounds = "(]", symbol = "X_E"
     ),
-    .prow("tau_L", 6, "development", "d", "GP2014", "S5",
+    .prow("larva_duration_days", 6, "development", "d", "GP2014", "S5",
       "Mean larval stage duration in calendar days (larvae develop in hosts).",
       lower = 0, bounds = "(]", symbol = "tau_L"
     ),
-    .prow("X_P", 95, "development", "dd", "GP2014", "S5",
+    .prow("pupa_duration_dd", 95, "development", "dd", "GP2014", "S5",
       "Mean pupal stage duration (6-10 d, mean 7.5 d at 27.5 degC).",
-      lower = 0, bounds = "(]"
+      lower = 0, bounds = "(]", symbol = "X_P"
     ),
-    .prow("X_A", 202.8, "development", "dd", "GP2014", "S5, S6",
+    .prow("adult_lifespan_dd", 202.8, "development", "dd", "GP2014", "S5, S6",
       paste(
         "Mean adult physiological lifespan of the wild type; adults leaving",
         "the last age class die of old age. Scaled by l_g per genotype (D-002)."
       ),
-      lower = 0, bounds = "(]"
+      lower = 0, bounds = "(]", symbol = "X_A"
     ),
 
     # ---- stages: Erlang sub-stage numbers (D-003: defaults <= 10) ----------
-    .prow("n_E", 3L, "stages", "-", "adapted", "S5",
+    .prow("egg_substages", 3L, "stages", "-", "adapted", "S5",
       "Number of Erlang sub-stages for eggs. D-003.",
-      type = "integer", lower = 1, upper = 1000
+      type = "integer", lower = 1, upper = 1000, symbol = "n_E"
     ),
-    .prow("n_L", 6L, "stages", "-", "adapted", "S5",
+    .prow("larva_substages", 6L, "stages", "-", "adapted", "S5",
       "Number of Erlang sub-stages for larvae. D-003.",
-      type = "integer", lower = 1, upper = 1000
+      type = "integer", lower = 1, upper = 1000, symbol = "n_L"
     ),
-    .prow("n_P", 10L, "stages", "-", "adapted", "S5",
+    .prow("pupa_substages", 10L, "stages", "-", "adapted", "S5",
       "Number of Erlang sub-stages for pupae. D-003.",
-      type = "integer", lower = 1, upper = 1000
+      type = "integer", lower = 1, upper = 1000, symbol = "n_P"
     ),
-    .prow("n_A", 10L, "stages", "-", "adapted", "S5, S6",
+    .prow("adult_substages", 10L, "stages", "-", "adapted", "S5, S6",
       paste(
         "Number of adult sub-stages per sex, allocated to the segments of the",
         "adult chain (S6). D-003, D-018."
       ),
-      type = "integer", lower = 1, upper = 1000
+      type = "integer", lower = 1, upper = 1000, symbol = "n_A"
     ),
 
     # ---- thresholds: maturity ages in absolute degree-days (D-002, D-004) --
-    .prow("X_ovi", 61, "thresholds", "dd", "GP2014", "S6, S8",
+    .prow("oviposition_age_dd", 61, "thresholds", "dd", "GP2014", "S6, S8",
       paste(
         "Age at first oviposition: mated females older than this lay eggs",
         "and search for wounds (segment boundary of the female chain). D-018."
       ),
-      lower = 0, bounds = "(]"
+      lower = 0, bounds = "(]", symbol = "X_ovi"
     ),
-    .prow("X_rec", 0, "thresholds", "dd", "adapted", "S6, S12",
+    .prow("female_receptive_age_dd", 0, "thresholds", "dd", "adapted", "S6, S12",
       "Female receptivity age: virgins younger than this cannot mate. D-004, D-018.",
-      lower = 0
+      lower = 0, symbol = "X_rec"
     ),
-    .prow("X_mat", 0, "thresholds", "dd", "adapted", "S6, S12",
+    .prow("male_mature_age_dd", 0, "thresholds", "dd", "adapted", "S6, S12",
       "Male maturity age: younger males are not available as mates. D-004, D-018.",
-      lower = 0
+      lower = 0, symbol = "X_mat"
     ),
 
     # ---- mortality ----------------------------------------------------------
-    .prow("c_A", 0.00036, "mortality", "degC^-2", "GP2014", "S2",
+    .prow("adult_mortality_curvature", 0.00036, "mortality", "degC^-2", "GP2014", "S2",
       "Curvature of the daily pupal/adult mortality curve p_A(T).",
-      lower = 0
+      lower = 0, symbol = "c_A"
     ),
-    .prow("p_A0", 0.0035, "mortality", "-", "GP2014", "S2",
-      "Minimum daily pupal/adult mortality (at T_opt).",
-      lower = 0, upper = 1
+    .prow("adult_mortality_min", 0.0035, "mortality", "-", "GP2014", "S2",
+      "Minimum daily pupal/adult mortality (at optimal_survival_temp).",
+      lower = 0, upper = 1, symbol = "p_A0"
     ),
-    .prow("c_E", 0.00375, "mortality", "degC^-2", "GP2014", "S3",
+    .prow("egg_failure_curvature", 0.00375, "mortality", "degC^-2", "GP2014", "S3",
       "Curvature of the egg hatch-failure curve.",
-      lower = 0
+      lower = 0, symbol = "c_E"
     ),
-    .prow("p_E0", 0.3, "mortality", "-", "GP2014", "S3",
-      "Minimum egg hatch failure (at T_opt).",
-      lower = 0, upper = 1
+    .prow("egg_failure_min", 0.3, "mortality", "-", "GP2014", "S3",
+      "Minimum egg hatch failure (at optimal_survival_temp).",
+      lower = 0, upper = 1, symbol = "p_E0"
     ),
-    .prow("s_L", 0.95, "mortality", "-", "GP2014", "S7",
+    .prow("larva_survival_daily", 0.95, "mortality", "-", "GP2014", "S7",
       "Daily larval survival (density independent).",
-      lower = 0, upper = 1, bounds = "(]"
+      lower = 0, upper = 1, bounds = "(]", symbol = "s_L"
     ),
-    .prow("mu_b_F", 0, "mortality", "d^-1", "adapted", "S7",
+    .prow("female_background_mortality", 0, "mortality", "d^-1", "adapted", "S7",
       "Background (field) mortality of adult females, added to mu_T.",
       lower = 0, symbol = "mu_b,F"
     ),
-    .prow("mu_b_M", 0, "mortality", "d^-1", "adapted", "S7",
+    .prow("male_background_mortality", 0, "mortality", "d^-1", "adapted", "S7",
       "Background (field) mortality of adult males, added to mu_T.",
       lower = 0, symbol = "mu_b,M"
     ),
-    .prow("larval_dd", "none", "mortality", "-", "adapted", "S7",
+    .prow("larval_crowding_mode", "none", "mortality", "-", "adapted", "S7",
       paste(
         "Larval density dependence: \"none\" or \"per_wound\"",
-        "(mu_L + gamma_L * L / H)."
+        "(larval hazard + larval_crowding_coef * larvae / wounds)."
       ),
-      type = "choice", choices = "none|per_wound"
+      type = "choice", choices = "none|per_wound", symbol = "larval_dd"
     ),
-    .prow("gamma_L", 0, "mortality", "d^-1 wound larva^-1", "adapted", "S7",
-      "Larval crowding coefficient, used when larval_dd = \"per_wound\".",
-      lower = 0
+    .prow("larval_crowding_coef", 0, "mortality", "d^-1 wound larva^-1", "adapted", "S7",
+      "Larval crowding coefficient, used when larval_crowding_mode = \"per_wound\".",
+      lower = 0, symbol = "gamma_L"
     ),
-    .prow("mu_W", 0, "mortality", "d^-1", "adapted", "S7",
+    .prow("pupa_drought_mortality", 0, "mortality", "d^-1", "adapted", "S7",
       "Extra pupal mortality under full moisture stress (rain index 0).",
-      lower = 0
+      lower = 0, symbol = "mu_W"
     ),
-    .prow("rain_threshold", 450, "mortality", "mm yr^-1", "GP2014", "S7",
+    .prow("drought_free_rainfall", 450, "mortality", "mm yr^-1", "GP2014", "S7",
       "Annual rainfall above which there is no moisture stress.",
-      lower = 0, bounds = "(]"
+      lower = 0, bounds = "(]", symbol = "rain_threshold"
     ),
-    .prow("eps_s", 1e-5, "mortality", "-", "GP2014", "S2, S3",
+    .prow("survival_floor", 1e-5, "mortality", "-", "GP2014", "S2, S3",
       "Lower clamp on daily survival before converting to a hazard.",
       lower = 0, upper = 1, bounds = "()", symbol = "epsilon_s"
     ),
 
     # ---- reproduction -------------------------------------------------------
-    .prow("R", 90, "reproduction", "eggs female^-1 d^-1", "GP2014", "S9",
+    .prow("eggs_per_day_max", 90, "reproduction", "eggs female^-1 d^-1", "GP2014", "S9",
       "Maximum eggs per egg-laying female per day (at about 29 degC).",
-      lower = 0
+      lower = 0, symbol = "R"
     ),
-    .prow("a_s", 0.001, "reproduction", "dd^-1", "GP2014", "S8",
+    .prow("wound_search_rate", 0.001, "reproduction", "dd^-1", "GP2014", "S8",
       "Wound-search constant.",
-      lower = 0
+      lower = 0, symbol = "a_s"
     ),
-    .prow("H", 5, "reproduction", "wounds km^-2", "GP2014", "S8",
+    .prow("wound_density", 5, "reproduction", "wounds km^-2", "GP2014", "S8",
       paste(
         "Density of wounds available for oviposition; converted to a count",
         "per node with the node area. The default is the relative value of",
         "Gutierrez & Ponti (2014); calibrate for absolute densities."
       ),
-      lower = 0
+      lower = 0, symbol = "H"
     ),
-    .prow("sigma0", 1, "reproduction", "-", "adapted", "S8",
+    .prow("wound_finding_max", 1, "reproduction", "-", "adapted", "S8",
       "Baseline wound-finding efficiency at low density.",
       lower = 0, upper = 1, symbol = "sigma_0"
     ),
-    .prow("search_denominator", "searching_females", "reproduction", "-",
+    .prow("wound_competitors", "searching_females", "reproduction", "-",
       "adapted", "S8",
       paste(
         "Who competes for wounds: \"searching_females\" (egg-laying mated",
         "females, default) or \"all_adults\" (Gutierrez & Ponti code). D-006."
       ),
-      type = "choice", choices = "searching_females|all_adults"
+      type = "choice", choices = "searching_females|all_adults", symbol = "search_denominator"
     ),
-    .prow("oviposition", "batches", "reproduction", "-", "adapted", "S17",
+    .prow("oviposition_mode", "batches", "reproduction", "-", "adapted", "S17",
       paste(
         "Egg laying in the chain-binomial solver: \"batches\" (default;",
         "Poisson numbers of oviposition events, each of clutch_size eggs on",
@@ -234,40 +234,40 @@
         "batches give the larger variance of real egg masses. The ODE is not",
         "affected. D-024."
       ),
-      type = "choice", choices = "batches|eggs"
+      type = "choice", choices = "batches|eggs", symbol = "oviposition"
     ),
     .prow("clutch_size", NA_real_, "reproduction", "eggs", "adapted", "S17",
       paste(
-        "Mean eggs per oviposition event. NA (default): R * phi_ov, the eggs",
-        "a female lays in one day at the day's temperature (one wound found",
+        "Mean eggs per oviposition event. NA (default): eggs_per_day_max * phi_ov,",
+        "the eggs a female lays in one day at the day's temperature (one wound found",
         "per day, as in Gutierrez & Ponti). When set, events occur at",
-        "R * phi_ov * Psi / clutch_size per egg-laying female per day, so",
+        "eggs_per_day_max * phi_ov * Psi / clutch_size per egg-laying female per day, so",
         "mean egg production is unchanged. D-024."
       ),
       lower = 0, bounds = "(]", allow_na = TRUE
     ),
 
     # ---- mating -------------------------------------------------------------
-    .prow("nu", log(2), "mating", "d^-1", "G2019", "S12",
+    .prow("mating_rate", log(2), "mating", "d^-1", "G2019", "S12",
       "Mating rate of receptive virgins (half mate per day). D-004.",
-      lower = 0
+      lower = 0, symbol = "nu"
     ),
-    .prow("h_M", 0, "mating", "males km^-2", "adapted", "S12",
+    .prow("male_density_half_mating", 0, "mating", "males km^-2", "adapted", "S12",
       "Half-saturation male density for mate finding; 0 = no Allee effect.",
-      lower = 0
+      lower = 0, symbol = "h_M"
     ),
-    .prow("mating", "rate", "mating", "-", "MGDrivE2", "S12, S14",
+    .prow("mating_mode", "rate", "mating", "-", "MGDrivE2", "S12, S14",
       paste(
         "\"rate\": virgins mate at rate nu; \"instant\": females mate at",
         "emergence when males are present (MGDrivE2)."
       ),
-      type = "choice", choices = "rate|instant"
+      type = "choice", choices = "rate|instant", symbol = "mating"
     ),
 
     # ---- numerical ----------------------------------------------------------
-    .prow("ext_threshold", 1, "numerical", "individuals", "adapted", "S10",
+    .prow("extinction_threshold", 1, "numerical", "individuals", "adapted", "S10",
       "Extinction threshold for all wild stages combined.",
-      lower = 0
+      lower = 0, symbol = "ext_threshold"
     )
   )
 }

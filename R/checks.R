@@ -15,7 +15,7 @@
 #' @return A numeric vector of R0 values, one per temperature.
 #' @details The same quantity defines the constant-temperature equilibrium
 #'   ([sg_init()] with `method = "equilibrium"`, model specification section
-#'   11). The Allee effect (`h_M > 0`) is not included: with it, mating fails
+#'   11). The Allee effect (`male_density_half_mating > 0`) is not included: with it, mating fails
 #'   at very low densities.
 #' @seealso [check_model()]
 #' @export
@@ -153,28 +153,33 @@ check_model <- function(model, dt = 0.1, scale = TRUE) {
     released_genotypes = unique(rel$genotype)
   )
   options <- p[c(
-    "mating", "oviposition", "clutch_size", "search_denominator", "larval_dd",
-    "egg_temperature", "h_M"
+    "mating_mode", "oviposition_mode", "clutch_size", "wound_competitors",
+    "larval_crowding_mode", "egg_temp_source", "male_density_half_mating"
   )]
 
   # ---- fastest processes (without crowding; mating separately) ------------
   day_max <- vapply(seq_len(f$n_days), function(d) {
     juv <- c(
-      s$n_E * f$dx_egg[d] / p$X_E + f$mu_E[d], s$n_L / p$tau_L - log(p$s_L),
-      s$n_P * f$dx[d] / p$X_P + f$mu_T[d] + p$mu_W * (1 - f$moisture[d])
+      s$n_E * f$dx_egg[d] / p$egg_duration_dd + f$mu_E[d],
+      s$n_L / p$larva_duration_days - log(p$larva_survival_daily),
+      s$n_P * f$dx[d] / p$pupa_duration_dd + f$mu_T[d] +
+        p$pupa_drought_mortality * (1 - f$moisture[d])
     )
     q_f <- (f$dx[d] / s$w_f)[is.finite(s$w_f)]
     q_m <- (f$dx[d] / s$w_m)[is.finite(s$w_m)]
-    max(juv, max(q_f) + f$mu_T[d] + p$mu_b_F, max(q_m) + f$mu_T[d] + p$mu_b_M)
+    max(
+      juv, max(q_f) + f$mu_T[d] + p$female_background_mortality,
+      max(q_m) + f$mu_T[d] + p$male_background_mortality
+    )
   }, 0)
   rates <- list(
     max_rate = max(day_max), max_rate_date = f$dates[which.max(day_max)],
-    mating_rate = p$nu, mating_probability_per_step = 1 - exp(-p$nu * dt)
+    mating_rate = p$mating_rate, mating_probability_per_step = 1 - exp(-p$mating_rate * dt)
   )
-  if (p$nu >= 1000 || rates$max_rate >= 1000) {
+  if (p$mating_rate >= 1000 || rates$max_rate >= 1000) {
     warn <- c(warn, sprintf(
       "Rates up to %.3g per day: the ODE may be stiff on some days (%s).",
-      max(p$nu, rates$max_rate), "handled by the lsoda fallback"
+      max(p$mating_rate, rates$max_rate), "handled by the lsoda fallback"
     ))
   }
 
@@ -206,7 +211,7 @@ check_model <- function(model, dt = 0.1, scale = TRUE) {
   females <- cb$genotypes[cb$phi > 0]
   males <- cb$genotypes[cb$phi < 1]
   never_lay <- females[s$last_f[females] < first_class(s$laying)]
-  never_rec <- if (p$mating == "rate") {
+  never_rec <- if (p$mating_mode == "rate") {
     females[s$last_f[females] < first_class(s$receptive)]
   } else {
     character(0)
@@ -215,19 +220,19 @@ check_model <- function(model, dt = 0.1, scale = TRUE) {
   if (length(never_lay)) {
     warn <- c(warn, paste0(
       "Genotype(s) ", paste(never_lay, collapse = ", "),
-      ": females die before they can lay eggs (lifespan shorter than X_ovi)."
+      ": females die before they can lay eggs (lifespan shorter than oviposition_age_dd)."
     ))
   }
   if (length(never_rec)) {
     warn <- c(warn, paste0(
       "Genotype(s) ", paste(never_rec, collapse = ", "),
-      ": females die before they become receptive (X_rec)."
+      ": females die before they become receptive (female_receptive_age_dd)."
     ))
   }
   if (length(never_mature)) {
     warn <- c(warn, paste0(
       "Genotype(s) ", paste(never_mature, collapse = ", "),
-      ": males die before they mature as mates (X_mat)."
+      ": males die before they mature as mates (male_mature_age_dd)."
     ))
   }
   wild_f <- intersect(cb$wild_type, females)
@@ -294,7 +299,8 @@ print.sg_check <- function(x, ...) {
       "  options: mating \"%s\", eggs in %s, search \"%s\", larval crowding \"%s\",",
       "eggs at %s temperature\n"
     ),
-    o$mating, o$oviposition, o$search_denominator, o$larval_dd, o$egg_temperature
+    o$mating_mode, o$oviposition_mode, o$wound_competitors,
+    o$larval_crowding_mode, o$egg_temp_source
   ))
   r <- x$rates
   cat(sprintf(

@@ -30,22 +30,23 @@
 #'   Per-genotype vectors may be named (they are reordered to `genotypesID`)
 #'   or unnamed (assumed to be in `genotypesID` order). Other list elements
 #'   are ignored.
-#' @param mu_ref Daily adult mortality (probability, in (0, 1)) that was used
+#' @param reference_mortality Daily adult mortality (probability, in (0, 1)) that was used
 #'   when the cube's `omega` values were computed with
-#'   `MGDrivE::calcOmega(mu_ref, L)`. Required when any `omega` differs from 1
-#'   and `ell` is not given (D-012).
-#' @param ell Optional lifespan fractions per genotype (> 0; 1 = wild-type
+#'   `MGDrivE::calcOmega(mu, L)`. Required when any `omega` differs from 1
+#'   and `lifespan_fraction` is not given (D-012).
+#' @param lifespan_fraction Optional lifespan fractions per genotype (> 0; 1 = wild-type
 #'   lifespan, 0.5 = half), named or in `genotypesID` order. When given, the
 #'   cube's `omega` is not used.
 #'
 #' @details
 #' **Lifespan fractions.** SGDrivE represents a genotype's effect on adult
-#' lifespan as a fraction l_g of the wild-type physiological lifespan X_A
+#' lifespan as a fraction l_g of the wild-type physiological lifespan `adult_lifespan_dd`
 #' (D-002; model specification S5). Temperature mortality is the same for all
 #' genotypes. MGDrivE v1 cubes instead store omega, a multiplier of daily
-#' survival. For a cube built with `MGDrivE::calcOmega(mu_ref, L)` the exact
+#' survival. For a cube built with `MGDrivE::calcOmega(mu, L)` (mu =
+#' `reference_mortality`) the exact
 #' inverse is
-#' \deqn{l_g = mu_ref / (1 - omega_g (1 - mu_ref)),}
+#' \deqn{l_g = mu / (1 - omega_g (1 - mu)),}
 #' which recovers L. `omega = 0` (immediate death) maps to l_g = 0.001. See
 #' [sg_omega_to_ell()].
 #'
@@ -64,7 +65,8 @@
 #' @return An object of class `sg_cube`: a list with `genotypes`,
 #'   `n_genotypes`, `wild_type`, `release_type`, `ih`, `tau`, `eta` (n x n),
 #'   per-genotype vectors `phi`, `xiF`, `xiM`, `s`, `omega` and `ell`,
-#'   `ell_source` (`"none"`, `"omega"` or `"user"`), `mu_ref`, `egg_tensor`
+#'   `ell_source` (`"none"`, `"omega"` or `"user"`), `mu_ref` (the reference mortality),
+#'   `egg_tensor`
 #'   (n^2 x n) and `egg_total` (total viable-egg factor per cross).
 #' @seealso [sg_omega_to_ell()]
 #' @export
@@ -75,10 +77,10 @@
 #'
 #'   # A cube with a lifespan cost built with calcOmega(0.055, 0.5)
 #'   om <- MGDrivE::calcOmega(mu = 0.055, lifespanReduction = 0.5)
-#'   cube2 <- sg_cube(MGDrivE::cubeMendelian(omega = c(aa = om)), mu_ref = 0.055)
+#'   cube2 <- sg_cube(MGDrivE::cubeMendelian(omega = c(aa = om)), reference_mortality = 0.055)
 #'   cube2$ell
 #' }
-sg_cube <- function(cube, mu_ref = NULL, ell = NULL) {
+sg_cube <- function(cube, reference_mortality = NULL, lifespan_fraction = NULL) {
   if (!is.list(cube)) {
     .sg_stop("`cube` must be a list (an MGDrivE inheritance cube).")
   }
@@ -113,7 +115,7 @@ sg_cube <- function(cube, mu_ref = NULL, ell = NULL) {
   wild <- .sg_cube_types(cube$wildType, "wildType", geno, allow_empty = FALSE)
   rel <- .sg_cube_types(cube$releaseType, "releaseType", geno, allow_empty = TRUE)
 
-  lifespan <- .sg_cube_ell(omega, mu_ref, ell, geno)
+  lifespan <- .sg_cube_ell(omega, reference_mortality, lifespan_fraction, geno)
 
   egg <- .sg_egg_tensor(ih, tau, fec, geno)
 
@@ -144,49 +146,51 @@ sg_cube <- function(cube, mu_ref = NULL, ell = NULL) {
 #' Convert MGDrivE v1 lifespan modifiers to lifespan fractions
 #'
 #' Inverts `MGDrivE::calcOmega()`: given the omega values of a cube and the
-#' daily adult mortality `mu_ref` used to compute them, returns the fraction
+#' daily adult mortality `reference_mortality` used to compute them, returns the fraction
 #' of the wild-type adult lifespan retained by each genotype.
 #'
 #' @param omega Numeric vector of MGDrivE v1 omega values (>= 0; daily
-#'   survival multipliers, so `(1 - mu_ref) * omega` must be below 1).
-#' @param mu_ref Daily adult mortality probability in (0, 1) used when the
+#'   survival multipliers, so `(1 - reference_mortality) * omega` must be below 1).
+#' @param reference_mortality Daily adult mortality probability in (0, 1) used when the
 #'   omega values were computed.
-#' @return Numeric vector of lifespan fractions l = mu_ref /
-#'   (1 - omega (1 - mu_ref)), with omega = 0 mapped to 0.001 (D-002). Names
+#' @return Numeric vector of lifespan fractions l = mu /
+#'   (1 - omega (1 - mu)) with mu = `reference_mortality`, with omega = 0 mapped to 0.001
+#'   (D-002). Names
 #'   are kept.
 #' @seealso [sg_cube()]
 #' @export
 #' @examples
-#' sg_omega_to_ell(c(1, 0.9418, 0), mu_ref = 0.055)
+#' sg_omega_to_ell(c(1, 0.9418, 0), reference_mortality = 0.055)
 #' if (requireNamespace("MGDrivE", quietly = TRUE)) {
 #'   # round trip: calcOmega(mu, L) -> L
 #'   om <- MGDrivE::calcOmega(mu = 0.055, lifespanReduction = 0.5)
-#'   sg_omega_to_ell(om, mu_ref = 0.055)
+#'   sg_omega_to_ell(om, reference_mortality = 0.055)
 #' }
-sg_omega_to_ell <- function(omega, mu_ref) {
-  mu_ok <- is.numeric(mu_ref) && length(mu_ref) == 1L && is.finite(mu_ref) &&
-    mu_ref > 0 && mu_ref < 1
+sg_omega_to_ell <- function(omega, reference_mortality) {
+  mu_ok <- is.numeric(reference_mortality) && length(reference_mortality) == 1L &&
+    is.finite(reference_mortality) && reference_mortality > 0 && reference_mortality < 1
   if (!mu_ok) {
     .sg_stop(
-      "`mu_ref` must be a single daily mortality probability in (0, 1); got ",
-      .sg_fmt(mu_ref), "."
+      "`reference_mortality` must be a single daily mortality probability in (0, 1); got ",
+      .sg_fmt(reference_mortality), "."
     )
   }
   if (!is.numeric(omega) || any(!is.finite(omega)) || any(omega < 0)) {
     .sg_stop("`omega` must be finite and >= 0.")
   }
-  surv <- omega * (1 - mu_ref)
+  surv <- omega * (1 - reference_mortality)
   if (any(surv >= 1)) {
     bad <- which(surv >= 1)
     .sg_stop(
-      "omega = ", .sg_fmt(omega[bad[1L]]), " with mu_ref = ", .sg_fmt(mu_ref),
-      " gives daily survival (1 - mu_ref) * omega >= 1, i.e. no adult ever dies. ",
-      "Check mu_ref: it must be the mortality used to compute omega."
+      "omega = ", .sg_fmt(omega[bad[1L]]), " with reference_mortality = ",
+      .sg_fmt(reference_mortality),
+      " gives daily survival (1 - reference_mortality) * omega >= 1, i.e. no adult ever dies. ",
+      "Check reference_mortality: it must be the mortality used to compute omega."
     )
   }
   # 1 - omega (1 - mu_ref) written as mu_ref + (1 - mu_ref)(1 - omega): the same
   # value, but exact (l = 1) for omega = 1 in floating point.
-  ell <- mu_ref / (mu_ref + (1 - mu_ref) * (1 - omega))
+  ell <- reference_mortality / (reference_mortality + (1 - reference_mortality) * (1 - omega))
   ell[omega == 0] <- 0.001
   ell
 }
@@ -386,13 +390,13 @@ print.sg_cube <- function(x, ...) {
 
 .sg_cube_ell <- function(omega, mu_ref, ell, geno) {
   if (!is.null(ell)) {
-    ell <- .sg_cube_vector(ell, "ell", geno)
+    ell <- .sg_cube_vector(ell, "lifespan_fraction", geno)
     names(ell) <- geno
     if (any(ell <= 0)) {
-      .sg_stop("`ell` (lifespan fractions) must be > 0.")
+      .sg_stop("`lifespan_fraction` must be > 0.")
     }
     if (any(omega != 1)) {
-      .sg_warn("`ell` was given, so the cube's omega values are not used.")
+      .sg_warn("`lifespan_fraction` was given, so the cube's omega values are not used.")
     }
     return(list(ell = ell, source = "user", mu_ref = if (is.null(mu_ref)) NA_real_ else mu_ref))
   }
@@ -404,8 +408,8 @@ print.sg_cube <- function(x, ...) {
     .sg_stop(
       "The cube has omega values different from 1 (",
       paste(names(omega)[omega != 1], collapse = ", "), "). To convert them to lifespan ",
-      "fractions, give `mu_ref`, the daily adult mortality used when they were computed ",
-      "with MGDrivE::calcOmega(), or give lifespan fractions directly with `ell`."
+      "fractions, give `reference_mortality`, the daily adult mortality used when they were ",
+      "computed with MGDrivE::calcOmega(), or give `lifespan_fraction` directly."
     )
   }
   list(ell = sg_omega_to_ell(omega, mu_ref), source = "omega", mu_ref = mu_ref)

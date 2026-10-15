@@ -2,7 +2,7 @@
 
 #' Calibrate the wound density to a target population density
 #'
-#' Finds the wound density `H` (wounds per km^2) at which a summary of the
+#' Finds the wound density `wound_density` (wounds per km^2) at which a summary of the
 #' simulated population, by default the mean adult density over the model's
 #' forcing period, equals a target.
 #'
@@ -21,14 +21,14 @@
 #' @param tol Relative tolerance of the root search.
 #'
 #' @details Each evaluation runs the ODE from a burn-in. With no Allee effect
-#'   (`h_M = 0`) and no releases every equation is homogeneous of degree one
+#'   (`male_density_half_mating = 0`) and no releases every equation is homogeneous of degree one
 #'   in the state and H, so after the burn-in the population is exactly
 #'   proportional to H: one evaluation gives the calibrated H in closed form
-#'   (`H * target / value`), checked by a second. Otherwise (Allee effect, or
+#'   (`wound_density * target / value`), checked by a second. Otherwise (Allee effect, or
 #'   releases, which are usually left out of a calibration of the wild
 #'   population) H is found by a one-dimensional root search on log H.
 #'   Because H is per km^2, the result does not depend on the node area.
-#' @return An object of class `sg_calibration`, a list with `H` (calibrated
+#' @return An object of class `sg_calibration`, a list with `wound_density` (calibrated
 #'   wounds per km^2), `params` (the model's parameters with that H),
 #'   `model` (the model rebuilt with it), `target`, `achieved`, `stat`,
 #'   `stages`, `method` (`"proportional"` or `"root search"`) and
@@ -40,15 +40,14 @@
 #'   p <- sg_params()
 #'   wx <- sg_forcing(sg_example_weather(), p, start = "1971-01-01", end = "1971-12-31")
 #'   mod <- sg_model(p, sg_cube(MGDrivE::cubeMendelian()), wx)
-#'   cal <- calibrate_H(mod, target = 100) # mean of 100 adults per km^2 in 1971
+#'   cal <- calibrate_wound_density(mod, target = 100) # mean of 100 adults per km^2 in 1971
 #'   cal
 #'   # simulate with the calibrated model
 #'   sim <- simulate_ode(cal$model, init = sg_init(cal$model, "burn_in"))
 #' }
-# The name keeps the model symbol H (D-026), hence the nolint.
-calibrate_H <- function(model, target, stat = c("mean", "peak", "min", "quantile"), # nolint
-                        stages = "adults", period = NULL, prob = 0.5, years = 1L,
-                        weather = NULL, tol = 1e-8) {
+calibrate_wound_density <- function(model, target, stat = c("mean", "peak", "min", "quantile"),
+                                    stages = "adults", period = NULL, prob = 0.5, years = 1L,
+                                    weather = NULL, tol = 1e-8) {
   if (!inherits(model, "sg_model")) {
     .sg_stop("`model` must be an sg_model object; create one with sg_model().")
   }
@@ -62,7 +61,10 @@ calibrate_H <- function(model, target, stat = c("mean", "peak", "min", "quantile
   .sg_expand_stages(stages)
   days <- .sg_calib_days(model, period)
   if (model$counts$H <= 0) {
-    .sg_stop("The model has no wounds (H = 0); give a positive H to start from.")
+    .sg_stop(
+      "The model has no wounds (wound_density = 0); give a positive wound_density ",
+      "to start from."
+    )
   }
 
   runs <- new.env(parent = emptyenv()) # counts model runs across value_at() calls
@@ -71,15 +73,16 @@ calibrate_H <- function(model, target, stat = c("mean", "peak", "min", "quantile
     runs$n <- runs$n + 1L
     .sg_calib_value(.sg_model_with_h(model, h), stages, days, stat, prob, years, weather)
   }
-  h0 <- model$params$H
+  h0 <- model$params$wound_density
   v0 <- value_at(h0)
   if (!is.finite(v0) || v0 < 1e-9) { # essentially extinct
     .sg_stop(
-      "The population is zero over the reference period at H = ", format(h0),
-      ", so H cannot be calibrated; check that the population can persist (check_model())."
+      "The population is zero over the reference period at wound_density = ", format(h0),
+      ", so wound_density cannot be calibrated; check that the population can persist ",
+      "(check_model())."
     )
   }
-  proportional <- model$params$h_M == 0 && nrow(model$releases) == 0L
+  proportional <- model$params$male_density_half_mating == 0 && nrow(model$releases) == 0L
   if (nrow(model$releases) > 0L) {
     .sg_warn(
       "The model has releases; calibrating with them included. Calibrations of the wild ",
@@ -115,7 +118,7 @@ calibrate_H <- function(model, target, stat = c("mean", "peak", "min", "quantile
   achieved <- value_at(h)
   structure(
     list(
-      H = h, params = calibrated$params, model = calibrated, target = target,
+      wound_density = h, params = calibrated$params, model = calibrated, target = target,
       achieved = achieved, stat = stat, stages = stages, method = method,
       evaluations = runs$n
     ),
@@ -127,7 +130,8 @@ calibrate_H <- function(model, target, stat = c("mean", "peak", "min", "quantile
 print.sg_calibration <- function(x, ...) {
   cat("<sg_calibration>\n")
   cat(sprintf(
-    "  H = %.6g wounds per km^2 (%s, %d model runs)\n", x$H, x$method, x$evaluations
+    "  wound_density = %.6g wounds per km^2 (%s, %d model runs)\n",
+    x$wound_density, x$method, x$evaluations
   ))
   cat(sprintf(
     "  %s of %s per km^2: target %.6g, achieved %.6g (relative difference %.2g)\n",
@@ -142,7 +146,7 @@ print.sg_calibration <- function(x, ...) {
 # The model with wound density h (per km^2), its hash updated.
 .sg_model_with_h <- function(model, h) {
   m <- model
-  m$params <- stats::update(model$params, H = h)
+  m$params <- stats::update(model$params, wound_density = h)
   m$counts$H <- h * model$area
   m$meta$hash <- .sg_model_hash(m)
   m

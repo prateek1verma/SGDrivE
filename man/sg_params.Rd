@@ -8,7 +8,8 @@ sg_params(..., preset = c("default", "gp2014"))
 }
 \arguments{
 \item{...}{Named parameter values that override the defaults, e.g.
-\verb{n_A = 8, R = 67}. Names must match \code{sg_param_table()$name}. To pass a
+\verb{adult_substages = 8, eggs_per_day_max = 67}. Names must match
+\code{sg_param_table()$name}. To pass a
 list \code{x} of values, use \code{do.call(sg_params, x)}.}
 
 \item{preset}{Which set of defaults to start from:
@@ -18,7 +19,8 @@ with speed-tuned sub-stage numbers (at most 10 per stage), mating at
 rate \code{nu}, and searching mated females as competitors for wounds.}
 \item{\code{"gp2014"}}{The configuration of the Gutierrez & Ponti (2014)
 Pascal code, for regression tests and benchmarking: 25 sub-stages per
-stage, egg laying from adult class 8 (\code{X_ovi} = 7/25 of \code{X_A}), the
+stage, egg laying from adult class 8 (\code{oviposition_age_dd} = 7/25 of
+\code{adult_lifespan_dd}), the
 0.61 dd per day floor on
 development, all adults competing for wounds, and instant mating (the
 2014 model has no mating step).}
@@ -37,13 +39,15 @@ sources); arguments given in \code{...} override the defaults.
 \details{
 Each value is checked against its type and allowed range. Cross-checks
 then catch combinations that cannot work, for example an age at first
-oviposition \code{X_ovi} longer than the adult lifespan \code{X_A}. Settings that
-are valid but have no effect (such as \code{gamma_L > 0} without larval density
+oviposition \code{oviposition_age_dd} longer than the adult lifespan
+\code{adult_lifespan_dd}. Settings that
+are valid but have no effect (such as \code{larval_crowding_coef > 0} without larval density
 dependence) give a warning.
 
 Units follow the conventions of the package: temperatures in degrees
 Celsius, durations in degree-days (\code{dd}) or days (\code{d}), rates per day.
-Parameters given per km^2 (\code{H}, \code{h_M}) are converted to counts per node
+Parameters given per km^2 (\code{wound_density}, \code{male_density_half_mating}) are converted to
+counts per node
 when the model is assembled.
 }
 \examples{
@@ -51,12 +55,12 @@ p <- sg_params()
 p
 
 # Change values
-p2 <- sg_params(n_A = 8, nu = 1)
-p2$n_A
+p2 <- sg_params(adult_substages = 8, mating_rate = 1)
+p2$adult_substages
 
 # Configuration of the Gutierrez & Ponti (2014) code
 gp <- sg_params(preset = "gp2014")
-gp$n_A
+gp$adult_substages
 }
 \seealso{
 \code{\link[=sg_param_table]{sg_param_table()}} for definitions; \code{\link[=update.sg_params]{update.sg_params()}} to change

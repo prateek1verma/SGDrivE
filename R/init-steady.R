@@ -95,8 +95,10 @@
   t_ww <- w$t_ww
   rates <- .sg_constant_rates(s, .sg_constant_forcing(model$params, temperature))
   per_b <- .sg_eq_given_b(1, s, gi, rates, crowd = FALSE)
-  r0 <- p$R * rates$phi_ov * t_ww * per_b$W * p$sigma0 # eggs per egg at low density
-  nonlinear <- (p$larval_dd == "per_wound" && s$counts$H > 0 && p$gamma_L > 0) || p$h_M > 0
+  # eggs per egg at low density
+  r0 <- p$eggs_per_day_max * rates$phi_ov * t_ww * per_b$W * p$wound_finding_max
+  crowded <- p$larval_crowding_mode == "per_wound" && s$counts$H > 0 && p$larval_crowding_coef > 0
+  nonlinear <- crowded || p$male_density_half_mating > 0
   zero <- list(
     x = numeric(s$n_states),
     info = list(temperature = temperature, R0 = r0, psi = NA_real_, eggs_per_day = 0)
@@ -109,21 +111,26 @@
     return(zero)
   }
   psi_of <- function(n_s) {
-    if (n_s > 0) p$sigma0 * (1 - exp(-p$a_s * rates$dx * s$counts$H / n_s)) else p$sigma0
+    if (n_s > 0) {
+      p$wound_finding_max * (1 - exp(-p$wound_search_rate * rates$dx * s$counts$H / n_s))
+    } else {
+      p$wound_finding_max
+    }
   }
   if (!nonlinear) {
-    psi <- 1 / (p$R * rates$phi_ov * t_ww * per_b$W)
-    n_s <- p$a_s * rates$dx * s$counts$H / (-log(1 - psi / p$sigma0))
+    psi <- 1 / (p$eggs_per_day_max * rates$phi_ov * t_ww * per_b$W)
+    n_s <- p$wound_search_rate * rates$dx * s$counts$H / (-log(1 - psi / p$wound_finding_max))
     b <- n_s / per_b$N_s
     eq <- .sg_eq_given_b(b, s, gi, rates, crowd = FALSE)
   } else {
     gap <- function(log_b) {
       e <- .sg_eq_given_b(exp(log_b), s, gi, rates, crowd = TRUE)
-      log(p$R * rates$phi_ov * t_ww * psi_of(e$N_s) * e$W) - log_b
+      log(p$eggs_per_day_max * rates$phi_ov * t_ww * psi_of(e$N_s) * e$W) - log_b
     }
     # bracket the upper root: above it egg production falls short (gap < 0)
-    psi0 <- 1 / (p$R * rates$phi_ov * t_ww * per_b$W)
-    b_hi <- log(p$a_s * rates$dx * s$counts$H / (-log(1 - psi0 / p$sigma0)) / per_b$N_s)
+    psi0 <- 1 / (p$eggs_per_day_max * rates$phi_ov * t_ww * per_b$W)
+    n_s0 <- p$wound_search_rate * rates$dx * s$counts$H / (-log(1 - psi0 / p$wound_finding_max))
+    b_hi <- log(n_s0 / per_b$N_s)
     while (gap(b_hi) > 0) b_hi <- b_hi + log(10)
     b_lo <- b_hi
     tries <- 0L
@@ -166,10 +173,12 @@
 .sg_constant_rates <- function(s, f) {
   p <- s$p
   list(
-    dx = f$dx, q_e = s$n_E * f$dx_egg / p$X_E, mu_e = f$mu_E,
-    q_l = s$n_L / p$tau_L, q_p = s$n_P * f$dx / p$X_P,
-    mu_p = f$mu_T + p$mu_W * (1 - f$moisture),
-    mu_f = f$mu_T + p$mu_b_F, mu_m = f$mu_T + p$mu_b_M, phi_ov = f$phi_ov
+    dx = f$dx, q_e = s$n_E * f$dx_egg / p$egg_duration_dd, mu_e = f$mu_E,
+    q_l = s$n_L / p$larva_duration_days, q_p = s$n_P * f$dx / p$pupa_duration_dd,
+    mu_p = f$mu_T + p$pupa_drought_mortality * (1 - f$moisture),
+    mu_f = f$mu_T + p$female_background_mortality,
+    mu_m = f$mu_T + p$male_background_mortality,
+    phi_ov = f$phi_ov
   )
 }
 
@@ -179,7 +188,7 @@
 .sg_r0_of <- function(w, rates) {
   p <- w$s$p
   per_b <- .sg_eq_given_b(1, w$s, w$gi, rates, crowd = FALSE)
-  p$R * rates$phi_ov * w$t_ww * per_b$W * p$sigma0
+  p$eggs_per_day_max * rates$phi_ov * w$t_ww * per_b$W * p$wound_finding_max
 }
 
 # Forcing values at a constant temperature (after five days, so that the
@@ -206,12 +215,14 @@
   chain <- function(inflow, n, q, mu) inflow / (q + mu) * (q / (q + mu))^(0:(n - 1L))
   eggs <- chain(b, s$n_E, rates$q_e, rates$mu_e)
   into_l <- rates$q_e * eggs[s$n_E]
-  mu_l <- -log(p$s_L)
-  if (crowd && p$larval_dd == "per_wound" && s$counts$H > 0 && p$gamma_L > 0) {
+  mu_l0 <- -log(p$larva_survival_daily) # larval mortality without crowding
+  mu_l <- mu_l0
+  crowd_coef <- p$larval_crowding_coef
+  if (crowd && p$larval_crowding_mode == "per_wound" && s$counts$H > 0 && crowd_coef > 0) {
     l_tot <- function(mu) sum(chain(into_l, s$n_L, rates$q_l, mu))
-    fixed <- function(mu) mu - (-log(p$s_L)) - p$gamma_L * l_tot(mu) / s$counts$H
-    hi <- -log(p$s_L) + p$gamma_L * l_tot(-log(p$s_L)) / s$counts$H
-    if (hi > -log(p$s_L)) mu_l <- stats::uniroot(fixed, c(-log(p$s_L), hi), tol = 1e-14)$root
+    fixed <- function(mu) mu - mu_l0 - crowd_coef * l_tot(mu) / s$counts$H
+    hi <- mu_l0 + crowd_coef * l_tot(mu_l0) / s$counts$H
+    if (hi > mu_l0) mu_l <- stats::uniroot(fixed, c(mu_l0, hi), tol = 1e-14)$root
   }
   lar <- chain(into_l, s$n_L, rates$q_l, mu_l)
   pup <- chain(rates$q_l * lar[s$n_L], s$n_P, rates$q_p, rates$mu_p)
@@ -229,18 +240,22 @@
   mal <- adult((1 - s$phi[gi]) * s$xiM[gi] * emerge, s$w_m[, gi], s$last_m[gi], rates$mu_m)
   m_bar <- sum(mal[s$mature])
   mate_ok <- m_bar > 0 && s$eta[gi, gi] > 0
-  g_find <- if (crowd && p$h_M > 0) m_bar / (s$counts$h_M + m_bar) else as.numeric(m_bar > 0)
+  g_find <- if (crowd && p$male_density_half_mating > 0) {
+    m_bar / (s$counts$h_M + m_bar)
+  } else {
+    as.numeric(m_bar > 0)
+  }
   into_f <- s$phi[gi] * s$xiF[gi] * emerge
   all_f <- adult(into_f, s$w_f[, gi], s$last_f[gi], rates$mu_f)
-  unm <- if (p$mating == "instant") {
+  unm <- if (p$mating_mode == "instant") {
     if (mate_ok) numeric(n_a) else all_f
   } else {
-    nu <- if (mate_ok) p$nu * s$receptive * g_find else rep(0, n_a)
+    nu <- if (mate_ok) p$mating_rate * s$receptive * g_find else rep(0, n_a)
     adult(into_f, s$w_f[, gi], s$last_f[gi], rates$mu_f, extra = nu)
   }
   fem <- all_f - unm
   w_lay <- sum(fem[s$laying])
-  n_s <- if (p$search_denominator == "searching_females") w_lay else sum(mal, unm, fem)
+  n_s <- if (p$wound_competitors == "searching_females") w_lay else sum(mal, unm, fem)
 
   x <- numeric(s$n_states)
   idx <- function(block, offset_len) s$idx[[block]][(gi - 1L) * offset_len + seq_len(offset_len)]

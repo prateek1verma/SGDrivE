@@ -149,14 +149,14 @@ sg_fill_weather <- function(primary, backup = NULL, start = NULL, end = NULL) {
 #'
 #' Computes the annual cold-stress index mu_cold of Gutierrez & Ponti (2014):
 #' the sum of the daily pupal/adult mortality proportions p_A(T) over days with
-#' mean temperature below T_opt (27.2 degC). Values up to about 10 indicate
+#' mean temperature below `optimal_survival_temp` (27.2 degC). Values up to about 10 indicate
 #' that the screwworm can persist year-round; higher values indicate winter
 #' die-off. The heat-stress index mu_hot sums p_A(T) over days at or above
-#' T_opt.
+#' `optimal_survival_temp`.
 #'
 #' @param x An `sg_forcing` object, or a weather data frame accepted by
 #'   [sg_forcing()].
-#' @param p An `sg_params` object (used when `x` is a data frame; ignored for
+#' @param params An `sg_params` object (used when `x` is a data frame; ignored for
 #'   an `sg_forcing` object, which carries its own values).
 #' @param period `"calendar"` (1 January to 31 December, as in the published
 #'   index values) or `"jul_jun"` (1 July of the previous year to 30 June,
@@ -169,19 +169,19 @@ sg_fill_weather <- function(primary, backup = NULL, start = NULL, end = NULL) {
 #' @examples
 #' ci <- sg_cold_index(sg_example_weather())
 #' ci[ci$year %in% c(1971, 1979), ]
-sg_cold_index <- function(x, p = sg_params(), period = c("calendar", "jul_jun")) {
+sg_cold_index <- function(x, params = sg_params(), period = c("calendar", "jul_jun")) {
   period <- match.arg(period)
   if (inherits(x, "sg_forcing")) {
     dates <- x$dates
     p_a <- x$p_A
     tmean <- x$tmean
-    t_opt <- x$param_values$T_opt
+    t_opt <- x$param_values$optimal_survival_temp
   } else {
-    f <- sg_forcing(x, .sg_as_params(p))
+    f <- sg_forcing(x, .sg_as_params(params))
     dates <- f$dates
     p_a <- f$p_A
     tmean <- f$tmean
-    t_opt <- p$T_opt
+    t_opt <- params$optimal_survival_temp
   }
   yr <- as.integer(format(dates, "%Y"))
   if (period == "jul_jun") {

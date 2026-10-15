@@ -5,7 +5,8 @@
 #' sources); arguments given in `...` override the defaults.
 #'
 #' @param ... Named parameter values that override the defaults, e.g.
-#'   `n_A = 8, R = 67`. Names must match `sg_param_table()$name`. To pass a
+#'   `adult_substages = 8, eggs_per_day_max = 67`. Names must match
+#'   `sg_param_table()$name`. To pass a
 #'   list `x` of values, use `do.call(sg_params, x)`.
 #' @param preset Which set of defaults to start from:
 #'   \describe{
@@ -14,7 +15,8 @@
 #'       rate `nu`, and searching mated females as competitors for wounds.}
 #'     \item{`"gp2014"`}{The configuration of the Gutierrez & Ponti (2014)
 #'       Pascal code, for regression tests and benchmarking: 25 sub-stages per
-#'       stage, egg laying from adult class 8 (`X_ovi` = 7/25 of `X_A`), the
+#'       stage, egg laying from adult class 8 (`oviposition_age_dd` = 7/25 of
+#'       `adult_lifespan_dd`), the
 #'       0.61 dd per day floor on
 #'       development, all adults competing for wounds, and instant mating (the
 #'       2014 model has no mating step).}
@@ -24,13 +26,15 @@
 #' @details
 #' Each value is checked against its type and allowed range. Cross-checks
 #' then catch combinations that cannot work, for example an age at first
-#' oviposition `X_ovi` longer than the adult lifespan `X_A`. Settings that
-#' are valid but have no effect (such as `gamma_L > 0` without larval density
+#' oviposition `oviposition_age_dd` longer than the adult lifespan
+#' `adult_lifespan_dd`. Settings that
+#' are valid but have no effect (such as `larval_crowding_coef > 0` without larval density
 #' dependence) give a warning.
 #'
 #' Units follow the conventions of the package: temperatures in degrees
 #' Celsius, durations in degree-days (`dd`) or days (`d`), rates per day.
-#' Parameters given per km^2 (`H`, `h_M`) are converted to counts per node
+#' Parameters given per km^2 (`wound_density`, `male_density_half_mating`) are converted to
+#' counts per node
 #' when the model is assembled.
 #'
 #' @return An object of class `sg_params`: a named list of parameter values in
@@ -43,12 +47,12 @@
 #' p
 #'
 #' # Change values
-#' p2 <- sg_params(n_A = 8, nu = 1)
-#' p2$n_A
+#' p2 <- sg_params(adult_substages = 8, mating_rate = 1)
+#' p2$adult_substages
 #'
 #' # Configuration of the Gutierrez & Ponti (2014) code
 #' gp <- sg_params(preset = "gp2014")
-#' gp$n_A
+#' gp$adult_substages
 sg_params <- function(..., preset = c("default", "gp2014")) {
   preset <- match.arg(preset)
   overrides <- list(...)
@@ -64,13 +68,63 @@ sg_params <- function(..., preset = c("default", "gp2014")) {
   list(
     default = list(),
     gp2014 = list(
-      n_E = 25L, n_L = 25L, n_P = 25L, n_A = 25L,
+      egg_substages = 25L, larva_substages = 25L, pupa_substages = 25L, adult_substages = 25L,
       # laying from class 8 of 25: 7 classes of 202.8 / 25 dd before laying
-      X_ovi = 7 / 25 * 202.8,
-      dx_floor = 0.01,
-      search_denominator = "all_adults",
-      mating = "instant"
+      oviposition_age_dd = 7 / 25 * 202.8,
+      dev_rate_floor = 0.01,
+      wound_competitors = "all_adults",
+      mating_mode = "instant"
     )
+  )
+}
+
+# Former parameter names (Gutierrez & Ponti symbols) and their current names
+# (D-027), for informative errors; the symbols remain in sg_param_table().
+.sg_param_renames <- function() {
+  c(
+    T_L = "dev_temp_min",
+    T_U = "dev_temp_decline",
+    a_dev = "dev_rate_slope",
+    b_dev = "dev_decline_steepness",
+    dx_floor = "dev_rate_floor",
+    X_pre = "dd_scale_preoviposition",
+    T_opt = "optimal_survival_temp",
+    TU_ovip = "oviposition_temp_max",
+    egg_temperature = "egg_temp_source",
+    T_host = "host_body_temp",
+    X_E = "egg_duration_dd",
+    tau_L = "larva_duration_days",
+    X_P = "pupa_duration_dd",
+    X_A = "adult_lifespan_dd",
+    n_E = "egg_substages",
+    n_L = "larva_substages",
+    n_P = "pupa_substages",
+    n_A = "adult_substages",
+    X_ovi = "oviposition_age_dd",
+    X_rec = "female_receptive_age_dd",
+    X_mat = "male_mature_age_dd",
+    p_A0 = "adult_mortality_min",
+    c_A = "adult_mortality_curvature",
+    p_E0 = "egg_failure_min",
+    c_E = "egg_failure_curvature",
+    s_L = "larva_survival_daily",
+    mu_b_F = "female_background_mortality",
+    mu_b_M = "male_background_mortality",
+    larval_dd = "larval_crowding_mode",
+    gamma_L = "larval_crowding_coef",
+    mu_W = "pupa_drought_mortality",
+    rain_threshold = "drought_free_rainfall",
+    eps_s = "survival_floor",
+    R = "eggs_per_day_max",
+    H = "wound_density",
+    a_s = "wound_search_rate",
+    sigma0 = "wound_finding_max",
+    search_denominator = "wound_competitors",
+    oviposition = "oviposition_mode",
+    nu = "mating_rate",
+    h_M = "male_density_half_mating",
+    mating = "mating_mode",
+    ext_threshold = "extinction_threshold"
   )
 }
 
@@ -82,7 +136,7 @@ sg_params <- function(..., preset = c("default", "gp2014")) {
   nms <- names(overrides)
   if (is.null(nms) || any(!nzchar(nms))) {
     .sg_stop(
-      "All parameters must be named, e.g. sg_params(n_A = 8). ",
+      "All parameters must be named, e.g. sg_params(adult_substages = 8). ",
       "To pass a list x, use do.call(sg_params, x)."
     )
   }
@@ -92,7 +146,11 @@ sg_params <- function(..., preset = c("default", "gp2014")) {
   }
   unknown <- setdiff(nms, names(values))
   if (length(unknown) > 0L) {
+    renamed <- .sg_param_renames()
     msgs <- vapply(unknown, function(u) {
+      if (u %in% names(renamed)) {
+        return(paste0("'", u, "' (renamed to '", renamed[[u]], "')"))
+      }
       paste0("'", u, "'", .sg_suggest(u, names(values)))
     }, "")
     .sg_stop(
@@ -164,28 +222,40 @@ sg_params <- function(..., preset = c("default", "gp2014")) {
 }
 
 .sg_cross_check_params <- function(v) {
-  if (v$T_U <= v$T_L) {
-    .sg_stop("T_U (", v$T_U, ") must be greater than T_L (", v$T_L, ").")
+  if (v$dev_temp_decline <= v$dev_temp_min) {
+    .sg_stop(
+      "dev_temp_decline (", v$dev_temp_decline, ") must be greater than dev_temp_min (",
+      v$dev_temp_min, ")."
+    )
   }
-  if (v$TU_ovip <= v$T_L) {
-    .sg_stop("TU_ovip (", v$TU_ovip, ") must be greater than T_L (", v$T_L, ").")
+  if (v$oviposition_temp_max <= v$dev_temp_min) {
+    .sg_stop(
+      "oviposition_temp_max (", v$oviposition_temp_max, ") must be greater than dev_temp_min (",
+      v$dev_temp_min, ")."
+    )
   }
-  for (nm in c("X_ovi", "X_rec", "X_mat")) {
-    if (v[[nm]] >= v$X_A) {
+  for (nm in c("oviposition_age_dd", "female_receptive_age_dd", "male_mature_age_dd")) {
+    if (v[[nm]] >= v$adult_lifespan_dd) {
       .sg_stop(
-        nm, " (", v[[nm]], " dd) must be shorter than the adult lifespan X_A (",
-        v$X_A, " dd); otherwise no wild-type adult reaches that age."
+        nm, " (", v[[nm]], " dd) must be shorter than the adult lifespan adult_lifespan_dd (",
+        v$adult_lifespan_dd, " dd); otherwise no wild-type adult reaches that age."
       )
     }
   }
-  if (v$larval_dd == "none" && v$gamma_L > 0) {
-    .sg_warn("gamma_L = ", v$gamma_L, " has no effect unless larval_dd = \"per_wound\".")
+  if (v$larval_crowding_mode == "none" && v$larval_crowding_coef > 0) {
+    .sg_warn(
+      "larval_crowding_coef = ", v$larval_crowding_coef,
+      " has no effect unless larval_crowding_mode = \"per_wound\"."
+    )
   }
-  if (v$oviposition == "eggs" && !is.na(v$clutch_size)) {
-    .sg_warn("clutch_size has no effect unless oviposition = \"batches\".")
+  if (v$oviposition_mode == "eggs" && !is.na(v$clutch_size)) {
+    .sg_warn("clutch_size has no effect unless oviposition_mode = \"batches\".")
   }
-  if (v$mating == "instant" && v$X_rec > 0) {
-    .sg_warn("With mating = \"instant\" females mate at emergence; X_rec is ignored.")
+  if (v$mating_mode == "instant" && v$female_receptive_age_dd > 0) {
+    .sg_warn(
+      "With mating_mode = \"instant\" females mate at emergence; ",
+      "female_receptive_age_dd is ignored."
+    )
   }
   invisible(TRUE)
 }
@@ -201,8 +271,8 @@ sg_params <- function(..., preset = c("default", "gp2014")) {
 #' @export
 #' @examples
 #' p <- sg_params()
-#' p2 <- update(p, R = 67, n_A = 8)
-#' c(p$R, p2$R)
+#' p2 <- update(p, eggs_per_day_max = 67, adult_substages = 8)
+#' c(p$eggs_per_day_max, p2$eggs_per_day_max)
 update.sg_params <- function(object, ...) {
   values <- .sg_apply_overrides(unclass(object), list(...))
   attr(values, "preset") <- NULL
@@ -241,13 +311,14 @@ print.sg_params <- function(x, ...) {
     " parameters, ", sum(df$changed), " differ from the defaults (*)\n",
     sep = ""
   )
+  width <- max(nchar(df$name)) # one name column across all groups
   for (g in .sg_param_groups) {
     d <- df[df$group == g, , drop = FALSE]
     if (nrow(d) == 0L) next
     cat("\n", g, "\n", sep = "")
     lines <- sprintf(
-      "  %s %-19s %-20s %-21s %s",
-      ifelse(d$changed, "*", " "), d$name, d$value, d$units, d$source
+      "  %s %-*s %-20s %-21s %s",
+      ifelse(d$changed, "*", " "), width, d$name, d$value, d$units, d$source
     )
     cat(lines, sep = "\n")
   }

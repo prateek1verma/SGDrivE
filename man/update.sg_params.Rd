@@ -20,6 +20,6 @@ result is validated again, so invalid combinations are caught.
 }
 \examples{
 p <- sg_params()
-p2 <- update(p, R = 67, n_A = 8)
-c(p$R, p2$R)
+p2 <- update(p, eggs_per_day_max = 67, adult_substages = 8)
+c(p$eggs_per_day_max, p2$eggs_per_day_max)
 }

@@ -10,7 +10,7 @@
 #'
 #' @param temp Daily mean temperature (degrees Celsius), numeric vector.
 #' @param temp5 Running 5-day mean temperature (degrees Celsius), numeric vector.
-#' @param p An `sg_params` object supplying the constants (see
+#' @param params An `sg_params` object supplying the constants (see
 #'   [sg_param_table()], groups "temperature" and "mortality").
 #' @param type What to return:
 #'   * `sg_temp_mortality()`: `"hazard"` (default), the instantaneous rate
@@ -22,6 +22,10 @@
 #'     mortality rate mu_E = -log(max(eps_s, h)).
 #'
 #' @details
+#' The equations use the mathematical symbols of the model specification;
+#' `sg_param_table()` gives the parameter name of each symbol (column
+#' `symbol`), e.g. T_L is `dev_temp_min`.
+#'
 #' * **S1 physiological time.** `sg_degree_days()` returns the degree-days
 #'   accumulated in one day,
 #'   \deqn{dx(T) = X_pre max(dx_floor, 24 a (T - T_L) / (1 + b^(T - T_U))),}
@@ -55,46 +59,50 @@ NULL
 
 #' @rdname temperature_functions
 #' @export
-sg_degree_days <- function(temp, p = sg_params()) {
+sg_degree_days <- function(temp, params = sg_params()) {
   .sg_check_temperature_input(temp, "temp")
-  p <- .sg_as_params(p)
-  r_hour <- p$a_dev * (temp - p$T_L) / (1 + p$b_dev^(temp - p$T_U))
-  p$X_pre * pmax(p$dx_floor, 24 * r_hour)
+  params <- .sg_as_params(params)
+  r_hour <- params$dev_rate_slope * (temp - params$dev_temp_min) /
+    (1 + params$dev_decline_steepness^(temp - params$dev_temp_decline))
+  params$dd_scale_preoviposition * pmax(params$dev_rate_floor, 24 * r_hour)
 }
 
 #' @rdname temperature_functions
 #' @export
-sg_temp_mortality <- function(temp, p = sg_params(), type = c("hazard", "proportion")) {
+sg_temp_mortality <- function(temp, params = sg_params(), type = c("hazard", "proportion")) {
   .sg_check_temperature_input(temp, "temp")
-  p <- .sg_as_params(p)
+  params <- .sg_as_params(params)
   type <- match.arg(type)
-  p_a <- p$c_A * (temp - p$T_opt)^2 + p$p_A0
+  p_a <- params$adult_mortality_curvature * (temp - params$optimal_survival_temp)^2 +
+    params$adult_mortality_min
   if (type == "proportion") {
     return(pmin(1, pmax(0, p_a)))
   }
-  -log(pmax(p$eps_s, 1 - p_a))
+  -log(pmax(params$survival_floor, 1 - p_a))
 }
 
 #' @rdname temperature_functions
 #' @export
-sg_egg_viability <- function(temp5, p = sg_params(), type = c("viability", "hazard")) {
+sg_egg_viability <- function(temp5, params = sg_params(), type = c("viability", "hazard")) {
   .sg_check_temperature_input(temp5, "temp5")
-  p <- .sg_as_params(p)
+  params <- .sg_as_params(params)
   type <- match.arg(type)
-  h <- 1 - pmin(1, p$c_E * (temp5 - p$T_opt)^2 + p$p_E0)
+  failure <- params$egg_failure_curvature * (temp5 - params$optimal_survival_temp)^2 +
+    params$egg_failure_min
+  h <- 1 - pmin(1, failure)
   if (type == "viability") {
     return(h)
   }
-  -log(pmax(p$eps_s, h))
+  -log(pmax(params$survival_floor, h))
 }
 
 #' @rdname temperature_functions
 #' @export
-sg_ovip_scalar <- function(temp, p = sg_params()) {
+sg_ovip_scalar <- function(temp, params = sg_params()) {
   .sg_check_temperature_input(temp, "temp")
-  p <- .sg_as_params(p)
-  psi <- (p$TU_ovip - p$T_L) / 2
-  pmax(0, 1 - ((temp - p$T_L - psi) / psi)^2)
+  params <- .sg_as_params(params)
+  psi <- (params$oviposition_temp_max - params$dev_temp_min) / 2
+  pmax(0, 1 - ((temp - params$dev_temp_min - psi) / psi)^2)
 }
 
 # ---- internal ------------------------------------------------------------------

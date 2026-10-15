@@ -15,7 +15,7 @@ const_weather <- function(temp, days = 40) {
 }
 
 test_that("the largest-rate diagnostic includes mating of unmated females", {
-  pp <- sg_params(nu = 100)
+  pp <- sg_params(mating_rate = 100)
   m <- sg_model(pp, cube3, month(pp))
   x <- as.numeric(sg_init(m, values = c(E = 1, L = 1, P = 1, M = 1, U = 1, F = 1)))
   s <- ns$.sg_reference_setup(m)
@@ -60,7 +60,7 @@ test_that("check_model() reports size, rates, R0 season and the population scale
   expect_true(ck$r0$available)
   expect_gt(ck$r0$days_above_1, 200)
   expect_lte(ck$r0$longest_run, ck$r0$days_above_1)
-  expect_equal(ck$rates$mating_rate, p$nu)
+  expect_equal(ck$rates$mating_rate, p$mating_rate)
   expect_lt(ck$scale$min_wild, 10) # 1 km^2: a few individuals in winter
   expect_true(any(grepl("stochastic runs may go extinct", ck$warnings)))
   out <- capture.output(print(ck))
@@ -73,8 +73,8 @@ test_that("check_model() reports size, rates, R0 season and the population scale
 
 test_that("check_model() warns about stiffness, inert genotypes and cold climates", {
   raw <- sg_test_cube_sit(residual = 0)
-  pp <- sg_params(nu = 2000)
-  m <- sg_model(pp, sg_cube(raw, ell = c(W = 1, S = 0.25)), year(pp),
+  pp <- sg_params(mating_rate = 2000)
+  m <- sg_model(pp, sg_cube(raw, lifespan_fraction = c(W = 1, S = 0.25)), year(pp),
     sg_releases("S", "adult", "male", times = 10, number = 100),
     area = 1000
   )
@@ -113,12 +113,12 @@ test_that("flow balance: round-off for the ODE, exactly zero for stochastic runs
 })
 
 test_that("runtime guards stop runs whose numbers blow up", {
-  p <- sg_params(R = 1e300)
+  p <- sg_params(eggs_per_day_max = 1e300)
   m <- sg_model(p, sg_cube(sg_test_cube_wild()), month(p), area = 10)
   for (b in c("cpp", "R")) {
     expect_error(suppressWarnings(simulate_ode(m, backend = b)), "failed on day 1")
   }
-  p2 <- sg_params(R = 1e308, clutch_size = 1e-300)
+  p2 <- sg_params(eggs_per_day_max = 1e308, clutch_size = 1e-300)
   m2 <- sg_model(p2, sg_cube(sg_test_cube_wild()), month(p2), area = 10)
   expect_error(suppressWarnings(simulate_cb(m2, seed = 1)), "non-finite or negative on day 1")
 })

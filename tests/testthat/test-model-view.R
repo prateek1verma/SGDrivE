@@ -39,10 +39,14 @@ test_that("a 10-genotype model and a sex-linked model round-trip", {
 })
 
 test_that("view fields follow the C++ conventions", {
-  cb <- sg_cube(sg_test_cube_sit(), ell = c(W = 1, S = 0.25))
+  cb <- sg_cube(sg_test_cube_sit(), lifespan_fraction = c(W = 1, S = 0.25))
   rel <- sg_releases("S", "adult", "male", times = c(3, 9), number = 5)
-  m <- sg_model(sg_params(mating = "instant", larval_dd = "per_wound", gamma_L = 0.1), cb,
-    sg_forcing(sg_example_weather()[1:60, ], sg_params(mating = "instant")), rel,
+  m <- sg_model(
+    sg_params(
+      mating_mode = "instant",
+      larval_crowding_mode = "per_wound", larval_crowding_coef = 0.1
+    ), cb,
+    sg_forcing(sg_example_weather()[1:60, ], sg_params(mating_mode = "instant")), rel,
     area = 2
   )
   v <- view(m)

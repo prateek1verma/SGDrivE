@@ -62,7 +62,7 @@ sg_test_each_backend("very large sterile-male releases add no stiffness and stay
 })
 
 sg_test_each_backend("larval crowding with a huge fertile egg release stays accurate", {
-  p <- sg_params(larval_dd = "per_wound", gamma_L = 0.01)
+  p <- sg_params(larval_crowding_mode = "per_wound", larval_crowding_coef = 0.01)
   wx <- sg_forcing(wx_all, p, period[1], period[2])
   m <- sg_model(
     p, sg_cube(sg_test_cube_wild()), wx,
@@ -80,7 +80,7 @@ sg_test_each_backend("larval crowding with a huge fertile egg release stays accu
 })
 
 sg_test_each_backend("a very large mating rate stays accurate", {
-  p <- sg_params(nu = 1000)
+  p <- sg_params(mating_rate = 1000)
   wx <- sg_forcing(wx_all, p, "1971-05-01", "1971-05-30")
   m <- sg_model(p, sg_cube(sg_test_cube_mendelian()), wx)
   s <- both_methods(m, backend)
@@ -89,7 +89,7 @@ sg_test_each_backend("a very large mating rate stays accurate", {
 })
 
 sg_test_each_backend("many egg sub-stages (fast transfer rates) stay accurate", {
-  p <- sg_params(n_E = 25, n_L = 25)
+  p <- sg_params(egg_substages = 25, larva_substages = 25)
   wx <- sg_forcing(wx_all, p, period[1], period[2])
   m <- sg_model(p, sg_cube(sg_test_cube_wild()), wx)
   s <- both_methods(m, backend)

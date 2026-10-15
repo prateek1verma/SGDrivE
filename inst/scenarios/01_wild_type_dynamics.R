@@ -10,6 +10,7 @@
 # Run time: well under a minute.
 
 library(SGDrivE)
+library(MGDrivE)
 library(ggplot2) # plots
 
 # 1. Parameters ---------------------------------------------------------------
@@ -91,19 +92,7 @@ ggplot(both, aes(date)) +
   labs(x = NULL, title = "Adults (black) and daily mean temperature (orange)") +
   theme_minimal()
 
-# 10. Thermal window of growth --------------------------------------------------
-# R0: eggs per egg (per generation) of a small population at a constant
-# temperature. The population can grow only where R0 > 1.
-r0 <- data.frame(temperature = seq(12, 42, by = 0.25))
-r0$R0 <- sg_r0(model, r0$temperature)
-range(r0$temperature[r0$R0 > 1]) # temperatures at which the population can grow
-# R0 is exactly 0 below the developmental threshold; show values above 0.001
-ggplot(subset(r0, R0 > 1e-3), aes(temperature, R0)) +
-  geom_line() +
-  geom_hline(yintercept = 1, linetype = "dashed") +
-  scale_y_log10() +
-  labs(x = "temperature (degC)", y = "R0 (log scale)", title = "Eggs per egg at low density") +
-  theme_minimal()
+
 
 # 11. Tables ---------------------------------------------------------------------
 # The same results as tables, for further analysis.

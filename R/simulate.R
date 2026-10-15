@@ -394,10 +394,10 @@ print.sg_sim <- function(x, ...) {
 .sg_max_rate <- function(day, x, setup) {
   a <- .sg_rates_r(day, x, setup, aux = TRUE)$aux
   p <- setup$p
-  nu_i <- if (p$mating == "instant") {
-    rep(p$nu * a$g_find, setup$n_A)
+  nu_i <- if (p$mating_mode == "instant") {
+    rep(p$mating_rate * a$g_find, setup$n_A)
   } else {
-    p$nu * setup$receptive * a$g_find
+    p$mating_rate * setup$receptive * a$g_find
   }
   mate_ok <- rowSums(a$pi) > 0
   # unmated females [substage, genotype]: ageing, death and mating

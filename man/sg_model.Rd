@@ -10,7 +10,7 @@ sg_model(
   forcing,
   releases = NULL,
   area = 1,
-  adult_substages = NULL
+  adult_segment_substages = NULL
 )
 }
 \arguments{
@@ -24,15 +24,16 @@ temperature, development and mortality parameters as \code{params}.}
 \item{releases}{Optional \code{sg_releases} object (\code{\link[=sg_releases]{sg_releases()}}).}
 
 \item{area}{Node area in km^2 (> 0; default 1, so counts equal densities
-numerically; D-009). Wound density \code{H} and the mate-finding
-half-saturation \code{h_M} (per km^2) and releases given per km^2 are
+numerically; D-009). Wound density \code{wound_density} and the mate-finding
+half-saturation \code{male_density_half_mating} (per km^2) and releases given per km^2 are
 converted to counts per node with it.}
 
-\item{adult_substages}{Optional list with elements \code{female} and/or \code{male}:
+\item{adult_segment_substages}{Optional list with elements \code{female} and/or \code{male}:
 the number of sub-stages in each segment of that sex's adult chain,
-overriding the proportional allocation (D-018). Each must sum to \code{n_A}.
-Female segments are delimited by \code{X_rec} and \code{X_ovi}, male segments by
-\code{X_mat} (zero thresholds add no segment); \code{print()} of a model shows the
+overriding the proportional allocation (D-018). Each must sum to \code{adult_substages}.
+Female segments are delimited by \code{female_receptive_age_dd} and
+\code{oviposition_age_dd}, male segments by \code{male_mature_age_dd} (zero thresholds add no
+segment); \code{print()} of a model shows the
 segments.}
 }
 \value{
@@ -40,7 +41,7 @@ An object of class \code{sg_model}: a list with \code{params}, \code{cube},
 \code{forcing}, \code{area}, \code{dims} (numbers of genotypes, sub-stages, nodes and
 host classes), \code{adult} (female and male chains), \code{layout} (one row per
 state block: name, first index, length), \code{n_states}, \code{counts} (wound
-number \code{H}, half-saturation \code{h_M}, extinction threshold, per node),
+number \code{H}, half-saturation \code{h_M}, extinction threshold, per node; internal names),
 \code{releases} (events with day, state index and count) and \code{meta}
 (package version and hash).
 }
@@ -53,10 +54,11 @@ and the release events mapped to state positions.
 \details{
 \strong{Adult chains} (model specification S6, D-018). Each adult chain is split
 at its maturity thresholds into segments with exact mean durations. With
-the defaults (n_A = 10, X_ovi = 61 dd, X_rec = X_mat = 0) the female chain
+the defaults (\code{adult_substages} = 10, \code{oviposition_age_dd} = 61,
+\code{female_receptive_age_dd} = \code{male_mature_age_dd} = 0) the female chain
 has 3 sub-stages before first oviposition and 7 after; the male chain is a
 single segment. A genotype with lifespan fraction l_g keeps the same
-thresholds in degree-days; only the segment in which its lifespan l_g X_A
+thresholds in degree-days; only the segment in which its lifespan l_g \code{adult_lifespan_dd}
 ends changes length. A genotype whose lifespan ends before a threshold
 never reaches it (reported by \code{print()}).
 

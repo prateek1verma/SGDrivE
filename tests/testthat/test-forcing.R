@@ -17,8 +17,8 @@ test_that("McAllen forcing matches the legacy daily terms exactly (gp2014 preset
 })
 
 test_that("the forcing records the parameter values it used", {
-  f <- sg_forcing(wx[1:30, ], sg_params(T_opt = 27))
-  expect_identical(f$param_values$T_opt, 27)
+  f <- sg_forcing(wx[1:30, ], sg_params(optimal_survival_temp = 27))
+  expect_identical(f$param_values$optimal_survival_temp, 27)
   expect_named(f$param_values, SGDrivE:::.sg_forcing_param_names())
 })
 
@@ -44,7 +44,7 @@ test_that("tmean is computed from tmax and tmin when absent", {
 })
 
 test_that("host egg temperature gives constant egg degree-days (D-014)", {
-  f <- sg_forcing(wx[1:50, ], sg_params(egg_temperature = "host"))
+  f <- sg_forcing(wx[1:50, ], sg_params(egg_temp_source = "host"))
   expect_identical(unique(f$dx_egg), sg_degree_days(38.5))
   f2 <- sg_forcing(wx[1:50, ])
   expect_identical(f2$dx_egg, f2$dx)
@@ -62,7 +62,7 @@ test_that("moisture index follows annual rainfall and is 1 without rain", {
   expect_false(sg_forcing(dry)$has_rain)
   # an incomplete year is scaled to a full year
   half <- data.frame(date = as.Date("2001-01-01") + 0:181, tmean = 25, rain = 1)
-  m_half <- sg_forcing(half, sg_params(rain_threshold = 400))$moisture
+  m_half <- sg_forcing(half, sg_params(drought_free_rainfall = 400))$moisture
   expect_equal(unique(m_half), min(1, 365 / 400))
 })
 
@@ -90,7 +90,7 @@ test_that("invalid weather gives informative errors", {
   bad <- w
   bad$tmean <- as.character(bad$tmean)
   expect_error(sg_forcing(bad), "must be numeric")
-  expect_error(sg_forcing(w, p = list()), "sg_params object")
+  expect_error(sg_forcing(w, params = list()), "sg_params object")
 })
 
 test_that("print() summarises the forcing", {

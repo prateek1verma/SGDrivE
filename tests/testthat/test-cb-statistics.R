@@ -58,7 +58,7 @@ test_that("matings with a male genotype are binomial thinning of the virgins", {
   set.seed(2)
   r <- step_rep(m, x, 40000)
   pi_s <- 0.5 * 300 / (0.5 * 300 + 100)
-  pr <- (1 - exp(-p$nu * 0.1)) * pi_s
+  pr <- (1 - exp(-p$mating_rate * 0.1)) * pi_s
   y <- r[, "matings[W|S]"]
   expect_equal(mean(y), 2000 * pr, tolerance = 0.01)
   expect_equal(stats::var(y), 2000 * pr * (1 - pr), tolerance = 0.06)
@@ -146,7 +146,7 @@ test_that("sterile-male releases eliminate the wild type; released males remain"
 test_that("egg batches make small populations more likely to die out", {
   skip_on_cran()
   ext <- vapply(c("eggs", "batches"), function(ov) {
-    pp <- sg_params(oviposition = ov)
+    pp <- sg_params(oviposition_mode = ov)
     # 3 km^2 through the winter low (January to April)
     wx <- sg_forcing(wx_all, pp, "1971-01-01", "1971-04-30")
     m <- sg_model(pp, sg_cube(sg_test_cube_wild()), wx, area = 3)
@@ -187,8 +187,14 @@ test_that("stress: huge counts, step sizes, fast mating, long chains, many genot
   }
   # very fast mating, long chains, a ten-genotype homing drive, females only
   settings <- list(
-    list(sg_params(nu = 1e4), sg_cube(sg_test_cube_mendelian())),
-    list(sg_params(n_E = 25, n_L = 25, n_P = 25, n_A = 25), sg_cube(sg_test_cube_wild()))
+    list(sg_params(mating_rate = 1e4), sg_cube(sg_test_cube_mendelian())),
+    list(
+      sg_params(
+        egg_substages = 25, larva_substages = 25,
+        pupa_substages = 25, adult_substages = 25
+      ),
+      sg_cube(sg_test_cube_wild())
+    )
   )
   if (requireNamespace("MGDrivE", quietly = TRUE)) {
     settings <- c(settings, list(list(p, sg_cube(MGDrivE::cubeHomingDrive()))))

@@ -14,7 +14,7 @@
 #'       moisture index.}
 #'   }
 #'   Gaps must be filled before use, e.g. with [sg_fill_weather()].
-#' @param p An `sg_params` object. Only the temperature, development and
+#' @param params An `sg_params` object. Only the temperature, development and
 #'   mortality constants are used here; [sg_model()] checks that the model is
 #'   assembled with the same values.
 #' @param start,end Optional first and last date of the simulation (`Date` or
@@ -29,15 +29,15 @@
 #'   Gutierrez & Ponti code.
 #' * `dx`: degree-days accumulated (S1), driving pupal and adult ageing.
 #' * `dx_egg`: degree-days for eggs, equal to `dx` when
-#'   `egg_temperature = "ambient"` and the constant `dx(T_host)` when
-#'   `egg_temperature = "host"` (D-014).
+#'   `egg_temp_source = "ambient"` and the constant `dx(host_body_temp)` when
+#'   `egg_temp_source = "host"` (D-014).
 #' * `mu_T`: pupal/adult temperature mortality rate per day (S2) and `p_A`,
 #'   the corresponding daily proportion.
 #' * `egg_viability` and `mu_E`, the egg hatch probability and mortality rate
 #'   from the 5-day mean temperature (S3).
 #' * `phi_ov`: the oviposition temperature scalar (S4).
 #' * `moisture`: the moisture index I_W in \[0, 1\] (S7), equal to
-#'   `min(1, annual rainfall / rain_threshold)` for the calendar year, with
+#'   `min(1, annual rainfall / drought_free_rainfall)` for the calendar year, with
 #'   annual rainfall scaled up from incomplete years; 1 (no stress) when there
 #'   is no `rain` column.
 #'
@@ -53,8 +53,8 @@
 #' wx <- sg_forcing(sg_example_weather(), p, start = "1961-01-01", end = "1961-12-31")
 #' wx
 #' summary(wx$dx)
-sg_forcing <- function(weather, p = sg_params(), start = NULL, end = NULL) {
-  p <- .sg_as_params(p)
+sg_forcing <- function(weather, params = sg_params(), start = NULL, end = NULL) {
+  params <- .sg_as_params(params)
   w <- .sg_check_weather(weather)
 
   tmean5_all <- .sg_running_mean(w$tmean, 5L)
@@ -62,13 +62,13 @@ sg_forcing <- function(weather, p = sg_params(), start = NULL, end = NULL) {
   w <- w[keep, , drop = FALSE]
   tmean5 <- tmean5_all[keep]
 
-  dx <- sg_degree_days(w$tmean, p)
-  dx_egg <- if (p$egg_temperature == "host") {
-    rep(sg_degree_days(p$T_host, p), nrow(w))
+  dx <- sg_degree_days(w$tmean, params)
+  dx_egg <- if (params$egg_temp_source == "host") {
+    rep(sg_degree_days(params$host_body_temp, params), nrow(w))
   } else {
     dx
   }
-  viab <- sg_egg_viability(tmean5, p)
+  viab <- sg_egg_viability(tmean5, params)
 
   structure(
     list(
@@ -79,15 +79,15 @@ sg_forcing <- function(weather, p = sg_params(), start = NULL, end = NULL) {
       tmean5 = tmean5,
       dx = dx,
       dx_egg = dx_egg,
-      mu_T = sg_temp_mortality(w$tmean, p, type = "hazard"),
-      p_A = sg_temp_mortality(w$tmean, p, type = "proportion"),
+      mu_T = sg_temp_mortality(w$tmean, params, type = "hazard"),
+      p_A = sg_temp_mortality(w$tmean, params, type = "proportion"),
       egg_viability = viab,
-      mu_E = -log(pmax(p$eps_s, viab)),
-      phi_ov = sg_ovip_scalar(w$tmean, p),
+      mu_E = -log(pmax(params$survival_floor, viab)),
+      phi_ov = sg_ovip_scalar(w$tmean, params),
       has_rain = "rain" %in% names(w),
       rain = if ("rain" %in% names(w)) w$rain else NULL,
-      moisture = .sg_moisture_index(w, p$rain_threshold),
-      param_values = unclass(p)[.sg_forcing_param_names()]
+      moisture = .sg_moisture_index(w, params$drought_free_rainfall),
+      param_values = unclass(params)[.sg_forcing_param_names()]
     ),
     class = "sg_forcing"
   )
@@ -109,7 +109,7 @@ print.sg_forcing <- function(x, ...) {
   cat("  adult/pupal mortality mu_T:    ", rng(x$mu_T), " per day\n", sep = "")
   cat("  egg viability:                 ", rng(x$egg_viability), "\n", sep = "")
   cat(
-    "  eggs aged at:                  ", x$param_values$egg_temperature,
+    "  eggs aged at:                  ", x$param_values$egg_temp_source,
     " temperature\n",
     sep = ""
   )
@@ -131,9 +131,11 @@ print.sg_forcing <- function(x, ...) {
 # Parameters that sg_forcing() uses; sg_model() compares these with its own.
 .sg_forcing_param_names <- function() {
   c(
-    "T_L", "T_U", "a_dev", "b_dev", "dx_floor", "X_pre", "T_opt", "TU_ovip",
-    "egg_temperature", "T_host", "c_A", "p_A0", "c_E", "p_E0", "eps_s",
-    "rain_threshold"
+    "dev_temp_min", "dev_temp_decline", "dev_rate_slope", "dev_decline_steepness",
+    "dev_rate_floor", "dd_scale_preoviposition", "optimal_survival_temp",
+    "oviposition_temp_max", "egg_temp_source", "host_body_temp", "adult_mortality_curvature",
+    "adult_mortality_min", "egg_failure_curvature", "egg_failure_min", "survival_floor",
+    "drought_free_rainfall"
   )
 }
 

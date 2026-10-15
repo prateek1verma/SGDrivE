@@ -118,13 +118,13 @@
   p <- s$p
   dx <- f$dx[day]
   mu <- c(
-    E = f$mu_E[day], P = f$mu_T[day] + p$mu_W * (1 - f$moisture[day]),
-    F = f$mu_T[day] + p$mu_b_F, M = f$mu_T[day] + p$mu_b_M
+    E = f$mu_E[day], P = f$mu_T[day] + p$pupa_drought_mortality * (1 - f$moisture[day]),
+    F = f$mu_T[day] + p$female_background_mortality, M = f$mu_T[day] + p$male_background_mortality
   )
-  q_e <- s$n_E * f$dx_egg[day] / p$X_E
-  q_p <- s$n_P * dx / p$X_P
+  q_e <- s$n_E * f$dx_egg[day] / p$egg_duration_dd
+  q_p <- s$n_P * dx / p$pupa_duration_dd
   list(
-    day = day, phi_ov = f$phi_ov[day], mu = mu, q_l = s$n_L / p$tau_L,
+    day = day, phi_ov = f$phi_ov[day], mu = mu, q_l = s$n_L / p$larva_duration_days,
     ch_e = .sg_cb_chain(rep(q_e, s$n_E), s$n_E, mu[["E"]], dt),
     ch_p = .sg_cb_chain(rep(q_p, s$n_P), s$n_P, mu[["P"]], dt),
     ch_m = lapply(seq_len(s$n_g), function(g) {
@@ -158,7 +158,7 @@
   # ---- eggs (S17), per female x mate pair, split over offspring genotypes:
   # oviposition events (batches, D-024), those with at least one viable egg
   # (fertile, the case proxy; D-026), their viable eggs; or single eggs ----
-  batches <- p$oviposition == "batches"
+  batches <- p$oviposition_mode == "batches"
   factor <- .sg_batch_factor(p, info$phi_ov) # events per wound found
   clutch <- .sg_clutch(p, info$phi_ov)
   eggs <- numeric(n_g)
@@ -181,17 +181,17 @@
       } else {
         expected_fertile <- expected_fertile + a$w_lay[m, g] * share
         if (tot <= 0) next
-        n_eggs <- draw$pois(p$R * info$phi_ov * a$psi * a$w_lay[m, g] * tot * dt)
+        n_eggs <- draw$pois(p$eggs_per_day_max * info$phi_ov * a$psi * a$w_lay[m, g] * tot * dt)
       }
       eggs <- eggs + draw$multinom(n_eggs, tgm / tot)
     }
   }
 
   # ---- mating (S18), before ageing ------------------------------------------
-  nu_i <- if (p$mating == "instant") {
-    rep(p$nu * a$g_find, n_a)
+  nu_i <- if (p$mating_mode == "instant") {
+    rep(p$mating_rate * a$g_find, n_a)
   } else {
-    p$nu * s$receptive * a$g_find
+    p$mating_rate * s$receptive * a$g_find
   }
   matings <- matrix(0, n_g, n_g) # [g, m]
   for (g in seq_len(n_g)) {
@@ -288,7 +288,7 @@
   # of the step (probability 1 - (1 - exp(-nu_1 dt)) / (nu_1 dt) for a
   # uniform arrival time); unmated survivors go to U, mated ones to F, both
   # placed like other arrivals.
-  instant <- p$mating == "instant"
+  instant <- p$mating_mode == "instant"
   x_arr <- nu_i[1L] * dt
   p_arr_mate <- if (x_arr > 0) 1 + expm1(-x_arr) / x_arr else 0
   for (g in seq_len(n_g)) {

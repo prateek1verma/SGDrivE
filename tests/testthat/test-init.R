@@ -69,7 +69,7 @@ test_that("sex-linked cubes: adults only go to genotypes of the right sex", {
 })
 
 test_that("adults only fill the classes their genotype reaches (D-018)", {
-  cb <- sg_cube(sg_test_cube_sit(), ell = c(W = 1, S = 0.25))
+  cb <- sg_cube(sg_test_cube_sit(), lifespan_fraction = c(W = 1, S = 0.25))
   m <- sg_model(p, cb, wx)
   x <- sg_init(m, genotypes = c(W = 1, S = 1))
   expect_true(all(x[sg_state_index(m, "F", genotype = "S", substage = 4:10)] == 0))

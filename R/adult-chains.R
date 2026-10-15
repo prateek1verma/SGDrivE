@@ -14,8 +14,8 @@
   k <- length(lengths)
   if (n < k) {
     .sg_stop(
-      "n_A = ", n, " is too small for an adult chain with ", k, " segments; ",
-      "use n_A >= ", k, "."
+      "adult_substages = ", n, " is too small for an adult chain with ", k, " segments; ",
+      "use adult_substages >= ", k, "."
     )
   }
   quota <- n * lengths / sum(lengths)
@@ -98,15 +98,15 @@
     all(abs(x - round(x)) < 1e-8) && all(x >= 1)
   if (!ok) {
     .sg_stop(
-      "adult_substages$", sex, " must give ", k, " whole number(s) >= 1, one per ",
+      "adult_segment_substages$", sex, " must give ", k, " whole number(s) >= 1, one per ",
       "segment of the ", sex, " chain (", seg_txt, ")."
     )
   }
   x <- as.integer(round(x))
   if (sum(x) != n_A) {
     .sg_stop(
-      "adult_substages$", sex, " must sum to n_A = ", n_A, " (it sums to ", sum(x),
-      "). Change n_A with sg_params() if needed."
+      "adult_segment_substages$", sex, " must sum to adult_substages = ", n_A,
+      " (it sums to ", sum(x), "). Change adult_substages with sg_params() if needed."
     )
   }
   x

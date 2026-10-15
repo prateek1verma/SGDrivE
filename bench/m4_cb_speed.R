@@ -66,7 +66,7 @@ res <- list(
   scenario("SIT W/S, weekly releases", sg_params(), sit, 1e5, weekly("S", 30),
     dts = 0.1, ref = FALSE
   ),
-  scenario("SIT, single eggs", sg_params(oviposition = "eggs"), sit, 1000, weekly("S", 30),
+  scenario("SIT, single eggs", sg_params(oviposition_mode = "eggs"), sit, 1000, weekly("S", 30),
     dts = 0.1, ref = FALSE
   )
 )

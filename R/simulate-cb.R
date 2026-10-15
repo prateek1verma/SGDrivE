@@ -35,7 +35,7 @@
 #' eggs and emerge, with binomial, multinomial and Poisson draws. Arrivals
 #' during a step (eggs laid, individuals moving on to the next stage,
 #' emerged adults) are placed at their expected position. Eggs are laid in
-#' batches by default (`oviposition` and `clutch_size` in [sg_params()],
+#' batches by default (`oviposition_mode` and `clutch_size` in [sg_params()],
 #' D-024). The mean of a step is the deterministic map, which is within
 #' about 0.5% of the ODE at `dt = 0.1`.
 #'
@@ -54,7 +54,7 @@
 #' insect technique (`NA` if none; also when the population returns later).
 #'
 #' **Population size.** Counts are whole individuals per node, so the node
-#' area matters: with the defaults (1 km^2, H = 5 wounds per km^2) a McAllen
+#' area matters: with the defaults (1 km^2, `wound_density` = 5 wounds per km^2) a McAllen
 #' population falls below one individual in most winters. Use a larger
 #' `area` in [sg_model()] for populations that persist.
 #'
@@ -174,7 +174,7 @@ simulate_cb <- function(model, init = NULL, n_rep = 1L, dt = 0.1, output_every =
     backend = "cpp", dt = dt, n_rep = n_rep, keep = keep,
     output_every = as.integer(output_every), seed = rng$seed,
     streams = do.call(cbind, rng$streams), parallel = parallel, run_time = run_time,
-    oviposition = p$oviposition, clutch_size = p$clutch_size, mating = p$mating,
+    oviposition_mode = p$oviposition_mode, clutch_size = p$clutch_size, mating_mode = p$mating_mode,
     model_hash = model$meta$hash, info = .sg_output_info(model),
     package_version = as.character(utils::packageVersion("SGDrivE")), init = x0
   )
@@ -188,7 +188,7 @@ print.sg_sim_cb <- function(x, ...) {
   cat(sprintf(
     "<sg_sim_cb> %d replicate%s x %d days (%s to %s), dt = %g day, eggs in %s\n",
     m$n_rep, if (m$n_rep == 1L) "" else "s", n_days, format(x$date[2L]),
-    format(x$date[length(x$date)]), m$dt, m$oviposition
+    format(x$date[length(x$date)]), m$dt, m$oviposition_mode
   ))
   tot <- .sg_cb_block_totals(x)
   last <- tot[dim(tot)[1L], , , drop = FALSE]

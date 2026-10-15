@@ -24,15 +24,16 @@ init_of <- function(m) sg_init(m, values = c(E = 5, L = 5, P = 5, M = 3, U = 1, 
 cases <- list(
   "defaults (batches, rate mating)" = list(sg_params(), sg_cube(sg_test_cube_mendelian())),
   "single eggs, instant mating, Allee" = list(
-    sg_params(oviposition = "eggs", mating = "instant", h_M = 1),
+    sg_params(oviposition_mode = "eggs", mating_mode = "instant", male_density_half_mating = 1),
     sg_cube(sg_test_cube_mendelian())
   ),
   "crowding, clutch size, SIT cube" = list(
-    sg_params(larval_dd = "per_wound", gamma_L = 0.05, clutch_size = 200), sg_cube(sit_raw)
+    sg_params(larval_crowding_mode = "per_wound", larval_crowding_coef = 0.05, clutch_size = 200),
+    sg_cube(sit_raw)
   ),
   "short-lived genotype, receptivity, all adults search" = list(
-    sg_params(X_rec = 20, search_denominator = "all_adults"),
-    sg_cube(sg_test_cube_sit(), ell = c(W = 1, S = 0.25))
+    sg_params(female_receptive_age_dd = 20, wound_competitors = "all_adults"),
+    sg_cube(sg_test_cube_sit(), lifespan_fraction = c(W = 1, S = 0.25))
   ),
   "gp2014 preset" = list(sg_params(preset = "gp2014"), sg_cube(sg_test_cube_wild()))
 )

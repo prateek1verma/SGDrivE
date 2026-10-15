@@ -8,18 +8,18 @@
 \alias{sg_ovip_scalar}
 \title{Temperature-driven life-history functions}
 \usage{
-sg_degree_days(temp, p = sg_params())
+sg_degree_days(temp, params = sg_params())
 
-sg_temp_mortality(temp, p = sg_params(), type = c("hazard", "proportion"))
+sg_temp_mortality(temp, params = sg_params(), type = c("hazard", "proportion"))
 
-sg_egg_viability(temp5, p = sg_params(), type = c("viability", "hazard"))
+sg_egg_viability(temp5, params = sg_params(), type = c("viability", "hazard"))
 
-sg_ovip_scalar(temp, p = sg_params())
+sg_ovip_scalar(temp, params = sg_params())
 }
 \arguments{
 \item{temp}{Daily mean temperature (degrees Celsius), numeric vector.}
 
-\item{p}{An \code{sg_params} object supplying the constants (see
+\item{params}{An \code{sg_params} object supplying the constants (see
 \code{\link[=sg_param_table]{sg_param_table()}}, groups "temperature" and "mortality").}
 
 \item{type}{What to return:
@@ -47,6 +47,9 @@ development, mortality and oviposition (model specification S1-S4). They are
 vectorised over temperature.
 }
 \details{
+The equations use the mathematical symbols of the model specification;
+\code{sg_param_table()} gives the parameter name of each symbol (column
+\code{symbol}), e.g. T_L is \code{dev_temp_min}.
 \itemize{
 \item \strong{S1 physiological time.} \code{sg_degree_days()} returns the degree-days
 accumulated in one day,

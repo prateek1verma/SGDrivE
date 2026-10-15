@@ -4,13 +4,13 @@
 \alias{sg_cold_index}
 \title{Cold- and heat-stress indices}
 \usage{
-sg_cold_index(x, p = sg_params(), period = c("calendar", "jul_jun"))
+sg_cold_index(x, params = sg_params(), period = c("calendar", "jul_jun"))
 }
 \arguments{
 \item{x}{An \code{sg_forcing} object, or a weather data frame accepted by
 \code{\link[=sg_forcing]{sg_forcing()}}.}
 
-\item{p}{An \code{sg_params} object (used when \code{x} is a data frame; ignored for
+\item{params}{An \code{sg_params} object (used when \code{x} is a data frame; ignored for
 an \code{sg_forcing} object, which carries its own values).}
 
 \item{period}{\code{"calendar"} (1 January to 31 December, as in the published
@@ -24,10 +24,10 @@ A data frame with columns \code{year}, \code{mu_cold}, \code{mu_hot}, \code{n_da
 \description{
 Computes the annual cold-stress index mu_cold of Gutierrez & Ponti (2014):
 the sum of the daily pupal/adult mortality proportions p_A(T) over days with
-mean temperature below T_opt (27.2 degC). Values up to about 10 indicate
+mean temperature below \code{optimal_survival_temp} (27.2 degC). Values up to about 10 indicate
 that the screwworm can persist year-round; higher values indicate winter
 die-off. The heat-stress index mu_hot sums p_A(T) over days at or above
-T_opt.
+\code{optimal_survival_temp}.
 }
 \examples{
 ci <- sg_cold_index(sg_example_weather())

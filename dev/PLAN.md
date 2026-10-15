@@ -25,7 +25,7 @@ sg_releases() release table                cb_step.cpp    chain-binomial stepper
 sg_model()    assemble + index maps        events.cpp     releases at day boundaries
 sg_init()     initial state / burn-in      summary.cpp    on-the-fly aggregation
 simulate_ode(), simulate_cb()              checks.cpp     invariants, flow accounting
-summaries, plots, check_model(), calibrate_H()
+summaries, plots, check_model(), calibrate_wound_density()
 ```
 
 Everything done once per run (validation, tensors, forcing) is in R;

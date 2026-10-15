@@ -39,7 +39,11 @@ test_that("an empty population has zero rates", {
 })
 
 test_that("flow accounting closes for the total and for each block", {
-  for (p in list(sg_params(), sg_params(mating = "instant"), sg_params(mu_b_F = 0.1, h_M = 3))) {
+  variants <- list(
+    sg_params(), sg_params(mating_mode = "instant"),
+    sg_params(female_background_mortality = 0.1, male_density_half_mating = 3)
+  )
+  for (p in variants) {
     m <- mk(p)
     x <- rand_state(m)
     r <- rates(day_warm, x, setup(m))
@@ -67,7 +71,7 @@ test_that("flow accounting closes for the total and for each block", {
         k[["senescence_F"]],
       tolerance = sg_tol_exact
     )
-    if (p$mating == "rate") {
+    if (p$mating_mode == "rate") {
       expect_equal(block_sum(m, r$deriv, "F"), matings - k[["deaths_F"]] - k[["senescence_F"]],
         tolerance = sg_tol_exact
       )
@@ -90,10 +94,11 @@ test_that("egg production follows S8-S9 (wound search, egg tensor)", {
     }
   }
   n_s <- sum(w)
-  psi <- 1 - exp(-p$a_s * f$dx[day_warm] * p$H / n_s)
+  psi <- 1 - exp(-p$wound_search_rate * f$dx[day_warm] * p$wound_density / n_s)
   expect_equal(r$aux$psi, psi, tolerance = sg_tol_exact)
   births <- vapply(m$cube$genotypes, function(k) {
-    p$R * f$phi_ov[day_warm] * psi * sum(w * m$cube$ih[, , k] * m$cube$tau[, , k] * m$cube$s)
+    p$eggs_per_day_max * f$phi_ov[day_warm] * psi *
+      sum(w * m$cube$ih[, , k] * m$cube$tau[, , k] * m$cube$s)
   }, 0)
   expect_equal(unname(r$aux$births), unname(births), tolerance = sg_tol_exact)
   expect_equal(r$counters[["egg_batches"]], psi * n_s, tolerance = sg_tol_exact)
@@ -111,7 +116,7 @@ test_that("sterile-mated females lay no viable eggs but compete for wounds (D-00
   expect_lt(sum(r2$aux$births), sum(r1$aux$births)) # wound competition
   expect_identical(r2$aux$births[["S"]], 0)
   # with all adults as competitors, males count too
-  pa <- sg_params(search_denominator = "all_adults")
+  pa <- sg_params(wound_competitors = "all_adults")
   ma <- mk(pa, cube = sg_cube(sg_test_cube_sit()))
   x2 <- x
   x2[sg_state_index(ma, "M", genotype = "S")] <- 5
@@ -143,7 +148,7 @@ test_that("no males means no mating; instant mating sends females to U then", {
   r <- rates(day_warm, x, setup(m), aux = TRUE)
   expect_true(all(r$counters[grepl("^matings", names(r$counters))] == 0))
   expect_identical(r$aux$g_find, 0)
-  pi <- sg_params(mating = "instant")
+  pi <- sg_params(mating_mode = "instant")
   mi <- mk(pi)
   x <- numeric(mi$n_states)
   x[sg_state_index(mi, "P", genotype = "AA", substage = 10)] <- 10
@@ -157,7 +162,7 @@ test_that("no males means no mating; instant mating sends females to U then", {
 })
 
 test_that("receptivity, male maturity and the Allee term act as specified", {
-  pr <- sg_params(X_rec = 24, X_mat = 30)
+  pr <- sg_params(female_receptive_age_dd = 24, male_mature_age_dd = 30)
   m <- mk(pr)
   x <- numeric(m$n_states)
   x[sg_state_index(m, "U", genotype = "AA")] <- 1
@@ -168,14 +173,14 @@ test_that("receptivity, male maturity and the Allee term act as specified", {
   expect_true(all(r$aux$mating_flux[first_rec:10, 1] > 0))
   mature <- m$adult$male$flags$X_mat
   expect_equal(unname(r$aux$m_bar[["AA"]]), sum(mature))
-  ph <- sg_params(h_M = 4)
+  ph <- sg_params(male_density_half_mating = 4)
   mh <- mk(ph)
   rh <- rates(day_warm, x, setup(mh), aux = TRUE)
   expect_equal(rh$aux$g_find, 10 / (4 + 10), tolerance = sg_tol_exact)
 })
 
 test_that("genotypes leave the adult chain at their last reached class (D-018)", {
-  cb <- sg_cube(sg_test_cube_sit(), ell = c(W = 1, S = 0.25))
+  cb <- sg_cube(sg_test_cube_sit(), lifespan_fraction = c(W = 1, S = 0.25))
   m <- mk(cube = cb)
   x <- numeric(m$n_states)
   x[sg_state_index(m, "U", genotype = "S", substage = 3)] <- 1
@@ -214,21 +219,27 @@ test_that("optional terms change rates in the expected direction", {
     rates(day_warm, x, setup(mk(p)), aux = TRUE)
   }
   expect_gt(
-    with_p(larval_dd = "per_wound", gamma_L = 0.01)$counters[["deaths_L"]],
+    with_p(larval_crowding_mode = "per_wound", larval_crowding_coef = 0.01)$counters[["deaths_L"]],
     r0$counters[["deaths_L"]]
   )
-  expect_gt(with_p(mu_b_F = 0.1)$counters[["deaths_F"]], r0$counters[["deaths_F"]])
-  expect_gt(with_p(mu_b_M = 0.1)$counters[["deaths_M"]], r0$counters[["deaths_M"]])
-  expect_equal(sum(with_p(sigma0 = 0.5)$aux$births), 0.5 * sum(r0$aux$births),
+  expect_gt(
+    with_p(female_background_mortality = 0.1)$counters[["deaths_F"]],
+    r0$counters[["deaths_F"]]
+  )
+  expect_gt(
+    with_p(male_background_mortality = 0.1)$counters[["deaths_M"]],
+    r0$counters[["deaths_M"]]
+  )
+  expect_equal(sum(with_p(wound_finding_max = 0.5)$aux$births), 0.5 * sum(r0$aux$births),
     tolerance = sg_tol_exact
   )
-  host <- with_p(egg_temperature = "host")
+  host <- with_p(egg_temp_source = "host")
   expect_equal(host$aux$q[["E"]], 3 * sg_degree_days(38.5) / 10, tolerance = sg_tol_exact)
   # moisture: pupal mortality rises when annual rain is below the threshold
-  dry <- with_p(mu_W = 0.2, rain_threshold = 5000)
+  dry <- with_p(pupa_drought_mortality = 0.2, drought_free_rainfall = 5000)
   expect_gt(dry$counters[["deaths_P"]], r0$counters[["deaths_P"]])
   expect_identical(
-    with_p(mu_W = 0.2, rain_threshold = 1)$counters[["deaths_P"]],
+    with_p(pupa_drought_mortality = 0.2, drought_free_rainfall = 1)$counters[["deaths_P"]],
     r0$counters[["deaths_P"]]
   )
 })

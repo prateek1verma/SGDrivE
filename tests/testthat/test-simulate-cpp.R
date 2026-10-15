@@ -89,7 +89,7 @@ test_that("output_every and an empty population work in the C++ backend", {
 
 test_that("stiff days fall back to lsoda and give the same result", {
   # near-instant mating (nu = 1e4 per day) makes every day stiff
-  ps <- sg_params(nu = 1e4)
+  ps <- sg_params(mating_rate = 1e4)
   ms <- sg_model(ps, cube3, sg_forcing(sg_example_weather(), ps, "1971-05-01", "1971-05-10"))
   a <- simulate_ode(ms, backend = "R", rtol = 1e-9, atol = 1e-12)
   b <- simulate_ode(ms, backend = "cpp", rtol = 1e-9, atol = 1e-12)
@@ -112,7 +112,7 @@ test_that("stiff days fall back to lsoda and give the same result", {
 test_that("a stiff day in the middle of a run is handed over and the loop resumes", {
   # with an Allee effect, the effective mating rate nu * M / (h_M + M) is only
   # large (stiff) while a big release of males is alive and mature
-  pc <- sg_params(nu = 1e5, h_M = 1e5)
+  pc <- sg_params(mating_rate = 1e5, male_density_half_mating = 1e5)
   wx <- sg_forcing(sg_example_weather(), pc, "1971-05-01", "1971-05-30")
   mc <- sg_model(pc, cube3, wx, sg_releases("aa", "adult", "male", times = 10, number = 1e6))
   a <- simulate_ode(mc, backend = "R", rtol = 1e-9, atol = 1e-12)
@@ -146,7 +146,7 @@ test_that("the C++ backend needs deSolve only for a fallback day or a deSolve me
   expect_identical(sim$meta$desolve_version, NA_character_)
   expect_error(simulate_ode(m_rel, method = "lsoda"), "Method \"lsoda\" needs the 'deSolve'")
   expect_error(simulate_ode(m_rel, backend = "R"), "Method \"lsoda\" needs the 'deSolve'")
-  ps <- sg_params(nu = 1e4)
+  ps <- sg_params(mating_rate = 1e4)
   ms <- sg_model(ps, cube3, sg_forcing(sg_example_weather(), ps, "1971-05-01", "1971-05-03"))
   expect_error(
     simulate_ode(ms),

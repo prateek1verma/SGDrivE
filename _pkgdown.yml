@@ -43,7 +43,7 @@ reference:
       - check_model
       - sg_r0
       - sg_flow_balance
-      - calibrate_H
+      - calibrate_wound_density
   - title: Plots
     contents:
       - plot.sg_sim

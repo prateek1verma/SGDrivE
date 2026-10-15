@@ -14,6 +14,23 @@ are excluded from the built package.
 | C++ functions exported to R | `sg_..._cpp` (called only from R wrappers) | `sg_backend_info_cpp()` |
 | C++ files | one responsibility per file | `rates.cpp`, `dopri5.h` |
 | Model symbols in code | follow `dev/MODEL_SPEC.md`, ASCII | `q_A`, `mu_T`, `ell_g`, `i0` |
+| User-facing parameters and arguments | descriptive snake_case (D-027), see below | `pupa_duration_dd`, `mating_rate` |
+
+**Parameter names** (D-027): users set parameters and arguments by names
+that say what the quantity is; the mathematical symbols stay in the model
+specification, in internal code and in the `symbol` column of
+`sg_param_table()`.
+
+* Stage or subject first: `egg_`, `larva_`, `pupa_`, `adult_`, `female_`,
+  `male_`, `wound_`, `mating_`, `dev_` (development), so related parameters
+  sort together.
+* A unit suffix where a number could be misread: `_dd` (degree-days),
+  `_days` (calendar days), `_temp` (degC).
+* Quantity words: `_rate` (per day), `_mortality` (hazard per day),
+  `_survival` or `_failure` (daily probabilities), `_min` and `_max`,
+  `_mode` for a choice between methods.
+* Internal code (setup lists, the C++ model view, equations) keeps the
+  symbols, so it reads like the specification.
 
 R code follows the tidyverse style guide (apply with `Rscript dev/style.R`), checked by
 `lintr` with a 100-character line limit. C++ follows `.clang-format`

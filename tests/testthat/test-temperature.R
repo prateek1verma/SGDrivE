@@ -45,14 +45,17 @@ test_that("development stops below T_L with the default floor and not with gp201
 })
 
 test_that("functions use the supplied parameters", {
-  p <- sg_params(X_pre = 122)
+  p <- sg_params(dd_scale_preoviposition = 122)
   expect_equal(sg_degree_days(27.2, p), 2 * sg_degree_days(27.2, sg_params()))
-  expect_equal(sg_temp_mortality(27.2, sg_params(p_A0 = 0.01), type = "proportion"), 0.01)
+  expect_equal(
+    sg_temp_mortality(27.2, sg_params(adult_mortality_min = 0.01), type = "proportion"),
+    0.01
+  )
 })
 
 test_that("functions are vectorised and validate input", {
   expect_length(sg_degree_days(1:10), 10)
   expect_error(sg_degree_days("20"), "must be numeric")
-  expect_error(sg_degree_days(20, p = list()), "sg_params object")
+  expect_error(sg_degree_days(20, params = list()), "sg_params object")
   expect_error(sg_temp_mortality(20, type = "rate"), "should be one of")
 })

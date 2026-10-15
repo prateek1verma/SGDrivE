@@ -25,7 +25,7 @@ population can grow at a temperature only where R0 > 1.
 \details{
 The same quantity defines the constant-temperature equilibrium
 (\code{\link[=sg_init]{sg_init()}} with \code{method = "equilibrium"}, model specification section
-11). The Allee effect (\code{h_M > 0}) is not included: with it, mating fails
+11). The Allee effect (\code{male_density_half_mating > 0}) is not included: with it, mating fails
 at very low densities.
 }
 \examples{

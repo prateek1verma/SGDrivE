@@ -140,13 +140,13 @@ population is large enough to persist:
 check_model(mod_1000)
 ```
 
-The wound density sets the population size. `calibrate_H()` finds the
+The wound density sets the population size. `calibrate_wound_density()` finds the
 density that gives a target, by default the mean adult density over the
 model's forcing period:
 
 ```{r calibrate, eval = requireNamespace("MGDrivE", quietly = TRUE)}
 wx_1971 <- sg_forcing(sg_example_weather(), p, start = "1971-01-01", end = "1971-12-31")
-cal <- calibrate_H(sg_model(p, cube, wx_1971), target = 100) # adults per km^2
+cal <- calibrate_wound_density(sg_model(p, cube, wx_1971), target = 100) # adults per km^2
 cal
 ```
 

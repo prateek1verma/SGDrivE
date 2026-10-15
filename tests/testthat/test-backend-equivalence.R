@@ -23,7 +23,7 @@ scenarios <- list(
     releases = sg_releases("S", "adult", "male", times = weekly, number = 200)
   ),
   "instant mating, releases of every kind" = list(
-    p = sg_params(mating = "instant"), cube = sg_cube(sg_test_cube_mendelian()),
+    p = sg_params(mating_mode = "instant"), cube = sg_cube(sg_test_cube_mendelian()),
     releases = c(
       sg_releases("aa", "adult", "both", times = c(3, 17), number = 30),
       sg_releases("Aa", "pupa", times = 9, number = 12),
@@ -31,22 +31,26 @@ scenarios <- list(
     )
   ),
   "all adults search, Allee effect" = list(
-    p = sg_params(search_denominator = "all_adults", h_M = 2), cube = sg_cube(sit_raw),
+    p = sg_params(wound_competitors = "all_adults", male_density_half_mating = 2),
+    cube = sg_cube(sit_raw),
     releases = sg_releases("S", "adult", "male", times = weekly, number = 100)
   ),
   "larval crowding, large egg release" = list(
-    p = sg_params(larval_dd = "per_wound", gamma_L = 0.01),
+    p = sg_params(larval_crowding_mode = "per_wound", larval_crowding_coef = 0.01),
     cube = sg_cube(sg_test_cube_wild()),
     releases = sg_releases("W", "egg", times = 10, number = 1e5)
   ),
   "genotype lifespan costs" = list(
-    p = sg_params(X_rec = 24, X_mat = 15),
-    cube = sg_cube(sg_test_cube_sit(), ell = c(W = 1, S = 0.25)),
+    p = sg_params(female_receptive_age_dd = 24, male_mature_age_dd = 15),
+    cube = sg_cube(sg_test_cube_sit(), lifespan_fraction = c(W = 1, S = 0.25)),
     init = function(m) sg_init(m, genotypes = c(W = 0.5, S = 0.5))
   ),
   "gp2014 preset" = list(p = sg_params(preset = "gp2014"), cube = sg_cube(sg_test_cube_wild())),
   "custom sub-stages, background and moisture mortality" = list(
-    p = sg_params(n_E = 1, n_L = 2, n_P = 3, n_A = 4, mu_b_F = 0.1, mu_W = 0.2),
+    p = sg_params(
+      egg_substages = 1, larva_substages = 2, pupa_substages = 3, adult_substages = 4,
+      female_background_mortality = 0.1, pupa_drought_mortality = 0.2
+    ),
     cube = sg_cube(sg_test_cube_mendelian())
   )
 )
@@ -56,7 +60,7 @@ if (requireNamespace("MGDrivE", quietly = TRUE)) {
     releases = sg_releases("HH", "adult", "male", times = c(1, 15), number = 20)
   )
   scenarios[["sex-linked X-shredder"]] <- list(
-    p = sg_params(egg_temperature = "host"), cube = sg_cube(MGDrivE::cubeXShredderY())
+    p = sg_params(egg_temp_source = "host"), cube = sg_cube(MGDrivE::cubeXShredderY())
   )
 }
 

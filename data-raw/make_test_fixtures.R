@@ -28,7 +28,7 @@ grid <- data.frame(
   temp_mortality = legacy$gp_temp_mortality(temp, gp),
   temp_survival = legacy$gp_temp_survival(temp, gp),
   egg_viability = legacy$gp_egg_viability(temp, gp),
-  ovip_scalar = legacy$gp_ff_temperature(temp, gp$TL, gp$TU_ovip)
+  ovip_scalar = legacy$gp_ff_temperature(temp, gp$TL, gp$oviposition_temp_max)
 )
 utils::write.csv(grid, file.path(fix_dir, "gp2014_temperature_grid.csv"), row.names = FALSE)
 

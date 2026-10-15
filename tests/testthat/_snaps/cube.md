@@ -1,7 +1,7 @@
 # print() summarises the cube
 
     Code
-      print(sg_cube(raw, ell = c(W = 1, S = 0.52)))
+      print(sg_cube(raw, lifespan_fraction = c(W = 1, S = 0.52)))
     Output
       <sg_cube> 2 genotypes
         genotypes: W S

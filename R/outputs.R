@@ -124,7 +124,7 @@ sg_allele_freq <- function(sim, stages = "adults", alleles = NULL) {
 #'     \item{`females`}{All adult females (unmated and mated).}
 #'     \item{`unmated`, `mated`}{Unmated and mated females.}
 #'     \item{`wild_type`}{Females of the wild-type genotype(s).}
-#'     \item{`egg_laying`}{Mated females old enough to lay eggs (X_ovi).}
+#'     \item{`egg_laying`}{Mated females old enough to lay eggs (`oviposition_age_dd`).}
 #'     \item{`fertile_equivalent`}{Mated females weighted by the viability of
 #'       their cross (viable eggs per egg relative to wild type x wild type):
 #'       a female mated to a sterile male counts 0, one with half the viable
@@ -266,7 +266,7 @@ sg_cases <- function(sim, period = c("day", "week", "month", "year"), per = c("k
   laying <- model$adult$female$flags$X_ovi
   if (is.null(laying)) laying <- rep(TRUE, model$dims$n_A)
   list(
-    area = model$area, H = model$params$H, genotypes = cb$genotypes,
+    area = model$area, H = model$params$wound_density, genotypes = cb$genotypes,
     wild_type = cb$wild_type, laying = as.logical(laying), viability = cb$egg_total
   )
 }

@@ -34,7 +34,7 @@ test_that("simulate_cb() returns replicate arrays and metadata", {
   for (r in 1:3) expect_identical(flow_error(sim, r), 0)
   expect_identical(sim$meta$seed, 1L)
   expect_identical(dim(sim$meta$streams), c(7L, 3L))
-  expect_identical(sim$meta$oviposition, "batches")
+  expect_identical(sim$meta$oviposition_mode, "batches")
   expect_identical(sim$meta$model_hash, mod$meta$hash)
   expect_false(identical(sim$state[, , 1], sim$state[, , 2])) # replicates differ
 })

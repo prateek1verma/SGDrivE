@@ -4,31 +4,32 @@
 \alias{sg_omega_to_ell}
 \title{Convert MGDrivE v1 lifespan modifiers to lifespan fractions}
 \usage{
-sg_omega_to_ell(omega, mu_ref)
+sg_omega_to_ell(omega, reference_mortality)
 }
 \arguments{
 \item{omega}{Numeric vector of MGDrivE v1 omega values (>= 0; daily
-survival multipliers, so \code{(1 - mu_ref) * omega} must be below 1).}
+survival multipliers, so \code{(1 - reference_mortality) * omega} must be below 1).}
 
-\item{mu_ref}{Daily adult mortality probability in (0, 1) used when the
+\item{reference_mortality}{Daily adult mortality probability in (0, 1) used when the
 omega values were computed.}
 }
 \value{
-Numeric vector of lifespan fractions l = mu_ref /
-(1 - omega (1 - mu_ref)), with omega = 0 mapped to 0.001 (D-002). Names
+Numeric vector of lifespan fractions l = mu /
+(1 - omega (1 - mu)) with mu = \code{reference_mortality}, with omega = 0 mapped to 0.001
+(D-002). Names
 are kept.
 }
 \description{
 Inverts \code{MGDrivE::calcOmega()}: given the omega values of a cube and the
-daily adult mortality \code{mu_ref} used to compute them, returns the fraction
+daily adult mortality \code{reference_mortality} used to compute them, returns the fraction
 of the wild-type adult lifespan retained by each genotype.
 }
 \examples{
-sg_omega_to_ell(c(1, 0.9418, 0), mu_ref = 0.055)
+sg_omega_to_ell(c(1, 0.9418, 0), reference_mortality = 0.055)
 if (requireNamespace("MGDrivE", quietly = TRUE)) {
   # round trip: calcOmega(mu, L) -> L
   om <- MGDrivE::calcOmega(mu = 0.055, lifespanReduction = 0.5)
-  sg_omega_to_ell(om, mu_ref = 0.055)
+  sg_omega_to_ell(om, reference_mortality = 0.055)
 }
 }
 \seealso{

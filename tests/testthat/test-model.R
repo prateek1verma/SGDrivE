@@ -55,7 +55,7 @@ test_that("state index arguments are checked", {
 
 test_that("adult chains follow D-018 and genotype lifespans", {
   raw <- sg_test_cube_sit(omega_s = 1)
-  cb <- sg_cube(raw, ell = c(W = 1, S = 0.25))
+  cb <- sg_cube(raw, lifespan_fraction = c(W = 1, S = 0.25))
   m <- sg_model(p, cb, wx)
   expect_identical(m$adult$female$segment_counts, c(3L, 7L))
   expect_identical(m$adult$male$segment_counts, 10L)
@@ -66,25 +66,31 @@ test_that("adult chains follow D-018 and genotype lifespans", {
 })
 
 test_that("instant mating drops the receptivity boundary", {
-  m <- sg_model(sg_params(mating = "instant"), cube3, sg_forcing(
+  m <- sg_model(sg_params(mating_mode = "instant"), cube3, sg_forcing(
     sg_example_weather()[1:30, ],
-    sg_params(mating = "instant")
+    sg_params(mating_mode = "instant")
   ))
   expect_named(m$adult$female$thresholds, "X_ovi")
-  pr <- sg_params(X_rec = 24)
+  pr <- sg_params(female_receptive_age_dd = 24)
   m2 <- sg_model(pr, cube3, sg_forcing(sg_example_weather()[1:30, ], pr))
   expect_identical(m2$adult$female$segment_counts, c(1L, 2L, 7L))
 })
 
 test_that("adult_substages overrides the allocation", {
-  m <- sg_model(p, cube3, wx, adult_substages = list(female = c(5, 5), male = 10))
+  m <- sg_model(p, cube3, wx, adult_segment_substages = list(female = c(5, 5), male = 10))
   expect_identical(m$adult$female$segment_counts, c(5L, 5L))
-  expect_error(sg_model(p, cube3, wx, adult_substages = list(fem = 1)), "female` and/or `male")
-  expect_error(sg_model(p, cube3, wx, adult_substages = list(female = c(5, 6))), "sum to n_A")
+  expect_error(
+    sg_model(p, cube3, wx, adult_segment_substages = list(fem = 1)),
+    "female` and/or `male"
+  )
+  expect_error(
+    sg_model(p, cube3, wx, adult_segment_substages = list(female = c(5, 6))),
+    "sum to adult_substages"
+  )
 })
 
 test_that("counts per node use the node area", {
-  m <- sg_model(sg_params(H = 5, h_M = 2), cube3, wx, area = 25)
+  m <- sg_model(sg_params(wound_density = 5, male_density_half_mating = 2), cube3, wx, area = 25)
   expect_identical(m$counts$H, 125)
   expect_identical(m$counts$h_M, 50)
   expect_error(sg_model(p, cube3, wx, area = 0), "positive number")
@@ -111,9 +117,13 @@ test_that("release events map to the first sub-stage of their block", {
 })
 
 test_that("the forcing must be built with the same parameters", {
-  p2 <- sg_params(T_opt = 27)
-  expect_error(sg_model(p2, cube3, wx), "T_opt \\(forcing 27.2, params 27\\).*sg_forcing")
-  expect_no_error(sg_model(sg_params(R = 50), cube3, wx)) # R does not affect the forcing
+  p2 <- sg_params(optimal_survival_temp = 27)
+  expect_error(
+    sg_model(p2, cube3, wx),
+    "optimal_survival_temp \\(forcing 27.2, params 27\\).*sg_forcing"
+  )
+  # eggs_per_day_max does not affect the forcing
+  expect_no_error(sg_model(sg_params(eggs_per_day_max = 50), cube3, wx))
 })
 
 test_that("input objects are checked", {
@@ -132,14 +142,14 @@ test_that("the hash is stable for identical inputs and changes with any input", 
   rel <- sg_releases("aa", "adult", "male", times = 5, number = 10)
   h1 <- sg_model(p, cube3, wx, rel)$meta$hash
   expect_identical(sg_model(p, cube3, wx, rel)$meta$hash, h1)
-  expect_false(identical(sg_model(sg_params(R = 50), cube3, wx, rel)$meta$hash, h1))
+  expect_false(identical(sg_model(sg_params(eggs_per_day_max = 50), cube3, wx, rel)$meta$hash, h1))
   expect_false(identical(sg_model(p, cube3, wx, rel, area = 2)$meta$hash, h1))
   expect_false(identical(sg_model(p, cube3, wx)$meta$hash, h1))
 })
 
 test_that("print() summarises the model", {
   rel <- sg_releases("aa", "adult", "male", times = seq(60, by = 7, length.out = 10), number = 500)
-  cb <- sg_cube(sg_test_cube_mendelian(), ell = c(AA = 1, Aa = 1, aa = 0.25))
+  cb <- sg_cube(sg_test_cube_mendelian(), lifespan_fraction = c(AA = 1, Aa = 1, aa = 0.25))
   m <- sg_model(p, cb, wx, rel)
   out <- capture.output(print(m))
   expect_match(out[1], "^<sg_model> 207 states; 3 genotypes; 365 days")

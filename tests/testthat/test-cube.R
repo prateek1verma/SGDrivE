@@ -102,30 +102,33 @@ test_that("sg_omega_to_ell() inverts MGDrivE::calcOmega() exactly", {
 
 test_that("sg_omega_to_ell() handles omega = 0, 1 and invalid input", {
   expect_identical(sg_omega_to_ell(c(a = 1, b = 0), 0.055), c(a = 1, b = 0.001))
-  expect_error(sg_omega_to_ell(1, 0), "mu_ref")
-  expect_error(sg_omega_to_ell(1, 1), "mu_ref")
-  expect_error(sg_omega_to_ell(1, c(0.1, 0.2)), "mu_ref")
+  expect_error(sg_omega_to_ell(1, 0), "reference_mortality")
+  expect_error(sg_omega_to_ell(1, 1), "reference_mortality")
+  expect_error(sg_omega_to_ell(1, c(0.1, 0.2)), "reference_mortality")
   expect_error(sg_omega_to_ell(-1, 0.1), ">= 0")
   expect_error(sg_omega_to_ell(1.2, 0.1), "no adult ever dies")
 })
 
-test_that("cube omega is converted with mu_ref, and mu_ref is required", {
+test_that("cube omega is converted with reference_mortality, which is required", {
   raw <- sg_test_cube_sit(omega_s = 0.9417989)
-  expect_error(sg_cube(raw), "give `mu_ref`")
-  cb <- sg_cube(raw, mu_ref = 0.055)
+  expect_error(sg_cube(raw), "give `reference_mortality`")
+  cb <- sg_cube(raw, reference_mortality = 0.055)
   expect_identical(cb$ell_source, "omega")
   expect_identical(cb$mu_ref, 0.055)
   expect_equal(unname(cb$ell), c(1, 0.5), tolerance = 1e-6)
 })
 
 test_that("user-given ell is used as is and overrides omega with a warning", {
-  expect_identical(sg_cube(sg_test_cube_sit(), ell = c(S = 0.5, W = 1))$ell, c(W = 1, S = 0.5))
+  expect_identical(
+    sg_cube(sg_test_cube_sit(), lifespan_fraction = c(S = 0.5, W = 1))$ell,
+    c(W = 1, S = 0.5)
+  )
   raw <- sg_test_cube_sit(omega_s = 0.5)
-  expect_warning(cb <- sg_cube(raw, ell = c(1, 0.7)), "omega values are not used")
+  expect_warning(cb <- sg_cube(raw, lifespan_fraction = c(1, 0.7)), "omega values are not used")
   expect_identical(cb$ell_source, "user")
   expect_identical(unname(cb$ell), c(1, 0.7))
-  expect_error(sg_cube(sg_test_cube_sit(), ell = c(1, 0)), "must be > 0")
-  expect_error(sg_cube(sg_test_cube_sit(), ell = 1), "one value per genotype")
+  expect_error(sg_cube(sg_test_cube_sit(), lifespan_fraction = c(1, 0)), "must be > 0")
+  expect_error(sg_cube(sg_test_cube_sit(), lifespan_fraction = 1), "one value per genotype")
 })
 
 # ---- invalid cubes -----------------------------------------------------------------
@@ -203,6 +206,6 @@ test_that("print() summarises the cube", {
   raw <- sg_test_cube_sit(residual = 1.2e-8)
   raw$eta[, "S"] <- 0.35
   raw$s["S"] <- 2.3e-7
-  expect_snapshot(print(sg_cube(raw, ell = c(W = 1, S = 0.52))))
+  expect_snapshot(print(sg_cube(raw, lifespan_fraction = c(W = 1, S = 0.52))))
   expect_invisible(print(sg_cube(sg_test_cube_sit())))
 })

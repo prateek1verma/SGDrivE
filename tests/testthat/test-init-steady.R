@@ -14,9 +14,12 @@ const_weather <- function(temp, days = 40) {
 
 test_that("the equilibrium is a fixed point of the ODE at that temperature", {
   settings <- list(
-    sg_params(), sg_params(larval_dd = "per_wound", gamma_L = 0.05), sg_params(h_M = 3),
-    sg_params(mating = "instant", search_denominator = "all_adults"),
-    sg_params(preset = "gp2014"), sg_params(X_rec = 20, mu_b_F = 0.05)
+    sg_params(),
+    sg_params(larval_crowding_mode = "per_wound", larval_crowding_coef = 0.05),
+    sg_params(male_density_half_mating = 3),
+    sg_params(mating_mode = "instant", wound_competitors = "all_adults"),
+    sg_params(preset = "gp2014"),
+    sg_params(female_receptive_age_dd = 20, female_background_mortality = 0.05)
   )
   for (pp in settings) {
     for (temp in c(22, 29)) {

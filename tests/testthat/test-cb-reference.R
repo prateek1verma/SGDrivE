@@ -30,10 +30,19 @@ test_that("a very short deterministic step reproduces the ODE derivatives and fl
   h <- 1e-6
   cases <- list(
     list(sg_params(), sg_cube(sg_test_cube_mendelian())),
-    list(sg_params(mating = "instant", h_M = 2), sg_cube(sg_test_cube_mendelian())),
-    list(sg_params(larval_dd = "per_wound", gamma_L = 0.05), sg_cube(sit_raw)),
-    list(sg_params(search_denominator = "all_adults", X_rec = 20), sg_cube(sit_raw)),
-    list(sg_params(), sg_cube(sg_test_cube_sit(), ell = c(W = 1, S = 0.25)))
+    list(
+      sg_params(mating_mode = "instant", male_density_half_mating = 2),
+      sg_cube(sg_test_cube_mendelian())
+    ),
+    list(
+      sg_params(larval_crowding_mode = "per_wound", larval_crowding_coef = 0.05),
+      sg_cube(sit_raw)
+    ),
+    list(
+      sg_params(wound_competitors = "all_adults", female_receptive_age_dd = 20),
+      sg_cube(sit_raw)
+    ),
+    list(sg_params(), sg_cube(sg_test_cube_sit(), lifespan_fraction = c(W = 1, S = 0.25)))
   )
   for (cs in cases) {
     m <- mk(cs[[1]], cs[[2]])
@@ -87,13 +96,16 @@ test_that("stochastic runs give whole, non-negative counts with exact flow accou
 
 test_that("the mean of a stochastic step is the deterministic step", {
   settings <- list(
-    list(mating = "rate", oviposition = "batches"),
-    list(mating = "instant", oviposition = "eggs"),
-    list(mating = "rate", oviposition = "batches", clutch_size = 250)
+    list(mating_mode = "rate", oviposition_mode = "batches"),
+    list(mating_mode = "instant", oviposition_mode = "eggs"),
+    list(mating_mode = "rate", oviposition_mode = "batches", clutch_size = 250)
   )
   for (st in settings) {
     mating <- paste(unlist(st), collapse = " ")
-    p <- do.call(sg_params, c(st, list(larval_dd = "per_wound", gamma_L = 0.01)))
+    p <- do.call(sg_params, c(
+      st,
+      list(larval_crowding_mode = "per_wound", larval_crowding_coef = 0.01)
+    ))
     m <- mk(p, sg_cube(sit_raw), area = 1000) # wounds do not limit laying
     s <- setup(m)
     set.seed(5)
@@ -128,7 +140,7 @@ test_that("batches give the variance of egg masses, single eggs Poisson variance
     expect_equal(mean(e), det, tolerance = 0.08)
     list(ratio = stats::var(e) / mean(e), clutch = 90 * info$phi_ov)
   }
-  single <- egg_var_ratio(m_of(oviposition = "eggs"))
+  single <- egg_var_ratio(m_of(oviposition_mode = "eggs"))
   expect_gt(single$ratio, 0.85)
   expect_lt(single$ratio, 1.15)
   b <- egg_var_ratio(m_of())
@@ -168,7 +180,7 @@ test_that("unbiased rounding, empty populations and sex-linked cubes", {
 })
 
 test_that("individuals in sub-stages a genotype never reaches only die", {
-  m <- mk(sg_params(), sg_cube(sg_test_cube_sit(), ell = c(W = 1, S = 0.25)))
+  m <- mk(sg_params(), sg_cube(sg_test_cube_sit(), lifespan_fraction = c(W = 1, S = 0.25)))
   s <- setup(m)
   # the female chain of S ends before oviposition (D-018); place virgins
   # beyond it, with no males present so that nobody mates

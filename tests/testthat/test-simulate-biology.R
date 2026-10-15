@@ -40,8 +40,8 @@ sg_test_each_backend("a neutral Mendelian cube stays at Hardy-Weinberg, allele f
 })
 
 sg_test_each_backend("rate mating approaches instant mating as nu grows (S14)", {
-  pr <- sg_params(nu = 1000)
-  pi <- sg_params(mating = "instant")
+  pr <- sg_params(mating_rate = 1000)
+  pi <- sg_params(mating_mode = "instant")
   cube <- sg_cube(sg_test_cube_mendelian())
   # nu = 1000 makes the system deliberately stiff, so keep the window short
   period <- c("1971-05-01", "1971-06-14")
@@ -85,7 +85,7 @@ sg_test_each_backend("sterile male releases divert matings and suppress the wild
 })
 
 sg_test_each_backend("a genotype whose lifespan ends before oviposition never lays (D-018)", {
-  cube <- sg_cube(sg_test_cube_sit(), ell = c(W = 1, S = 0.25))
+  cube <- sg_cube(sg_test_cube_sit(), lifespan_fraction = c(W = 1, S = 0.25))
   m <- sg_model(p, cube, wx90)
   init <- sg_init(m, values = c(M = 1, F = 1), genotypes = c(W = 0.5, S = 0.5))
   sim <- sim_ode(m, init)
@@ -101,7 +101,7 @@ sg_test_each_backend("a genotype whose lifespan ends before oviposition never la
 })
 
 sg_test_each_backend("a shorter lifespan shortens adult survival", {
-  cube <- sg_cube(sg_test_cube_sit(), ell = c(W = 1, S = 0.5))
+  cube <- sg_cube(sg_test_cube_sit(), lifespan_fraction = c(W = 1, S = 0.5))
   m <- sg_model(p, cube, wx90)
   init <- sg_init(m, values = c(M = 1), genotypes = c(W = 0.5, S = 0.5))
   sim <- sim_ode(m, init)

@@ -42,24 +42,26 @@ mk <- function(p, cube, ...) {
 
 cubes <- list(
   wild = sg_cube(sg_test_cube_wild()),
-  sit = sg_cube(sg_test_cube_sit(residual = 1.2e-8), ell = c(W = 1, S = 0.52)),
+  sit = sg_cube(sg_test_cube_sit(residual = 1.2e-8), lifespan_fraction = c(W = 1, S = 0.52)),
   mendelian = sg_cube(sg_test_cube_mendelian()),
-  short_lived = sg_cube(sg_test_cube_sit(), ell = c(W = 1, S = 0.25))
+  short_lived = sg_cube(sg_test_cube_sit(), lifespan_fraction = c(W = 1, S = 0.25))
 )
 
 param_sets <- list(
   default = sg_params(),
-  instant = sg_params(mating = "instant"),
-  all_adults = sg_params(search_denominator = "all_adults"),
-  crowding = sg_params(larval_dd = "per_wound", gamma_L = 0.05),
-  allee = sg_params(h_M = 2),
-  thresholds = sg_params(X_rec = 24, X_mat = 15),
-  background = sg_params(mu_b_F = 0.15, mu_b_M = 0.08),
-  moisture = sg_params(mu_W = 0.2, rain_threshold = 2000),
-  sigma0 = sg_params(sigma0 = 0.05),
-  host_eggs = sg_params(egg_temperature = "host"),
+  instant = sg_params(mating_mode = "instant"),
+  all_adults = sg_params(wound_competitors = "all_adults"),
+  crowding = sg_params(larval_crowding_mode = "per_wound", larval_crowding_coef = 0.05),
+  allee = sg_params(male_density_half_mating = 2),
+  thresholds = sg_params(female_receptive_age_dd = 24, male_mature_age_dd = 15),
+  background = sg_params(female_background_mortality = 0.15, male_background_mortality = 0.08),
+  moisture = sg_params(pupa_drought_mortality = 0.2, drought_free_rainfall = 2000),
+  sigma0 = sg_params(wound_finding_max = 0.05),
+  host_eggs = sg_params(egg_temp_source = "host"),
   gp2014 = sg_params(preset = "gp2014"),
-  custom_stages = sg_params(n_E = 1, n_L = 2, n_P = 3, n_A = 4)
+  custom_stages = sg_params(
+    egg_substages = 1, larva_substages = 2, pupa_substages = 3, adult_substages = 4
+  )
 )
 
 test_that("C++ rates equal R rates for every option and hand-built cube", {
@@ -78,7 +80,7 @@ test_that("C++ rates equal R rates for MGDrivE cubes, including sex-linked ones"
     MGDrivE::cubeReciprocalTranslocations()
   )) {
     cb <- sg_cube(raw)
-    for (p in list(sg_params(), sg_params(mating = "instant", h_M = 1))) {
+    for (p in list(sg_params(), sg_params(mating_mode = "instant", male_density_half_mating = 1))) {
       m <- mk(p, cb)
       expect_rates_equal(m, rand_state(m, seed = cb$n_genotypes), paste(cb$genotypes[1]))
     }
@@ -93,11 +95,11 @@ test_that("C++ rates equal R rates in edge cases", {
   expect_identical(cc$deriv, numeric(m$n_states))
   expect_true(all(cc$counters == 0))
   # no males at all: no mating, instant mating sends females to U
-  for (p in list(sg_params(), sg_params(mating = "instant"))) {
+  for (p in list(sg_params(), sg_params(mating_mode = "instant"))) {
     mm <- mk(p, cubes$mendelian)
     x <- rand_state(mm, 3)
     x[sg_state_index(mm, "M")] <- 0
-    expect_rates_equal(mm, x, paste("no males", p$mating))
+    expect_rates_equal(mm, x, paste("no males", p$mating_mode))
   }
   # males present but rejected by every female (eta = 0)
   raw <- sg_test_cube_sit()
@@ -105,7 +107,13 @@ test_that("C++ rates equal R rates in edge cases", {
   ms <- mk(sg_params(), sg_cube(raw))
   expect_rates_equal(ms, rand_state(ms, 4), "eta zero")
   # minimal chains: one juvenile sub-stage, two adult sub-stages (one per segment)
-  m1 <- mk(sg_params(n_E = 1, n_L = 1, n_P = 1, n_A = 2), cubes$wild)
+  m1 <- mk(
+    sg_params(
+      egg_substages = 1, larva_substages = 1,
+      pupa_substages = 1, adult_substages = 2
+    ),
+    cubes$wild
+  )
   expect_rates_equal(m1, rand_state(m1, 5), "minimal chains")
 })
 

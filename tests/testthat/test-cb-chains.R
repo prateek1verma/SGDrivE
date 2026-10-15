@@ -135,7 +135,7 @@ test_that("degenerate chains are handled", {
 test_that("chains of a real model: adult chains of a short-lived genotype", {
   p <- sg_params()
   # S lives 0.25 x 202.8 = 50.7 dd, ending in the pre-oviposition segment
-  cube <- sg_cube(sg_test_cube_sit(), ell = c(W = 1, S = 0.25))
+  cube <- sg_cube(sg_test_cube_sit(), lifespan_fraction = c(W = 1, S = 0.25))
   m <- sg_model(p, cube, sg_forcing(sg_example_weather(), p, "1971-06-01", "1971-06-30"))
   v <- SGDrivE:::.sg_model_view(m)
   dx <- v$dx[1]

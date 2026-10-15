@@ -79,7 +79,7 @@ with the exact probabilities of the chain over the step, die, mate, lay
 eggs and emerge, with binomial, multinomial and Poisson draws. Arrivals
 during a step (eggs laid, individuals moving on to the next stage,
 emerged adults) are placed at their expected position. Eggs are laid in
-batches by default (\code{oviposition} and \code{clutch_size} in \code{\link[=sg_params]{sg_params()}},
+batches by default (\code{oviposition_mode} and \code{clutch_size} in \code{\link[=sg_params]{sg_params()}},
 D-024). The mean of a step is the deterministic map, which is within
 about 0.5\% of the ODE at \code{dt = 0.1}.
 
@@ -98,7 +98,7 @@ measure of eradication when released insects remain, as with the sterile
 insect technique (\code{NA} if none; also when the population returns later).
 
 \strong{Population size.} Counts are whole individuals per node, so the node
-area matters: with the defaults (1 km^2, H = 5 wounds per km^2) a McAllen
+area matters: with the defaults (1 km^2, \code{wound_density} = 5 wounds per km^2) a McAllen
 population falls below one individual in most winters. Use a larger
 \code{area} in \code{\link[=sg_model]{sg_model()}} for populations that persist.
 }

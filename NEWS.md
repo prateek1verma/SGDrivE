@@ -1,5 +1,16 @@
 # SGDrivE 0.0.0.9000
 
+## Descriptive parameter names (breaking)
+
+* All parameters and several function arguments have descriptive names
+  (D-027), e.g. `X_P` is now `pupa_duration_dd`, `nu` is `mating_rate`, `H`
+  is `wound_density` and `R` is `eggs_per_day_max`; `sg_cube(ell, mu_ref)`
+  is now `sg_cube(lifespan_fraction, reference_mortality)`, `p` is `params`
+  in `sg_forcing()` and the temperature functions, and `calibrate_H()` is
+  `calibrate_wound_density()`. Old names give an error naming the new one;
+  `sg_param_table()` keeps the mathematical symbol of each parameter. Results
+  are unchanged. Entries below use the names of their time.
+
 ## Scenario scripts
 
 * New folder `inst/scenarios/` (installed; `system.file("scenarios",
@@ -45,7 +56,7 @@
   simulation between output days.
 * The solver diagnostic `max_rate` includes the mating rate of unmated
   females (O-007).
-* `calibrate_H()`: the wound density at which a summary of the population
+* `calibrate_wound_density()`: the wound density at which a summary of the population
   (by default the mean adult density over the model's forcing period, per
   km^2) equals a target. Without an Allee effect or releases the population
   is exactly proportional to H, so two model runs suffice (closed form);

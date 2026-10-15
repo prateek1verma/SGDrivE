@@ -56,12 +56,12 @@
 # Oviposition events per wound found (D-024): 1 when a batch is the day's
 # eggs (clutch_size = NA), otherwise R * phi_ov / clutch_size.
 .sg_batch_factor <- function(p, phi_ov) {
-  if (is.na(p$clutch_size)) 1 else p$R * phi_ov / p$clutch_size
+  if (is.na(p$clutch_size)) 1 else p$eggs_per_day_max * phi_ov / p$clutch_size
 }
 
 # Mean eggs per oviposition event (D-024): R * phi_ov unless clutch_size is set.
 .sg_clutch <- function(p, phi_ov) {
-  if (is.na(p$clutch_size)) p$R * phi_ov else p$clutch_size
+  if (is.na(p$clutch_size)) p$eggs_per_day_max * phi_ov else p$clutch_size
 }
 
 # Share of oviposition events with at least one viable egg (D-026): a batch
@@ -133,43 +133,47 @@
   moisture <- f$moisture[day]
 
   # ---- transfer rates (S5, S6) -------------------------------------------------
-  q_e <- s$n_E * dx_egg / p$X_E
-  q_l <- s$n_L / p$tau_L
-  q_p <- s$n_P * dx / p$X_P
+  q_e <- s$n_E * dx_egg / p$egg_duration_dd
+  q_l <- s$n_L / p$larva_duration_days
+  q_p <- s$n_P * dx / p$pupa_duration_dd
   q_f <- dx / s$w_f # [substage, genotype], 0 for classes never reached
   q_m <- dx / s$w_m
 
   # ---- hazards (S7) ------------------------------------------------------------
   l_tot <- sum(lar)
-  mu_l <- -log(p$s_L)
-  if (p$larval_dd == "per_wound" && s$counts$H > 0) {
-    mu_l <- mu_l + p$gamma_L * l_tot / s$counts$H
+  mu_l <- -log(p$larva_survival_daily)
+  if (p$larval_crowding_mode == "per_wound" && s$counts$H > 0) {
+    mu_l <- mu_l + p$larval_crowding_coef * l_tot / s$counts$H
   }
-  mu_p <- mu_t + p$mu_W * (1 - moisture)
-  mu_f <- mu_t + p$mu_b_F
-  mu_m <- mu_t + p$mu_b_M
+  mu_p <- mu_t + p$pupa_drought_mortality * (1 - moisture)
+  mu_f <- mu_t + p$female_background_mortality
+  mu_m <- mu_t + p$male_background_mortality
 
   # ---- wound search and egg production (S8, S9) -------------------------------
   w_lay <- apply(fem[s$laying, , , drop = FALSE], c(2L, 3L), sum) # [mate, genotype]
-  n_s <- if (p$search_denominator == "searching_females") {
+  n_s <- if (p$wound_competitors == "searching_females") {
     sum(w_lay)
   } else {
     sum(mal) + sum(unm) + sum(fem)
   }
   psi <- if (n_s > 0) {
-    p$sigma0 * (1 - exp(-p$a_s * dx * s$counts$H / n_s))
+    p$wound_finding_max * (1 - exp(-p$wound_search_rate * dx * s$counts$H / n_s))
   } else {
-    p$sigma0
+    p$wound_finding_max
   }
   # Rows of the egg tensor run over crosses with the mate genotype varying
   # fastest, which is also the order of the flattened w_lay matrix.
-  births <- p$R * phi_ov * psi * as.vector(crossprod(s$egg_tensor, as.vector(w_lay)))
+  births <- p$eggs_per_day_max * phi_ov * psi * as.vector(crossprod(s$egg_tensor, as.vector(w_lay)))
   names(births) <- s$geno
 
   # ---- male availability and mating (S12) ------------------------------------
   m_bar <- stats::setNames(colSums(mal[s$mature, , drop = FALSE]), s$geno)
   m_tot <- sum(m_bar)
-  g_find <- if (p$h_M > 0) m_tot / (s$counts$h_M + m_tot) else as.numeric(m_tot > 0)
+  g_find <- if (p$male_density_half_mating > 0) {
+    m_tot / (s$counts$h_M + m_tot)
+  } else {
+    as.numeric(m_tot > 0)
+  }
   # preference of females of genotype g for the mature males of genotype m
   pref <- sweep(s$eta, 2L, m_bar, `*`)
   pref_sum <- rowSums(pref)
@@ -185,16 +189,16 @@
   emergence_deaths <- sum(emerge) - sum(in_m) - sum(in_f)
 
   # Mating flux per virgin [substage, genotype] (S12, S14).
-  if (p$mating == "instant") {
+  if (p$mating_mode == "instant") {
     # emerging females mate immediately when a compatible male is present;
     # virgins (from releases or times without males) mate at rate nu
     in_u <- ifelse(mate_ok, 0, in_f)
     in_f_mated <- ifelse(mate_ok, in_f, 0)
-    nu_rate <- matrix(p$nu * g_find, n_a, n_g)
+    nu_rate <- matrix(p$mating_rate * g_find, n_a, n_g)
   } else {
     in_u <- in_f
     in_f_mated <- rep(0, n_g)
-    nu_rate <- outer(p$nu * s$receptive * g_find, rep(1, n_g))
+    nu_rate <- outer(p$mating_rate * s$receptive * g_find, rep(1, n_g))
   }
   nu_rate[, !mate_ok] <- 0
   mating_flux <- nu_rate * unm # [substage, genotype]

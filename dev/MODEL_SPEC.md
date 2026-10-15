@@ -65,7 +65,7 @@ the start of a run).
     Δx(T) = X_pre · max(dx_floor, 24 · r(T))           [dd d⁻¹]
 
 with a = 0.00065, b = 1.75, T_L = 14.5 °C, T_U = 40.5 °C (code; 40 in paper),
-X_pre = 61 dd. `dx_floor` = 0 by default; 0.01 reproduces the Pascal floor of
+X_pre = 61 dd. `dev_rate_floor` (dx_floor) = 0 by default; 0.01 reproduces the Pascal floor of
 0.61 dd/d.
 
 **(S2) Pupal/adult temperature mortality** [GP2014 Eq. 2]
@@ -89,7 +89,7 @@ c_E = 0.00375, p_E0 = 0.3.
 **(S5) Transfer rates** (per sub-stage, d⁻¹)
 
     q_E(t)   = n_E Δx(T) / X_E            X_E = 10 dd       [GP2014 code; D-014]
-               (egg_temperature = "host": q_E = n_E Δx(T_host) / X_E, constant)
+               (`egg_temp_source = "host"`: q_E = n_E Δx(T_host) / X_E, constant)
     q_L      = n_L / τ_L                  τ_L = 6 d         [GP2014 code]
     q_P(t)   = n_P Δx(T) / X_P            X_P = 95 dd       [GP2014]
     q_{g,i}(t) = Δx(T) / w^F_{g,i}  (females),  Δx(T) / w^M_{g,i}  (males)
@@ -207,7 +207,7 @@ F_{g,m,0} ≡ 0. Outflow from the last reached class l_g (S6) is death by old ag
 sub-stages after l_g stay empty.
 A mating female keeps her age class i.
 
-**(S14) Instant-mating switch** `mating = "instant"` [MGDrivE2]: emerging
+**(S14) Instant-mating switch** `mating_mode = "instant"` [MGDrivE2]: emerging
 females go directly to F_{g,m,1} with weights π_{g,m}, or to U_{g,1} only when
 M̄ = 0; U then mates at rate ν once males appear. Equivalent to the limit
 ν → ∞ with X_rec = 0, without stiffness.
@@ -290,7 +290,7 @@ probability Ā_{1,out} of leaving again being kept in sub-stage l. Arrivals of
 a step are added at its end.
 
 **(S17) Eggs.** For each female × mate genotype pair (g, m), with
-T[g,m,k] = s_g · ih[g,m,k] · τ[g,m,k] (S9). With `oviposition = "batches"`
+T[g,m,k] = s_g · ih[g,m,k] · τ[g,m,k] (S9). With `oviposition_mode = "batches"`
 (default, D-024):
 
     B_{g,m}         ~ Poisson(Ψ f W_{g,m} dt)                     oviposition events
@@ -306,7 +306,7 @@ inversion.
 
 with clutch size C = R φ_ov and f = 1 when `clutch_size` is NA (a batch is
 the eggs of one day; Ψ is the daily probability of finding a wound), or
-C = `clutch_size` and f = R φ_ov / C. With `oviposition = "eggs"`:
+C = `clutch_size` and f = R φ_ov / C. With `oviposition_mode = "eggs"`:
 
     N_{g,m}         ~ Poisson(R φ_ov Ψ W_{g,m} Σ_k T[g,m,k] dt)
 
@@ -327,7 +327,7 @@ The mated females move to F_{g,m,i} and then age with all other females
 (S16). ν_{g,i} = 0 when no compatible male is present. Emerged females that
 survive their arrival mate during the rest of the step with probability
 1 − (1 − e^{−ν_{g,1} dt}) / (ν_{g,1} dt) (a uniform arrival time), mates from
-π_{g,·}. With `mating = "instant"` the receptivity flag is not used, and
+π_{g,·}. With `mating_mode = "instant"` the receptivity flag is not used, and
 surviving emerged females are split over mates by Multinomial(π_{g,·}) (to U
 only when no compatible male is present).
 
@@ -412,7 +412,7 @@ follow in M5.
 **Checks and calibration.** R0 (`sg_r0()`, `check_model()`) is the eggs per
 egg at low density of the wild type at the day's or a constant temperature:
 R φ_ov T_ww Ψ₀ W(1), with Ψ₀ = σ₀ and W(1) the egg-laying females per unit
-egg input from the chain steady state (section 11). `calibrate_H()` sets H so
+egg input from the chain steady state (section 11). `calibrate_wound_density()` sets H so
 that a summary of the ODE population after a burn-in (default: mean adult
 density per km² over the forcing period) equals a target; without an Allee
 effect or releases all equations are homogeneous of degree one in (state, H),
@@ -425,20 +425,63 @@ units, sources and the equations that use them, is the parameter table in
 `R/param-table.R`, returned by `sg_param_table()` (D-017). `print(sg_params())`
 shows the current values.
 
-Groups: temperature (T_L, T_U, a_dev, b_dev, dx_floor, T_opt, TU_ovip,
-egg_temperature, T_host); development (X_pre, X_E, tau_L, X_P, X_A); stages
-(n_E = 3, n_L = 6, n_P = 10, n_A = 10); thresholds (X_rec, X_mat and the class
-X_ovi; thresholds define the segmented adult chains, S6); mortality (c_A, p_A0, c_E, p_E0, s_L, mu_b_F, mu_b_M,
-larval_dd, gamma_L, mu_W, rain_threshold, eps_s); reproduction (R, a_s, H,
-sigma0, search_denominator); mating (nu, h_M, mating); numerical
-(ext_threshold).
+The equations of this specification use mathematical symbols; users set
+parameters by descriptive names (D-027). Symbol, name, default and units:
+
+| Symbol | Parameter | Default | Units |
+|---|---|---|---|
+| T_L | `dev_temp_min` | 14.5 | degC |
+| T_U | `dev_temp_decline` | 40.5 | degC |
+| a | `dev_rate_slope` | 0.00065 | h^-1 degC^-1 |
+| b | `dev_decline_steepness` | 1.75 | - |
+| dx_floor | `dev_rate_floor` | 0 | - |
+| T_opt | `optimal_survival_temp` | 27.2 | degC |
+| TU_ovip | `oviposition_temp_max` | 43.5 | degC |
+| egg_temperature | `egg_temp_source` | "ambient" | - |
+| T_host | `host_body_temp` | 38.5 | degC |
+| X_pre | `dd_scale_preoviposition` | 61 | dd |
+| X_E | `egg_duration_dd` | 10 | dd |
+| tau_L | `larva_duration_days` | 6 | d |
+| X_P | `pupa_duration_dd` | 95 | dd |
+| X_A | `adult_lifespan_dd` | 202.8 | dd |
+| n_E | `egg_substages` | 3 | - |
+| n_L | `larva_substages` | 6 | - |
+| n_P | `pupa_substages` | 10 | - |
+| n_A | `adult_substages` | 10 | - |
+| X_ovi | `oviposition_age_dd` | 61 | dd |
+| X_rec | `female_receptive_age_dd` | 0 | dd |
+| X_mat | `male_mature_age_dd` | 0 | dd |
+| c_A | `adult_mortality_curvature` | 0.00036 | degC^-2 |
+| p_A0 | `adult_mortality_min` | 0.0035 | - |
+| c_E | `egg_failure_curvature` | 0.00375 | degC^-2 |
+| p_E0 | `egg_failure_min` | 0.3 | - |
+| s_L | `larva_survival_daily` | 0.95 | - |
+| mu_b,F | `female_background_mortality` | 0 | d^-1 |
+| mu_b,M | `male_background_mortality` | 0 | d^-1 |
+| larval_dd | `larval_crowding_mode` | "none" | - |
+| gamma_L | `larval_crowding_coef` | 0 | d^-1 wound larva^-1 |
+| mu_W | `pupa_drought_mortality` | 0 | d^-1 |
+| rain_threshold | `drought_free_rainfall` | 450 | mm yr^-1 |
+| epsilon_s | `survival_floor` | 1e-05 | - |
+| R | `eggs_per_day_max` | 90 | eggs female^-1 d^-1 |
+| a_s | `wound_search_rate` | 0.001 | dd^-1 |
+| H | `wound_density` | 5 | wounds km^-2 |
+| sigma_0 | `wound_finding_max` | 1 | - |
+| search_denominator | `wound_competitors` | "searching_females" | - |
+| oviposition | `oviposition_mode` | "batches" | - |
+| clutch_size | `clutch_size` | NA | eggs |
+| nu | `mating_rate` | 0.693147 | d^-1 |
+| h_M | `male_density_half_mating` | 0 | males km^-2 |
+| mating | `mating_mode` | "rate" | - |
+| ext_threshold | `extinction_threshold` | 1 | individuals |
 
 Cube-derived quantities (ℓ_g, φ_g, ξ_F,g, ξ_M,g, s_g, η, ih, τ) come from
 `sg_cube()`; the node area A comes from `sg_model()`.
 
 Preset `"gp2014"` (regression configuration of the Gutierrez & Ponti code):
-n_E = n_L = n_P = n_A = 25, X_ovi = 56.784 dd, dx_floor = 0.01,
-search_denominator = "all_adults", mating = "instant".
+all four sub-stage numbers 25, `oviposition_age_dd` = 56.784 dd,
+`dev_rate_floor` = 0.01, `wound_competitors = "all_adults"`,
+`mating_mode = "instant"`.
 
 Values marked "calibrate" in the table (notably H) should be set so the model
 matches target densities (e.g. 7–54 females km⁻² in the field, Gutierrez et

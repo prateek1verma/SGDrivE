@@ -332,7 +332,7 @@ and needs 'deSolve' only when a fallback day occurs.
     in most McAllen winters, so stochastic runs at 1 km² go extinct almost
     every winter. Defaults are kept (ODE regressions); stochastic tests and
     examples use node areas of at least 1000 km²; realistic wound densities
-    are calibrated in M5 (`calibrate_H()`).
+    are calibrated in M5 (`calibrate_wound_density()`).
 
 ---
 
@@ -418,7 +418,7 @@ User decisions for milestone M5:
    bands, extinction confidence intervals and time-to-eradication
    statistics were dropped (user decision): users analyse the raw
    replicate outputs.
-3. **Calibration** (`calibrate_H()`): by default the wound density H is set
+3. **Calibration** (`calibrate_wound_density()`): by default the wound density H is set
    so that the mean adult density over a reference year equals a target
    (adults per km^2, a required argument). With h_M = 0 and no releases all
    equations are homogeneous of degree one in (state, H), so after a burn-in
@@ -436,6 +436,74 @@ mated, wild type, egg-laying, and fertile-equivalent: mated females weighted
 by the viability of their cross relative to wild type x wild type).
 Simulations store the information these need (`meta$info`: area, H,
 genotypes, wild type, laying classes, cross viabilities).
+
+---
+
+## D-027 Descriptive parameter and argument names (Accepted, 2026-10-14)
+
+User-facing parameter names were the symbols of Gutierrez & Ponti (2014)
+(`X_P`, `c_A`, `p_E0`, `a_s`, ...), Greek spellings (`nu`, `sigma0`,
+`gamma_L`) or ad hoc words. At the user's request they are renamed to
+descriptive snake_case names (rules in CONVENTIONS.md), in a clean rename
+before the first release: the old names give an error naming the new one
+(`.sg_param_renames()`), and the symbols remain in the `symbol` column of
+`sg_param_table()`, in the model specification (which tabulates symbol and
+name, section 13) and in internal code. Results are unchanged.
+
+| Former name | New name |
+|---|---|
+| `T_L` | `dev_temp_min` |
+| `T_U` | `dev_temp_decline` |
+| `a_dev` | `dev_rate_slope` |
+| `b_dev` | `dev_decline_steepness` |
+| `dx_floor` | `dev_rate_floor` |
+| `X_pre` | `dd_scale_preoviposition` |
+| `T_opt` | `optimal_survival_temp` |
+| `TU_ovip` | `oviposition_temp_max` |
+| `egg_temperature` | `egg_temp_source` |
+| `T_host` | `host_body_temp` |
+| `X_E` | `egg_duration_dd` |
+| `tau_L` | `larva_duration_days` |
+| `X_P` | `pupa_duration_dd` |
+| `X_A` | `adult_lifespan_dd` |
+| `n_E` | `egg_substages` |
+| `n_L` | `larva_substages` |
+| `n_P` | `pupa_substages` |
+| `n_A` | `adult_substages` |
+| `X_ovi` | `oviposition_age_dd` |
+| `X_rec` | `female_receptive_age_dd` |
+| `X_mat` | `male_mature_age_dd` |
+| `p_A0` | `adult_mortality_min` |
+| `c_A` | `adult_mortality_curvature` |
+| `p_E0` | `egg_failure_min` |
+| `c_E` | `egg_failure_curvature` |
+| `s_L` | `larva_survival_daily` |
+| `mu_b_F` | `female_background_mortality` |
+| `mu_b_M` | `male_background_mortality` |
+| `larval_dd` | `larval_crowding_mode` |
+| `gamma_L` | `larval_crowding_coef` |
+| `mu_W` | `pupa_drought_mortality` |
+| `rain_threshold` | `drought_free_rainfall` |
+| `eps_s` | `survival_floor` |
+| `R` | `eggs_per_day_max` |
+| `H` | `wound_density` |
+| `a_s` | `wound_search_rate` |
+| `sigma0` | `wound_finding_max` |
+| `search_denominator` | `wound_competitors` |
+| `oviposition` | `oviposition_mode` |
+| `nu` | `mating_rate` |
+| `h_M` | `male_density_half_mating` |
+| `mating` | `mating_mode` |
+| `ext_threshold` | `extinction_threshold` |
+
+Function arguments: `sg_cube(ell, mu_ref)` became `lifespan_fraction`,
+`reference_mortality` (also in `sg_omega_to_ell()`); `p` became `params`
+in `sg_forcing()`, `sg_degree_days()`, `sg_temp_mortality()`,
+`sg_egg_viability()`, `sg_ovip_scalar()` and `sg_cold_index()`;
+`sg_model(adult_substages)` became `adult_segment_substages`;
+`calibrate_H()` became `calibrate_wound_density()`, its result field `H`
+became `wound_density`; `simulate_cb()` metadata fields follow the new
+names. Decisions above this one use the former names.
 
 ---
 

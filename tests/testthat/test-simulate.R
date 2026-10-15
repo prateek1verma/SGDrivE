@@ -92,7 +92,7 @@ test_that("output_every thins the stored states but keeps daily counters", {
 })
 
 sg_test_each_backend("init is checked against the model", {
-  m_other <- sg_model(sg_params(R = 50), cube3, wx60)
+  m_other <- sg_model(sg_params(eggs_per_day_max = 50), cube3, wx60)
   expect_error(sim_ode(m3, init = sg_init(m_other)), "different model")
   x <- as.numeric(sg_init(m3))
   sim <- sim_ode(m3, init = x)

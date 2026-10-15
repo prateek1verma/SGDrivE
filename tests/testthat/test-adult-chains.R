@@ -64,7 +64,7 @@ test_that("user-given sub-stages per segment are used and checked", {
   )
   expect_error(
     chain(c(X_ovi = 61), 202.8, 10L, c(W = 1), substages = c(4, 4), sex = "female"),
-    "must sum to n_A = 10"
+    "must sum to adult_substages = 10"
   )
   expect_error(
     chain(c(X_ovi = 61), 202.8, 10L, c(W = 1), substages = c(0, 10), sex = "female"),
@@ -74,7 +74,10 @@ test_that("user-given sub-stages per segment are used and checked", {
 
 test_that("gp2014 preset reproduces the equal-width Gutierrez & Ponti chain", {
   gp <- sg_params(preset = "gp2014")
-  ch <- chain(c(X_ovi = gp$X_ovi), gp$X_A, gp$n_A, c(W = 1), sex = "female")
+  ch <- chain(c(X_ovi = gp$oviposition_age_dd), gp$adult_lifespan_dd, gp$adult_substages,
+    c(W = 1),
+    sex = "female"
+  )
   expect_identical(ch$segment_counts, c(7L, 18L))
   expect_equal(unname(ch$width["W", ]), rep(202.8 / 25, 25), tolerance = 1e-12)
   expect_identical(which(ch$flags$X_ovi)[1], 8L) # laying from class 8, as in the Pascal code

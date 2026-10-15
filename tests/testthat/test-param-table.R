@@ -38,15 +38,16 @@ test_that("table text is ASCII only (portability)", {
 
 test_that("default sub-stage numbers do not exceed 10 (D-003)", {
   d <- SGDrivE:::.sg_param_defaults()
-  expect_true(all(unlist(d[c("n_E", "n_L", "n_P", "n_A")]) <= 10L))
+  stage_n <- d[c("egg_substages", "larva_substages", "pupa_substages", "adult_substages")]
+  expect_true(all(unlist(stage_n) <= 10L))
 })
 
 test_that("key defaults match the model specification", {
   d <- SGDrivE:::.sg_param_defaults()
-  expect_identical(d$nu, log(2))
-  expect_identical(d$h_M, 0)
-  expect_identical(d$search_denominator, "searching_females")
-  expect_identical(d$X_pre, 61)
-  expect_identical(d$X_A, 202.8)
-  expect_identical(d$R, 90)
+  expect_identical(d$mating_rate, log(2))
+  expect_identical(d$male_density_half_mating, 0)
+  expect_identical(d$wound_competitors, "searching_females")
+  expect_identical(d$dd_scale_preoviposition, 61)
+  expect_identical(d$adult_lifespan_dd, 202.8)
+  expect_identical(d$eggs_per_day_max, 90)
 })

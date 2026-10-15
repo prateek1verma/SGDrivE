@@ -31,8 +31,8 @@ scenarios <- list(
   "SIT, weekly releases" = mk(
     sg_params(), sit, sg_releases("S", "adult", "male", times = seq(1, 365, by = 7), number = 200)
   ),
-  "larval crowding" = mk(sg_params(larval_dd = "per_wound", gamma_L = 0.05), sg_test_cube_wild()),
-  "instant mating, Allee" = mk(sg_params(mating = "instant", h_M = 2), sg_test_cube_mendelian())
+  "larval crowding" = mk(sg_params(larval_crowding_mode = "per_wound", larval_crowding_coef = 0.05), sg_test_cube_wild()),
+  "instant mating, Allee" = mk(sg_params(mating_mode = "instant", male_density_half_mating = 2), sg_test_cube_mendelian())
 )
 
 rel_err <- function(a, b) if (max(abs(b)) > 0) max(abs(a - b)) / max(abs(b)) else max(abs(a))

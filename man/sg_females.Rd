@@ -18,7 +18,7 @@ runs only) and
 \item{\code{females}}{All adult females (unmated and mated).}
 \item{\code{unmated}, \code{mated}}{Unmated and mated females.}
 \item{\code{wild_type}}{Females of the wild-type genotype(s).}
-\item{\code{egg_laying}}{Mated females old enough to lay eggs (X_ovi).}
+\item{\code{egg_laying}}{Mated females old enough to lay eggs (\code{oviposition_age_dd}).}
 \item{\code{fertile_equivalent}}{Mated females weighted by the viability of
 their cross (viable eggs per egg relative to wild type x wild type):
 a female mated to a sterile male counts 0, one with half the viable

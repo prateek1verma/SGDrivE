@@ -11,23 +11,25 @@
 #'   temperature, development and mortality parameters as `params`.
 #' @param releases Optional `sg_releases` object ([sg_releases()]).
 #' @param area Node area in km^2 (> 0; default 1, so counts equal densities
-#'   numerically; D-009). Wound density `H` and the mate-finding
-#'   half-saturation `h_M` (per km^2) and releases given per km^2 are
+#'   numerically; D-009). Wound density `wound_density` and the mate-finding
+#'   half-saturation `male_density_half_mating` (per km^2) and releases given per km^2 are
 #'   converted to counts per node with it.
-#' @param adult_substages Optional list with elements `female` and/or `male`:
+#' @param adult_segment_substages Optional list with elements `female` and/or `male`:
 #'   the number of sub-stages in each segment of that sex's adult chain,
-#'   overriding the proportional allocation (D-018). Each must sum to `n_A`.
-#'   Female segments are delimited by `X_rec` and `X_ovi`, male segments by
-#'   `X_mat` (zero thresholds add no segment); `print()` of a model shows the
+#'   overriding the proportional allocation (D-018). Each must sum to `adult_substages`.
+#'   Female segments are delimited by `female_receptive_age_dd` and
+#'   `oviposition_age_dd`, male segments by `male_mature_age_dd` (zero thresholds add no
+#'   segment); `print()` of a model shows the
 #'   segments.
 #'
 #' @details
 #' **Adult chains** (model specification S6, D-018). Each adult chain is split
 #' at its maturity thresholds into segments with exact mean durations. With
-#' the defaults (n_A = 10, X_ovi = 61 dd, X_rec = X_mat = 0) the female chain
+#' the defaults (`adult_substages` = 10, `oviposition_age_dd` = 61,
+#' `female_receptive_age_dd` = `male_mature_age_dd` = 0) the female chain
 #' has 3 sub-stages before first oviposition and 7 after; the male chain is a
 #' single segment. A genotype with lifespan fraction l_g keeps the same
-#' thresholds in degree-days; only the segment in which its lifespan l_g X_A
+#' thresholds in degree-days; only the segment in which its lifespan l_g `adult_lifespan_dd`
 #' ends changes length. A genotype whose lifespan ends before a threshold
 #' never reaches it (reported by `print()`).
 #'
@@ -48,7 +50,7 @@
 #'   `forcing`, `area`, `dims` (numbers of genotypes, sub-stages, nodes and
 #'   host classes), `adult` (female and male chains), `layout` (one row per
 #'   state block: name, first index, length), `n_states`, `counts` (wound
-#'   number `H`, half-saturation `h_M`, extinction threshold, per node),
+#'   number `H`, half-saturation `h_M`, extinction threshold, per node; internal names),
 #'   `releases` (events with day, state index and count) and `meta`
 #'   (package version and hash).
 #' @seealso [sg_state_index()], [sg_state_names()]
@@ -67,7 +69,7 @@
 #'   head(sg_state_names(mod))
 #' }
 sg_model <- function(params, cube, forcing, releases = NULL, area = 1,
-                     adult_substages = NULL) {
+                     adult_segment_substages = NULL) {
   if (!inherits(params, "sg_params")) {
     .sg_stop("`params` must be an sg_params object; create one with sg_params().")
   }
@@ -82,26 +84,29 @@ sg_model <- function(params, cube, forcing, releases = NULL, area = 1,
     .sg_stop("`area` must be a single positive number (node area in km^2).")
   }
   .sg_check_forcing_params(forcing, params)
-  adult_substages <- .sg_check_adult_substages_arg(adult_substages)
+  adult_segment_substages <- .sg_check_adult_substages_arg(adult_segment_substages)
 
   p <- params
   n_g <- cube$n_genotypes
-  female_thr <- if (p$mating == "instant") {
-    c(X_ovi = p$X_ovi)
+  female_thr <- if (p$mating_mode == "instant") {
+    c(X_ovi = p$oviposition_age_dd)
   } else {
-    c(X_rec = p$X_rec, X_ovi = p$X_ovi)
+    c(X_rec = p$female_receptive_age_dd, X_ovi = p$oviposition_age_dd)
   }
   adult <- list(
-    female = .sg_adult_chain(female_thr, p$X_A, p$n_A, cube$ell,
-      substages = adult_substages$female, sex = "female"
+    female = .sg_adult_chain(female_thr, p$adult_lifespan_dd, p$adult_substages, cube$ell,
+      substages = adult_segment_substages$female, sex = "female"
     ),
-    male = .sg_adult_chain(c(X_mat = p$X_mat), p$X_A, p$n_A, cube$ell,
-      substages = adult_substages$male, sex = "male"
+    male = .sg_adult_chain(c(X_mat = p$male_mature_age_dd),
+      p$adult_lifespan_dd, p$adult_substages, cube$ell,
+      substages = adult_segment_substages$male, sex = "male"
     )
   )
 
   dims <- list(
-    n_genotypes = n_g, n_E = p$n_E, n_L = p$n_L, n_P = p$n_P, n_A = p$n_A,
+    n_genotypes = n_g,
+    n_E = p$egg_substages, n_L = p$larva_substages, n_P = p$pupa_substages,
+    n_A = p$adult_substages,
     n_node = 1L, n_host = 1L
   )
   layout <- .sg_layout(dims)
@@ -116,7 +121,10 @@ sg_model <- function(params, cube, forcing, releases = NULL, area = 1,
     adult = adult,
     layout = layout,
     n_states = n_states,
-    counts = list(H = p$H * area, h_M = p$h_M * area, ext_threshold = p$ext_threshold),
+    counts = list(
+      H = p$wound_density * area, h_M = p$male_density_half_mating * area,
+      ext_threshold = p$extinction_threshold
+    ),
     releases = NULL,
     meta = list(package_version = as.character(utils::packageVersion("SGDrivE")), hash = NA)
   )
@@ -240,7 +248,7 @@ print.sg_model <- function(x, ...) {
   p <- x$params
   cat(sprintf(
     "  node area %s km^2; wounds H = %s per node; mating \"%s\"; search competitors \"%s\"\n",
-    format(x$area), format(x$counts$H), p$mating, p$search_denominator
+    format(x$area), format(x$counts$H), p$mating_mode, p$wound_competitors
   ))
   rel <- x$releases
   if (nrow(rel) > 0L) {
@@ -281,7 +289,7 @@ print.sg_model <- function(x, ...) {
     return(list())
   }
   if (!is.list(x) || is.null(names(x)) || !all(names(x) %in% c("female", "male"))) {
-    .sg_stop("`adult_substages` must be a list with elements `female` and/or `male`.")
+    .sg_stop("`adult_segment_substages` must be a list with elements `female` and/or `male`.")
   }
   x
 }

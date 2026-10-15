@@ -4,7 +4,7 @@
 \alias{sg_cube}
 \title{Read and validate an MGDrivE inheritance cube}
 \usage{
-sg_cube(cube, mu_ref = NULL, ell = NULL)
+sg_cube(cube, reference_mortality = NULL, lifespan_fraction = NULL)
 }
 \arguments{
 \item{cube}{A list with the elements of an MGDrivE v1 cube:
@@ -32,12 +32,12 @@ Per-genotype vectors may be named (they are reordered to \code{genotypesID})
 or unnamed (assumed to be in \code{genotypesID} order). Other list elements
 are ignored.}
 
-\item{mu_ref}{Daily adult mortality (probability, in (0, 1)) that was used
+\item{reference_mortality}{Daily adult mortality (probability, in (0, 1)) that was used
 when the cube's \code{omega} values were computed with
-\code{MGDrivE::calcOmega(mu_ref, L)}. Required when any \code{omega} differs from 1
-and \code{ell} is not given (D-012).}
+\code{MGDrivE::calcOmega(mu, L)}. Required when any \code{omega} differs from 1
+and \code{lifespan_fraction} is not given (D-012).}
 
-\item{ell}{Optional lifespan fractions per genotype (> 0; 1 = wild-type
+\item{lifespan_fraction}{Optional lifespan fractions per genotype (> 0; 1 = wild-type
 lifespan, 0.5 = half), named or in \code{genotypesID} order. When given, the
 cube's \code{omega} is not used.}
 }
@@ -45,7 +45,8 @@ cube's \code{omega} is not used.}
 An object of class \code{sg_cube}: a list with \code{genotypes},
 \code{n_genotypes}, \code{wild_type}, \code{release_type}, \code{ih}, \code{tau}, \code{eta} (n x n),
 per-genotype vectors \code{phi}, \code{xiF}, \code{xiM}, \code{s}, \code{omega} and \code{ell},
-\code{ell_source} (\code{"none"}, \code{"omega"} or \code{"user"}), \code{mu_ref}, \code{egg_tensor}
+\code{ell_source} (\code{"none"}, \code{"omega"} or \code{"user"}), \code{mu_ref} (the reference mortality),
+\code{egg_tensor}
 (n^2 x n) and \code{egg_total} (total viable-egg factor per cross).
 }
 \description{
@@ -57,12 +58,13 @@ unchanged.
 }
 \details{
 \strong{Lifespan fractions.} SGDrivE represents a genotype's effect on adult
-lifespan as a fraction l_g of the wild-type physiological lifespan X_A
+lifespan as a fraction l_g of the wild-type physiological lifespan \code{adult_lifespan_dd}
 (D-002; model specification S5). Temperature mortality is the same for all
 genotypes. MGDrivE v1 cubes instead store omega, a multiplier of daily
-survival. For a cube built with \code{MGDrivE::calcOmega(mu_ref, L)} the exact
+survival. For a cube built with \code{MGDrivE::calcOmega(mu, L)} (mu =
+\code{reference_mortality}) the exact
 inverse is
-\deqn{l_g = mu_ref / (1 - omega_g (1 - mu_ref)),}
+\deqn{l_g = mu / (1 - omega_g (1 - mu)),}
 which recovers L. \code{omega = 0} (immediate death) maps to l_g = 0.001. See
 \code{\link[=sg_omega_to_ell]{sg_omega_to_ell()}}.
 
@@ -85,7 +87,7 @@ if (requireNamespace("MGDrivE", quietly = TRUE)) {
 
   # A cube with a lifespan cost built with calcOmega(0.055, 0.5)
   om <- MGDrivE::calcOmega(mu = 0.055, lifespanReduction = 0.5)
-  cube2 <- sg_cube(MGDrivE::cubeMendelian(omega = c(aa = om)), mu_ref = 0.055)
+  cube2 <- sg_cube(MGDrivE::cubeMendelian(omega = c(aa = om)), reference_mortality = 0.055)
   cube2$ell
 }
 }

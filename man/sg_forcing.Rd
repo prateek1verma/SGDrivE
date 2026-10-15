@@ -4,7 +4,7 @@
 \alias{sg_forcing}
 \title{Daily weather forcing for a simulation}
 \usage{
-sg_forcing(weather, p = sg_params(), start = NULL, end = NULL)
+sg_forcing(weather, params = sg_params(), start = NULL, end = NULL)
 }
 \arguments{
 \item{weather}{A data frame with one row per day and columns:
@@ -18,7 +18,7 @@ moisture index.}
 }
 Gaps must be filled before use, e.g. with \code{\link[=sg_fill_weather]{sg_fill_weather()}}.}
 
-\item{p}{An \code{sg_params} object. Only the temperature, development and
+\item{params}{An \code{sg_params} object. Only the temperature, development and
 mortality constants are used here; \code{\link[=sg_model]{sg_model()}} checks that the model is
 assembled with the same values.}
 
@@ -46,15 +46,15 @@ the start of the series the mean of the available days is used, as in the
 Gutierrez & Ponti code.
 \item \code{dx}: degree-days accumulated (S1), driving pupal and adult ageing.
 \item \code{dx_egg}: degree-days for eggs, equal to \code{dx} when
-\code{egg_temperature = "ambient"} and the constant \code{dx(T_host)} when
-\code{egg_temperature = "host"} (D-014).
+\code{egg_temp_source = "ambient"} and the constant \code{dx(host_body_temp)} when
+\code{egg_temp_source = "host"} (D-014).
 \item \code{mu_T}: pupal/adult temperature mortality rate per day (S2) and \code{p_A},
 the corresponding daily proportion.
 \item \code{egg_viability} and \code{mu_E}, the egg hatch probability and mortality rate
 from the 5-day mean temperature (S3).
 \item \code{phi_ov}: the oviposition temperature scalar (S4).
 \item \code{moisture}: the moisture index I_W in [0, 1] (S7), equal to
-\verb{min(1, annual rainfall / rain_threshold)} for the calendar year, with
+\verb{min(1, annual rainfall / drought_free_rainfall)} for the calendar year, with
 annual rainfall scaled up from incomplete years; 1 (no stress) when there
 is no \code{rain} column.
 }
