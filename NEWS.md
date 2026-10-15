@@ -1,5 +1,16 @@
 # SGDrivE 0.0.0.9000
 
+## Allee threshold
+
+* `sg_init(method = "threshold")` gives the Allee threshold of a wild-type
+  population at a constant temperature: the lower, unstable equilibrium that
+  exists with an Allee effect (`male_density_half_mating > 0`), below which
+  too few females find a mate and the population declines (D-029).
+* Equilibrium and threshold states record `adult_females` in their
+  attribute.
+* New scenario script `inst/scenarios/03_allee_threshold.R`; scenario 02
+  shows how to change parameters in `sg_params()`.
+
 ## Constant temperature and fixed population size
 
 * `sg_constant_weather()` gives daily weather with one temperature, for

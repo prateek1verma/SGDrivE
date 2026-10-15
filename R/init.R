@@ -22,6 +22,12 @@
 #'       search with larval crowding or an Allee effect). Needs a single
 #'       wild-type genotype that breeds true. Gives an empty state, with a
 #'       message, when the population cannot persist at that temperature.}
+#'     \item{`"threshold"`}{The Allee threshold of a wild-type population at
+#'       the constant `temperature`: the lower, unstable equilibrium that
+#'       exists with an Allee effect (`male_density_half_mating > 0`), below
+#'       which too few females find a mate and the population declines
+#'       (D-029). Same requirements as `"equilibrium"`; gives an empty state,
+#'       with a message, when there is no threshold.}
 #'   }
 #' @param values For `"constant"` and `"hardy_weinberg"`: named counts per
 #'   sub-stage for blocks `E` (eggs), `L` (larvae), `P` (pupae), `M` (males),
@@ -43,7 +49,8 @@
 #' @param years For `"burn_in"`: number of years of burn-in (whole number).
 #' @param weather For `"burn_in"`: optional daily weather (as for
 #'   [sg_forcing()]) covering the `years` before the model's start date.
-#' @param temperature For `"equilibrium"`: constant temperature (degC).
+#' @param temperature For `"equilibrium"` and `"threshold"`: constant
+#'   temperature (degC).
 #'   Default: the temperature of the model's forcing, when it is constant
 #'   (e.g. from [sg_constant_weather()]).
 #'
@@ -64,8 +71,9 @@
 #'   (years, weather source, and `start_effect`: the relative difference to
 #'   the same burn-in from a start ten times larger; a warning is given above
 #'   1e-3) or
-#'   `equilibrium` (temperature, eggs per egg at low density `R0`, wound
-#'   search `psi`, eggs laid per day).
+#'   `equilibrium` or `threshold` (temperature, eggs per egg at low density
+#'   `R0`, wound search `psi`, eggs laid per day, `adult_females`: unmated
+#'   plus mated females in the node).
 #' @seealso [sg_model()], [sg_state_names()]
 #' @export
 #' @examples
@@ -93,7 +101,10 @@
 #'   sg_init(mod_71, "burn_in", weather = wx)
 #' }
 sg_init <- function(model,
-                    method = c("constant", "hardy_weinberg", "state", "burn_in", "equilibrium"),
+                    method = c(
+                      "constant", "hardy_weinberg", "state", "burn_in", "equilibrium",
+                      "threshold"
+                    ),
                     values = c(E = 0.25, L = 0.25, P = 0.25, M = 0.125, U = 0, F = 0.125),
                     genotypes = NULL, alleles = NULL, state = NULL,
                     per = c("node", "km2"), years = 1L, weather = NULL, temperature = NULL) {
@@ -101,11 +112,12 @@ sg_init <- function(model,
     .sg_stop("`model` must be an sg_model object; create one with sg_model().")
   }
   method <- .sg_match_choice(
-    method, c("constant", "hardy_weinberg", "state", "burn_in", "equilibrium"), "method"
+    method, c("constant", "hardy_weinberg", "state", "burn_in", "equilibrium", "threshold"),
+    "method"
   )
   per <- .sg_match_choice(per, c("node", "km2"), "per")
 
-  if (method %in% c("burn_in", "equilibrium")) {
+  if (method %in% c("burn_in", "equilibrium", "threshold")) {
     res <- if (method == "burn_in") {
       weights <- if (is.null(alleles)) {
         .sg_init_weights(model, genotypes)
@@ -119,12 +131,15 @@ sg_init <- function(model,
         temperature <- .sg_forcing_constant_temp(model$forcing, model$params)
         if (is.null(temperature)) {
           .sg_stop(
-            "method = \"equilibrium\" needs a `temperature` (degC): the model's forcing ",
+            "method = \"", method, "\" needs a `temperature` (degC): the model's forcing ",
             "does not have one constant temperature."
           )
         }
       }
-      .sg_init_equilibrium(model, temperature)
+      .sg_init_equilibrium(model, temperature,
+        what = paste0("method = \"", method, "\""),
+        root = if (method == "threshold") "lower" else "upper"
+      )
     }
     x <- res$x
     names(x) <- sg_state_names(model)
@@ -158,10 +173,12 @@ print.sg_state <- function(x, ...) {
       b$years, b$source, b$start_effect
     ))
   }
-  e <- attr(x, "equilibrium")
-  if (!is.null(e)) {
+  for (kind in c("equilibrium", "threshold")) {
+    e <- attr(x, kind)
+    if (is.null(e)) next
     cat(sprintf(
-      "  equilibrium at %g degC: R0 = %.3g, wound search %.3g, %.4g eggs per day\n",
+      "  %s at %g degC: R0 = %.3g, wound search %.3g, %.4g eggs per day\n",
+      if (kind == "threshold") "Allee threshold (unstable equilibrium)" else kind,
       e$temperature, e$R0, e$psi, e$eggs_per_day
     ))
   }

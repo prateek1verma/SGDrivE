@@ -84,8 +84,13 @@
 # Without crowding and Allee effect the equilibrium is in closed form:
 # R phi_ov T_ww Psi* W(1) = 1 gives Psi*, Psi* = sigma0 [1 - exp(-a_s dx H /
 # N_s*)] gives N_s*, and B* = N_s* / N_s(1). Otherwise B* is found by a
-# one-dimensional root search (the upper, stable root).
-.sg_init_equilibrium <- function(model, temperature, what = "method = \"equilibrium\"") {
+# one-dimensional root search (the upper, stable root). With an Allee effect
+# egg production per egg falls to zero at low density, so there is also a
+# lower, unstable root: the threshold below which the population declines
+# (root = "lower", D-029).
+.sg_init_equilibrium <- function(model, temperature, what = "method = \"equilibrium\"",
+                                 root = c("upper", "lower")) {
+  root <- match.arg(root)
   ok <- is.numeric(temperature) && length(temperature) == 1L && is.finite(temperature)
   if (!ok) .sg_stop(what, " needs a single `temperature` (degC).")
   w <- .sg_wild_setup(model, what)
@@ -101,13 +106,24 @@
   nonlinear <- crowded || p$male_density_half_mating > 0
   zero <- list(
     x = numeric(s$n_states),
-    info = list(temperature = temperature, R0 = r0, psi = NA_real_, eggs_per_day = 0)
+    info = list(
+      temperature = temperature, R0 = r0, psi = NA_real_, eggs_per_day = 0,
+      adult_females = 0
+    )
   )
   if (!is.finite(r0) || r0 <= 1 || rates$dx <= 0 || s$counts$H <= 0) {
     .sg_message(sprintf(
       "No positive equilibrium at %g degC: eggs per egg at low density R0 = %.3g.",
       temperature, r0
     ))
+    return(zero)
+  }
+  allee <- p$male_density_half_mating > 0 && p$mating_mode == "rate"
+  if (root == "lower" && !allee) {
+    .sg_message(
+      "No Allee threshold: without an Allee effect (male_density_half_mating > 0 with ",
+      "mating_mode = \"rate\") a population of any size grows when R0 > 1."
+    )
     return(zero)
   }
   psi_of <- function(n_s) {
@@ -132,10 +148,12 @@
     n_s0 <- p$wound_search_rate * rates$dx * s$counts$H / (-log(1 - psi0 / p$wound_finding_max))
     b_hi <- log(n_s0 / per_b$N_s)
     while (gap(b_hi) > 0) b_hi <- b_hi + log(10)
+    # a point between the roots (half-decade steps, so that the narrow
+    # positive range of a strong Allee effect is not stepped over)
     b_lo <- b_hi
     tries <- 0L
-    while (gap(b_lo) <= 0 && tries < 60L) {
-      b_lo <- b_lo - log(10)
+    while (gap(b_lo) <= 0 && tries < 120L) {
+      b_lo <- b_lo - log(10) / 2
       tries <- tries + 1L
     }
     if (gap(b_lo) <= 0) {
@@ -145,11 +163,22 @@
       ))
       return(zero)
     }
-    b <- exp(stats::uniroot(gap, c(b_lo, b_hi), tol = 1e-12)$root)
+    if (root == "upper") {
+      b <- exp(stats::uniroot(gap, c(b_lo, b_hi), tol = 1e-12)$root)
+    } else {
+      # below the lower root too few females find a mate (gap < 0)
+      b_min <- b_lo
+      while (gap(b_min) > 0) b_min <- b_min - log(10)
+      b <- exp(stats::uniroot(gap, c(b_min, b_lo), tol = 1e-12)$root)
+    }
     eq <- .sg_eq_given_b(b, s, gi, rates, crowd = TRUE)
     psi <- psi_of(eq$N_s)
   }
-  list(x = eq$x, info = list(temperature = temperature, R0 = r0, psi = psi, eggs_per_day = b))
+  females <- sum(eq$x[c(s$idx$U, s$idx$F)])
+  list(x = eq$x, info = list(
+    temperature = temperature, R0 = r0, psi = psi, eggs_per_day = b,
+    adult_females = females
+  ))
 }
 
 # The wild-type genotype of a model for equilibrium and R0 calculations: one
@@ -197,7 +226,7 @@
     )
   }
   eq <- suppressMessages(.sg_init_equilibrium(model, temperature, what))
-  females <- sum(eq$x[c(sg_state_index(model, "U"), sg_state_index(model, "F"))])
+  females <- eq$info$adult_females
   if (!(females > 0)) {
     .sg_stop(sprintf(
       "%s cannot be reached: no wild-type population persists at %g degC (R0 = %.3g).",

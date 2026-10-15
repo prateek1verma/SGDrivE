@@ -169,3 +169,55 @@ test_that("calibrating the wound density drops the adult_females note", {
   m <- sg_model(p, cube3, sg_forcing(sg_constant_weather(20), p), adult_females = 1000)
   expect_null(ns$.sg_model_with_h(m, 10)$meta$adult_females)
 })
+
+# ---- Allee threshold (D-029) ---------------------------------------------------
+
+test_that("the Allee threshold is the lower, unstable equilibrium", {
+  p <- sg_params(male_density_half_mating = 20)
+  m <- sg_model(p, cube3, sg_forcing(sg_constant_weather(20, days = 730), p), adult_females = 1000)
+  thr <- sg_init(m, "threshold") # temperature from the forcing
+  info <- attr(thr, "threshold")
+  expect_identical(info$temperature, 20)
+  expect_equal(info$adult_females, adult_females_of(m, thr), tolerance = 1e-12)
+  expect_gt(info$adult_females, 0)
+  expect_lt(info$adult_females, 1000)
+  expect_true(any(grepl("Allee threshold", capture.output(print(thr)))))
+  # an equilibrium: the ODE stays there over a few weeks
+  short <- sg_model(p, cube3, sg_forcing(sg_constant_weather(20, days = 20), p), area = m$area)
+  fem <- sg_females(simulate_ode(short, init = sg_init(short, "threshold")))$females
+  expect_lt(max(abs(fem / info$adult_females - 1)), 1e-6)
+  # unstable: just below it the population declines, just above it grows
+  end_from <- function(k) tail(sg_females(simulate_ode(m, init = thr * k))$females, 1)
+  expect_lt(end_from(0.9), 1e-3 * info$adult_females)
+  expect_equal(end_from(1.1), 1000, tolerance = 1e-4)
+})
+
+test_that("the Allee threshold rises in proportion to h_M", {
+  thr_of <- function(h) {
+    p <- sg_params(male_density_half_mating = h)
+    m <- sg_model(p, cube3, sg_forcing(sg_constant_weather(20, days = 30), p), area = 100)
+    attr(sg_init(m, "threshold"), "threshold")$adult_females
+  }
+  t1 <- thr_of(1)
+  expect_equal(thr_of(5) / t1, 5, tolerance = 1e-3)
+  expect_equal(thr_of(20) / t1, 20, tolerance = 1e-3)
+})
+
+test_that("there is no Allee threshold without an Allee effect", {
+  f <- sg_forcing(sg_constant_weather(20, days = 30), sg_params())
+  m <- sg_model(sg_params(), cube3, f)
+  expect_message(x <- sg_init(m, "threshold"), "No Allee threshold")
+  expect_identical(sum(x), 0)
+  expect_identical(attr(x, "threshold")$adult_females, 0)
+  pi <- sg_params(male_density_half_mating = 5, mating_mode = "instant")
+  mi <- sg_model(pi, cube3, sg_forcing(sg_constant_weather(20, days = 30), pi))
+  expect_message(sg_init(mi, "threshold"), "No Allee threshold")
+  # the stable equilibrium is unchanged by the lower-root option
+  p <- sg_params(male_density_half_mating = 5)
+  m5 <- sg_model(p, cube3, sg_forcing(sg_constant_weather(20, days = 30), p))
+  expect_equal(
+    attr(sg_init(m5, "equilibrium"), "equilibrium")$adult_females,
+    attr(sg_init(m, "equilibrium"), "equilibrium")$adult_females,
+    tolerance = 1e-3
+  )
+})

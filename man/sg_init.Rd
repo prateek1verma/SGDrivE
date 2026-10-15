@@ -6,7 +6,8 @@
 \usage{
 sg_init(
   model,
-  method = c("constant", "hardy_weinberg", "state", "burn_in", "equilibrium"),
+  method = c("constant", "hardy_weinberg", "state", "burn_in", "equilibrium",
+    "threshold"),
   values = c(E = 0.25, L = 0.25, P = 0.25, M = 0.125, U = 0, F = 0.125),
   genotypes = NULL,
   alleles = NULL,
@@ -39,6 +40,12 @@ constant \code{temperature} (degC), in closed form (one-dimensional root
 search with larval crowding or an Allee effect). Needs a single
 wild-type genotype that breeds true. Gives an empty state, with a
 message, when the population cannot persist at that temperature.}
+\item{\code{"threshold"}}{The Allee threshold of a wild-type population at
+the constant \code{temperature}: the lower, unstable equilibrium that
+exists with an Allee effect (\code{male_density_half_mating > 0}), below
+which too few females find a mate and the population declines
+(D-029). Same requirements as \code{"equilibrium"}; gives an empty state,
+with a message, when there is no threshold.}
 }}
 
 \item{values}{For \code{"constant"} and \code{"hardy_weinberg"}: named counts per
@@ -68,7 +75,8 @@ type(s).}
 \item{weather}{For \code{"burn_in"}: optional daily weather (as for
 \code{\link[=sg_forcing]{sg_forcing()}}) covering the \code{years} before the model's start date.}
 
-\item{temperature}{For \code{"equilibrium"}: constant temperature (degC).
+\item{temperature}{For \code{"equilibrium"} and \code{"threshold"}: constant
+temperature (degC).
 Default: the temperature of the model's forcing, when it is constant
 (e.g. from \code{\link[=sg_constant_weather]{sg_constant_weather()}}).}
 }
@@ -80,8 +88,9 @@ model. Burn-in and equilibrium states also carry an attribute \code{burn_in}
 (years, weather source, and \code{start_effect}: the relative difference to
 the same burn-in from a start ten times larger; a warning is given above
 1e-3) or
-\code{equilibrium} (temperature, eggs per egg at low density \code{R0}, wound
-search \code{psi}, eggs laid per day).
+\code{equilibrium} or \code{threshold} (temperature, eggs per egg at low density
+\code{R0}, wound search \code{psi}, eggs laid per day, \code{adult_females}: unmated
+plus mated females in the node).
 }
 \description{
 Builds the state vector (counts per node) at the start of a simulation.

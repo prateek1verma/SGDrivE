@@ -399,6 +399,12 @@ follow in M5.
   crowding (μ_L depends on L, solved by a one-dimensional root) or an Allee
   effect (g_find depends on M̄) B* is found by a one-dimensional root
   search, taking the upper (stable) root.
+* `"threshold"` (D-029): with an Allee effect (h_M > 0, mating "rate") egg
+  production per egg, R φ_ov T_ww Ψ W(B)/B, falls to zero as B → 0 because
+  g_find ≈ M̄/(h_M A) → 0, so the same equation has a lower root: the
+  unstable equilibrium (Allee threshold) below which the population
+  declines. At such low density Ψ = σ₀, so the threshold is proportional to
+  h_M. Without an Allee effect there is no threshold (empty state).
 
 ## 12. Outputs (D-026)
 

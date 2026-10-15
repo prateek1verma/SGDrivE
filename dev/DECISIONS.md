@@ -530,6 +530,26 @@ density is changed by calibration.
 
 ---
 
+## D-029 Allee threshold as an initial state (Accepted, 2026-10-15)
+
+With an Allee effect (h_M > 0, mating "rate") the wild-type equilibrium
+equation at constant temperature has two positive roots in the egg input
+B: the stable upper root (D-025) and a lower, unstable root, the Allee
+threshold. `sg_init(method = "threshold")` returns the lower root, found by
+the same one-dimensional search (stepping down from a point between the
+roots, in half-decade steps so a narrow positive range is not missed).
+Without an Allee effect it returns an empty state with a message. At the
+threshold almost all females are unmated (e.g. 1% mated at h_M = 20 males
+km^-2, 20 degC), so the threshold is a property of a sparse population, not
+of a number of adult females alone: a population of the same size taken
+from the upper equilibrium (two thirds mated, with juveniles in the
+pipeline) grows. The demonstration (scenario 03) therefore starts from
+multiples of the threshold state. Because wounds do not limit at such low
+density (Ψ = σ₀), the threshold is proportional to h_M. Equilibrium and
+threshold states record `adult_females` (U + F) in their attribute.
+
+---
+
 ## Open questions
 
 | ID | Question | Current assumption |
