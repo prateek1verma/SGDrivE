@@ -54,6 +54,17 @@ struct RandomDraws {
     }
     return total;
   }
+  // Distinct hosts hit when n batches fall at random on w wounded hosts
+  // (D-030): batch by batch, a new host with probability (w - k) / w; stops
+  // once every host is hit (as in R).
+  double occupancy(double n, double w) {
+    double k = 0.0;
+    for (double i = 0.0; i < n; i += 1.0) {
+      if (k >= w) break;
+      if (R::runif(0.0, 1.0) < (w - k) / w) k += 1.0;
+    }
+    return k;
+  }
   // Multinomial as sequential conditional binomials in category order; the
   // remaining probabilities are summed from the last category (as in R).
   void multinom(double n, const double* prob, int k, double* out, double* rest) {
@@ -76,6 +87,7 @@ struct ExpectedDraws {
   double binom(double n, double p) { return n * p; }
   double pois(double lambda) { return lambda; }
   double ztp_sum(double n, double lambda) { return n * lambda / -std::expm1(-lambda); }
+  double occupancy(double n, double w) { return w > 0.0 ? w * -std::expm1(-n / w) : 0.0; }
   void multinom(double n, const double* prob, int k, double* out, double*) {
     for (int j = 0; j < k; ++j) out[j] = n * prob[j];
   }
@@ -114,14 +126,15 @@ class CbStepper {
   RateKernel kernel_;
   DayRates r_;
   int day_ = 0;
-  ChainAdvance adv_e_, adv_l_, adv_p_, adv_a_;
-  PreparedChain ch_e_, ch_l_, ch_p_;
+  ChainAdvance adv_e_, adv_l_, adv_p_, adv_a_, adv_i_;
+  PreparedChain ch_e_, ch_l_, ch_p_, ch_i_;  // ch_i_: infestation chain (D-030)
   std::vector<PreparedChain> ch_m_, ch_f_;
   // work arrays
   std::vector<double> q_, p_, pbar_;           // chain preparation
   std::vector<double> cur_, nx_;               // state at step start (after mating), new state
   std::vector<double> eggs_, out_e_, out_l_, out_p_, em_m_, em_f_, matings_, ym_;
   std::vector<double> buf_, rest_;             // multinomial output and work
+  std::vector<double> host_i_;                 // [n_I]: infestation chain after moves
 
   void prepare(PreparedChain& ch, ChainAdvance& adv, const double* q, int n, int last,
                double mu);
@@ -220,6 +233,27 @@ void CbStepper::step(double* x, double* flows, D& draws) {
     }
   }
 
+  // ---- hosts (H3, D-030): fertile batches on uninfested wounds infest the
+  // distinct hosts they hit (cases); the rest are superinfestations; then
+  // healing, the infestation chain (end or treatment) and wounding -------------
+  double h_s = 0.0, h_w = 0.0, infested = 0.0, healed = 0.0, ended = 0.0, treated = 0.0;
+  double wounded = 0.0;
+  if (v.host_model) {
+    if (!batches) {  // single eggs: fertile oviposition events drawn for the hosts
+      n_fertile = draws.pois(a.psi * factor * expected_fertile * dt);
+    }
+    h_s = cur_[v.host_offsets[0]];
+    h_w = cur_[v.host_offsets[1]];
+    const double sites = a.sites;
+    const double n_on_w =
+        (sites > 0.0 && n_fertile > 0.0) ? draws.binom(n_fertile, h_w / sites) : 0.0;
+    infested = draws.occupancy(n_on_w, h_w);
+    healed = draws.binom(h_w - infested, 1.0 - std::exp(-v.host_healing * dt));
+    std::fill(host_i_.begin(), host_i_.end(), 0.0);
+    move(cur_.data() + v.host_offsets[2], host_i_.data(), ch_i_, draws, &ended, &treated);
+    wounded = draws.binom(h_s, 1.0 - std::exp(-v.host_wounding * dt));
+  }
+
   // ---- mating (S18), before ageing ------------------------------------------
   std::fill(matings_.begin(), matings_.end(), 0.0);
   const double nu_g = v.nu * a.g_find;
@@ -240,7 +274,8 @@ void CbStepper::step(double* x, double* flows, D& draws) {
   }
 
   // ---- chain moves (S16), block by block in state order ------------------------
-  if (v.larval_per_wound && v.H > 0) {  // the larval hazard depends on crowding
+  // the larval hazard depends on crowding
+  if ((v.larval_per_wound && v.H > 0) || v.larval_per_infested_host) {
     for (int s = 0; s < nL; ++s) q_[s] = r_.q_l;
     prepare(ch_l_, adv_l_, q_.data(), nL, nL, a.mu_l);
   }
@@ -326,7 +361,8 @@ void CbStepper::step(double* x, double* flows, D& draws) {
   int c = 0;
   for (int k = 0; k < ng; ++k) flows[c++] = eggs_[k];
   flows[c++] = batches ? n_batches : a.psi * a.sum_w * factor * dt;  // egg_batches
-  flows[c++] = batches ? n_fertile : a.psi * factor * expected_fertile * dt;  // fertile_batches
+  flows[c++] = (batches || v.host_model) ? n_fertile
+                                          : a.psi * factor * expected_fertile * dt;  // fertile_batches
   double sum_out_e = 0.0, sum_out_l = 0.0;
   for (int g = 0; g < ng; ++g) {
     sum_out_e += out_e_[g];
@@ -342,6 +378,18 @@ void CbStepper::step(double* x, double* flows, D& draws) {
   flows[c++] = sen_m;
   flows[c++] = sen_u;
   flows[c++] = sen_f;
+  if (v.host_model) {  // host flows and new host states (D-030)
+    flows[c++] = wounded;
+    flows[c++] = healed;
+    flows[c++] = infested;
+    flows[c++] = ended;
+    flows[c++] = treated;
+    flows[c++] = n_fertile - infested;  // superinfestations
+    nx_[v.host_offsets[0]] = h_s - wounded + healed + ended + treated;
+    nx_[v.host_offsets[1]] = h_w - infested - healed + wounded;
+    for (int j = 0; j < v.n_I; ++j) nx_[v.host_offsets[2] + j] = host_i_[j];
+    nx_[v.host_offsets[2]] += infested;
+  }
 
   std::copy(nx_.begin(), nx_.end(), x);
 }

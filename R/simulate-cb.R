@@ -92,7 +92,6 @@ simulate_cb <- function(model, init = NULL, n_rep = 1L, dt = 0.1, output_every =
   if (!inherits(model, "sg_model")) {
     .sg_stop("`model` must be an sg_model object; create one with sg_model().")
   }
-  .sg_require_static(model, "simulate_cb()")
   whole <- function(x, lower) {
     is.numeric(x) && length(x) == 1L && is.finite(x) && x >= lower && x == round(x)
   }
@@ -227,15 +226,18 @@ print.sg_sim_cb <- function(x, ...) {
 # ---- internal ------------------------------------------------------------------
 
 # Matrix summing states into totals by block and genotype (mated females
-# over mates): columns "E[g]", ..., "F[g]".
+# over mates): columns "E[g]", ..., "F[g]"; with the host-wound model also
+# "HS[hosts]", "HW[hosts]" and "HI[hosts]" (over infestation sub-stages).
 .sg_totals_matrix <- function(model) {
   nm <- sg_state_names(model)
-  block <- substr(nm, 1L, 1L)
-  geno <- sub("^.\\[([^,|]+).*$", "\\1", nm)
+  host <- grepl("^H[SWI]\\[", nm)
+  block <- ifelse(host, substr(nm, 1L, 2L), substr(nm, 1L, 1L))
+  geno <- ifelse(host, sub("^H.\\[([^,]+).*$", "\\1", nm), sub("^.\\[([^,|]+).*$", "\\1", nm))
   cols <- as.vector(outer(
     model$cube$genotypes, c("E", "L", "P", "M", "U", "F"),
     function(g, b) paste0(b, "[", g, "]")
   ))
+  if (any(host)) cols <- c(cols, paste0(.sg_host_blocks, "[", model$hosts$classes, "]"))
   agg <- matrix(0, length(nm), length(cols), dimnames = list(NULL, cols))
   agg[cbind(seq_along(nm), match(paste0(block, "[", geno, "]"), cols))] <- 1
   agg

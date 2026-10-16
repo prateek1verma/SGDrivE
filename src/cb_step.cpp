@@ -15,9 +15,10 @@ CbStepper::CbStepper(const ModelView& mv, double dt)
       adv_l_(mv.n_L),
       adv_p_(mv.n_P),
       adv_a_(mv.n_A),
+      adv_i_(std::max(1, mv.n_I)),
       ch_m_(mv.n_g),
       ch_f_(mv.n_g) {
-  const int n_max = std::max({mv.n_E, mv.n_L, mv.n_P, mv.n_A, mv.n_g});
+  const int n_max = std::max({mv.n_E, mv.n_L, mv.n_P, mv.n_A, mv.n_g, mv.n_I});
   ch_e_.resize(mv.n_E);
   ch_l_.resize(mv.n_L);
   ch_p_.resize(mv.n_P);
@@ -34,6 +35,8 @@ CbStepper::CbStepper(const ModelView& mv, double dt)
   matings_.assign(static_cast<std::size_t>(mv.n_g) * mv.n_g, 0.0);
   buf_.assign(n_max + 1, 0.0);
   rest_.assign(n_max + 1, 0.0);
+  ch_i_.resize(std::max(1, mv.n_I));
+  host_i_.assign(std::max(1, mv.n_I), 0.0);
 }
 
 // Death and destination probabilities, and the arrival distribution, of one
@@ -80,7 +83,10 @@ void CbStepper::prepare_day(int day) {
   for (int s = 0; s < v.n_E; ++s) q_[s] = r_.q_e;
   prepare(ch_e_, adv_e_, q_.data(), v.n_E, v.n_E, r_.mu_e);
   for (int s = 0; s < v.n_L; ++s) q_[s] = r_.q_l;
-  prepare(ch_l_, adv_l_, q_.data(), v.n_L, v.n_L, v.mu_L0);  // redone per step if crowding
+  // larval hazard without crowding (redone per step with crowding); treated
+  // hosts lose their larvae (D-030)
+  const double mu_l = v.mu_L0 + (v.host_model ? v.host_treatment : 0.0);
+  prepare(ch_l_, adv_l_, q_.data(), v.n_L, v.n_L, mu_l);
   for (int s = 0; s < v.n_P; ++s) q_[s] = r_.q_p;
   prepare(ch_p_, adv_p_, q_.data(), v.n_P, v.n_P, r_.mu_p);
   for (int g = 0; g < v.n_g; ++g) {
@@ -90,6 +96,10 @@ void CbStepper::prepare_day(int day) {
     prepare(ch_m_[g], adv_a_, q_.data(), v.n_A, v.last_m[g], r_.mu_m);
     for (int s = 0; s < v.n_A; ++s) q_[s] = r_.dx * iw_f[s];
     prepare(ch_f_[g], adv_a_, q_.data(), v.n_A, v.last_f[g], r_.mu_f);
+  }
+  if (v.host_model) {  // infestation chain: treatment in the role of the hazard
+    for (int j = 0; j < v.n_I; ++j) q_[j] = v.host_advance;
+    prepare(ch_i_, adv_i_, q_.data(), v.n_I, v.n_I, v.host_treatment);
   }
 }
 
@@ -144,8 +154,10 @@ Rcpp::List sg_cb_step_cpp(const Rcpp::List& view, int day, double dt,
 //   record: logical, length n_days: store the state at the end of that day.
 // Releases are added at the start of their day, then 1/dt steps follow with
 // the day's forcing. The run stops early once every compartment is zero and
-// no release is left (later days stay zero). Returns the states recorded,
-// daily counters, the first day ending with every compartment zero
+// no release is left (later days stay zero); with the host-wound model
+// (D-030) only the fly compartments count for extinction, and the run goes on
+// because the hosts keep changing. Returns the states recorded,
+// daily counters, the first day ending with every fly compartment zero
 // (extinct_day, 0 if none), the first day ending with no individual of the
 // wild-type genotype(s) (wild_extinct_day; mated females by their own
 // genotype; 0 if none) and the number of days simulated.
@@ -235,10 +247,12 @@ Rcpp::List sg_cb_run_cpp(const Rcpp::List& view, const Rcpp::NumericVector& x0,
       for (int i = 0; i < n; ++i) states(row, i) = x[i];
       state_days[row++] = d;
     }
-    const bool empty = std::all_of(x.begin(), x.end(), [](double v) { return v == 0.0; });
+    const int n_fly = mv.host_model ? mv.host_offsets[0] : n;  // fly states come first
+    const bool empty = std::all_of(x.begin(), x.begin() + n_fly, [](double v) { return v == 0.0; });
     if (empty && extinct_day == 0) extinct_day = d;
     if (wild_extinct_day == 0 && (empty || wild_total(x) == 0.0)) wild_extinct_day = d;
-    if (empty && d >= last_release_day) break;  // nothing can happen any more
+    // nothing can happen any more (hosts still change in the host-wound model)
+    if (empty && d >= last_release_day && !mv.host_model) break;
   }
   // days after an early stop stay zero; give them their rows
   for (int d = days_run + 1; d <= n_days; ++d) {

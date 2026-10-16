@@ -25,7 +25,8 @@
       binom = function(n, p) n * p,
       pois = function(lambda) lambda,
       multinom = function(n, prob) n * prob,
-      ztp_sum = function(n, lambda) n * lambda / -expm1(-lambda)
+      ztp_sum = function(n, lambda) n * lambda / -expm1(-lambda),
+      occupancy = function(n, w) if (w > 0) w * -expm1(-n / w) else 0
     ))
   }
   binom <- function(n, p) as.numeric(stats::rbinom(1L, n, p))
@@ -56,6 +57,18 @@
         total <- total + k
       }
       total
+    },
+    # Number of distinct hosts hit when n batches fall at random on w wounded
+    # hosts (host-wound model, D-030, design note 3.6): batch by batch, a
+    # batch hits a host not hit before with probability (w - k) / w; stops
+    # once every host is hit. Never more than w.
+    occupancy = function(n, w) {
+      k <- 0
+      for (i in seq_len(n)) {
+        if (k >= w) break
+        if (stats::runif(1L) < (w - k) / w) k <- k + 1
+      }
+      k
     },
     # sequential conditional binomials in category order (D-022); the sums
     # of the remaining probabilities are accumulated in double precision from
@@ -132,7 +145,13 @@
     }),
     ch_f = lapply(seq_len(s$n_g), function(g) {
       .sg_cb_chain(dx / s$w_f[, g], s$last_f[g], mu[["F"]], dt)
-    })
+    }),
+    # infestation chain of the host-wound model (D-030): treatment in the role
+    # of the hazard; both exits return the host to HS
+    ch_i = if (!is.null(s$hosts)) {
+      h <- s$hosts
+      .sg_cb_chain(rep(h$advance, h$n_I), h$n_I, h$treatment, dt)
+    }
   )
 }
 
@@ -154,6 +173,23 @@
   mal <- matrix(x[s$idx$M], n_a, n_g)
   unm <- matrix(x[s$idx$U], n_a, n_g)
   fem <- array(x[s$idx$F], c(n_a, n_g, n_g)) # [substage, mate, genotype]
+
+  # chain moves of one chain (S16): death in the chain, then destination
+  move <- function(xv, ch) {
+    n <- length(xv)
+    stay <- numeric(n)
+    out <- 0
+    deaths <- 0
+    for (i in seq_len(n)) {
+      if (xv[i] == 0) next
+      d <- draw$binom(xv[i], ch$die[i])
+      dest <- draw$multinom(xv[i] - d, ch$dest[i, i:(n + 1L)])
+      stay[i:n] <- stay[i:n] + dest[-length(dest)]
+      out <- out + dest[length(dest)]
+      deaths <- deaths + d
+    }
+    list(x = stay, out = out, deaths = deaths)
+  }
 
   # ---- eggs (S17), per female x mate pair, split over offspring genotypes:
   # oviposition events (batches, D-024), those with at least one viable egg
@@ -187,6 +223,28 @@
     }
   }
 
+  # ---- hosts (H3, D-030): fertile batches on uninfested wounds infest the
+  # distinct hosts they hit (cases); the rest are superinfestations; then
+  # healing, the infestation chain (end or treatment) and wounding -------------
+  h <- s$hosts
+  if (!is.null(h)) {
+    if (!batches) { # single eggs: fertile oviposition events drawn for the hosts
+      n_fertile <- draw$pois(a$psi * factor * expected_fertile * dt)
+    }
+    h_s <- x[s$idx$HS]
+    h_w <- x[s$idx$HW]
+    h_i <- x[s$idx$HI]
+    sites <- h_w + h$attractiveness * sum(h_i)
+    n_on_w <- if (sites > 0 && n_fertile > 0) draw$binom(n_fertile, h_w / sites) else 0
+    infested <- draw$occupancy(n_on_w, h_w)
+    healed <- draw$binom(h_w - infested, 1 - exp(-h$healing * dt))
+    mi <- move(h_i, info$ch_i)
+    wounded <- draw$binom(h_s, 1 - exp(-h$wounding * dt))
+    new_hi <- mi$x
+    new_hi[1L] <- new_hi[1L] + infested
+    host_flows <- c(wounded, healed, infested, mi$out, mi$deaths, n_fertile - infested)
+  }
+
   # ---- mating (S18), before ageing ------------------------------------------
   nu_i <- if (p$mating_mode == "instant") {
     rep(p$mating_rate * a$g_find, n_a)
@@ -208,21 +266,6 @@
 
   # ---- chain moves (S16): death in the chain, then destination --------------
   ch_l <- .sg_cb_chain(rep(info$q_l, s$n_L), s$n_L, a$mu[["L"]], dt)
-  move <- function(xv, ch) {
-    n <- length(xv)
-    stay <- numeric(n)
-    out <- 0
-    deaths <- 0
-    for (i in seq_len(n)) {
-      if (xv[i] == 0) next
-      d <- draw$binom(xv[i], ch$die[i])
-      dest <- draw$multinom(xv[i] - d, ch$dest[i, i:(n + 1L)])
-      stay[i:n] <- stay[i:n] + dest[-length(dest)]
-      out <- out + dest[length(dest)]
-      deaths <- deaths + d
-    }
-    list(x = stay, out = out, deaths = deaths)
-  }
   # each block in state order: genotype (then mate) slowest, sub-stage fastest
   block_moves <- function(x, chain_of) {
     res <- lapply(seq_len(ncol(x)), function(j) move(x[, j], chain_of(j)))
@@ -324,16 +367,26 @@
   out[s$idx$M] <- as.vector(new_m)
   out[s$idx$U] <- as.vector(new_u)
   out[s$idx$F] <- as.vector(new_f)
+  if (!is.null(h)) {
+    out[s$idx$HS] <- h_s - wounded + healed + mi$out + mi$deaths
+    out[s$idx$HW] <- h_w - infested - healed + wounded
+    out[s$idx$HI] <- new_hi
+  }
 
   flows <- c(
     eggs,
     if (batches) n_batches else a$psi * sum(a$w_lay) * factor * dt, # egg_batches
-    if (batches) n_fertile else a$psi * factor * expected_fertile * dt, # fertile_batches
+    if (batches || !is.null(h)) { # fertile_batches
+      n_fertile
+    } else {
+      a$psi * factor * expected_fertile * dt
+    },
     sum(me$out), sum(ml$out), sum(em_m), sum(em_f),
     sum(mp$out) - sum(em_m) - sum(em_f),
     as.vector(t(matings)),
     c(me$deaths, ml$deaths, mp$deaths, mm$deaths, mu_$deaths, mf$deaths) + arr_deaths,
-    sum(mm$out), sum(mu_$out), sum(mf$out)
+    sum(mm$out), sum(mu_$out), sum(mf$out),
+    if (!is.null(h)) host_flows
   )
   names(flows) <- s$counter_names
   list(x = out, flows = flows)

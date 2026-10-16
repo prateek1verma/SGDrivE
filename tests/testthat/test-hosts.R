@@ -86,9 +86,8 @@ test_that("a full state is checked against the number of hosts", {
   expect_error(sg_init(m, "state", state = x[-1]), "length")
 })
 
-test_that("the stochastic solver and dynamic starts refuse host models until implemented", {
+test_that("dynamic starts and diagnostics refuse host models until implemented", {
   m <- model_of(host_params())
-  expect_error(simulate_cb(m, n_rep = 1, seed = 1), "not available yet for wound_model = \"hosts\"")
   expect_error(sg_init(m, "equilibrium"), "not available yet")
   expect_error(sg_init(m, "threshold"), "not available yet")
   expect_error(check_model(m), "not available yet")
@@ -336,4 +335,134 @@ test_that("the C++ view refuses crowding per infested host without hosts", {
   v <- SGDrivE:::.sg_model_view(model_of(sg_params()))
   v$larval_per_infested_host <- 1L
   expect_error(SGDrivE:::sg_model_view_info_cpp(v), "needs the host model")
+})
+
+# ---- chain-binomial step (WP5) ------------------------------------------------
+
+cb_configs <- list(
+  batches = host_params(host_density = 5, wounded_fraction = 0.3, wound_search_rate = 0.05),
+  full_eggs = host_params(
+    host_density = 5, wounded_fraction = 0.3, wound_search_rate = 0.05,
+    infested_wound_attractiveness = 3, treatment_rate = 0.1, infestation_substages = 3,
+    larval_crowding_mode = "per_infested_host", larval_crowding_coef = 0.01,
+    oviposition_mode = "eggs"
+  ),
+  clutch_two_hosts = host_params(
+    host_density = 2, wounded_fraction = 0.6, wound_search_rate = 1, clutch_size = 200,
+    infestation_substages = 1
+  )
+)
+cb_model <- function(p, days = 20, area = 4) {
+  sg_model(p, cube3, sg_forcing(sg_constant_weather(25, days = days), p), area = area)
+}
+cb_init <- function(m) sg_init(m, values = c(E = 5, L = 5, P = 5, M = 3, U = 1, F = 3))
+
+test_that("C++ host steps equal the R reference draw for draw", {
+  ns <- asNamespace("SGDrivE")
+  for (nm in names(cb_configs)) {
+    m <- cb_model(cb_configs[[nm]], area = if (nm == "clutch_two_hosts") 1 else 4)
+    set.seed(3)
+    a <- ns$.sg_cb_run_r(m, cb_init(m))
+    set.seed(3)
+    b <- ns$.sg_cb_run_cpp(m, cb_init(m))
+    expect_identical(b$state, a$state, info = nm)
+    expect_identical(b$counters, a$counters, info = nm)
+    hosts <- grep("^H", colnames(b$state))
+    expect_true(all(rowSums(b$state[, hosts]) == sum(b$state[1, hosts])), info = nm)
+    expect_true(all(b$state == round(b$state)), info = nm)
+    k <- b$counters
+    expect_identical(
+      k[, "infestations"] + k[, "superinfestations"], k[, "fertile_batches"],
+      info = nm
+    )
+    da <- ns$.sg_cb_run_r(m, cb_init(m), stochastic = FALSE)
+    db <- ns$.sg_cb_run_cpp(m, cb_init(m), stochastic = FALSE)
+    expect_lt(max(abs(da$state - db$state)) / max(da$state), 1e-12)
+    expect_lt(max(abs(da$counters - db$counters)) / max(abs(da$counters)), 1e-12)
+  }
+})
+
+test_that("a step never infests more hosts than are wounded", {
+  p <- cb_configs$clutch_two_hosts
+  m <- cb_model(p, area = 1)
+  x <- as.numeric(sg_init(m, values = c(E = 50, L = 50, P = 50, M = 30, F = 300)))
+  x[sg_state_index(m, "HS")] <- 0
+  x[sg_state_index(m, "HW")] <- 2
+  x[sg_state_index(m, "HI")] <- 0
+  x <- round(x)
+  set.seed(5)
+  out <- SGDrivE:::sg_cb_step_rep_cpp(SGDrivE:::.sg_model_view(m), 1L, 0.1, x, 2000L)
+  n <- m$n_states
+  flows <- out[, n + seq_along(SGDrivE:::.sg_counter_names(cube3$genotypes, TRUE))]
+  colnames(flows) <- SGDrivE:::.sg_counter_names(cube3$genotypes, TRUE)
+  expect_true(all(flows[, "infestations"] <= 2))
+  expect_gt(mean(flows[, "infestations"] == 2), 0.05) # both hosts hit in some steps
+  expect_gt(sum(flows[, "superinfestations"]), 0)
+  hosts <- grep("^H", sg_state_names(m))
+  expect_true(all(rowSums(out[, hosts]) == 2))
+  expect_true(all(out[, sg_state_index(m, "HI")] <= 2))
+})
+
+test_that("the occupancy draw has the exact mean of random hits", {
+  set.seed(9)
+  occ <- SGDrivE:::.sg_cb_draws(TRUE)$occupancy
+  k <- vapply(1:20000, function(i) occ(5, 3), 0)
+  expected <- 3 * (1 - (2 / 3)^5)
+  expect_lt(abs(mean(k) - expected), 4 * stats::sd(k) / sqrt(20000))
+  expect_true(all(k >= 1 & k <= 3))
+  expect_identical(occ(0, 3), 0)
+  expect_identical(occ(4, 0), 0)
+  det <- SGDrivE:::.sg_cb_draws(FALSE)$occupancy
+  expect_equal(det(0.01, 3), 0.01, tolerance = 1e-2) # few batches: about one host each
+  expect_lt(det(1e6, 3), 3 + 1e-12)
+})
+
+test_that("the deterministic host map converges to the ODE as dt shrinks", {
+  ns <- asNamespace("SGDrivE")
+  p <- cb_configs$full_eggs
+  m <- cb_model(p, days = 15, area = 40)
+  x0 <- cb_init(m)
+  ode <- simulate_ode(m, x0, rtol = 1e-10, atol = 1e-12)
+  hosts <- grep("^H", sg_state_names(m))
+  err <- vapply(c(0.1, 0.02), function(dt) {
+    d <- ns$.sg_cb_run_cpp(m, x0, dt = dt, stochastic = FALSE)
+    max(abs(d$state[16, hosts] - ode$state[16, hosts])) / max(ode$state[16, hosts])
+  }, 0)
+  expect_lt(err[2], err[1])
+  expect_lt(err[2], 0.01)
+})
+
+test_that("simulate_cb() runs host models", {
+  p <- host_params(host_density = 20, wounded_fraction = 0.2, wound_search_rate = 0.02)
+  m <- sg_model(p, cube3, sg_forcing(sg_constant_weather(25, days = 60), p), area = 25)
+  x0 <- sg_init(m, values = c(E = 20, L = 20, P = 20, M = 10, F = 10))
+  sim <- simulate_cb(m, x0, n_rep = 40, seed = 2)
+  hosts <- grep("^H", dimnames(sim$state)[[2]])
+  tot <- apply(sim$state[, hosts, ], c(1, 3), sum)
+  expect_true(all(tot == rep(tot[1, ], each = nrow(tot))))
+  # replicate mean of infested hosts follows the ODE
+  ode <- simulate_ode(m, x0)
+  inf <- grep("^HI", dimnames(sim$state)[[2]])
+  cb_inf <- mean(apply(sim$state[31:61, inf, ], 3, sum)) / 31
+  ode_inf <- sum(ode$state[31:61, grep("^HI", colnames(ode$state))]) / 31
+  expect_equal(cb_inf, ode_inf, tolerance = 0.15)
+  totals <- simulate_cb(m, x0, n_rep = 2, seed = 2, keep = "totals")
+  expect_true(all(c("HS[hosts]", "HW[hosts]", "HI[hosts]") %in% dimnames(totals$totals)[[2]]))
+  expect_equal(totals$totals[, "HI[hosts]", ], apply(simulate_cb(m, x0, n_rep = 2, seed = 2)$state[
+    , inf, ,
+    drop = FALSE
+  ], c(1, 3), sum))
+})
+
+test_that("flies can die out while the hosts go on", {
+  p <- host_params(host_density = 10, wounded_fraction = 0.2)
+  m <- sg_model(p, cube3, sg_forcing(sg_constant_weather(10, days = 120), p), area = 1)
+  x0 <- sg_init(m, values = c(E = 1, L = 1, P = 1, M = 1, F = 1))
+  sim <- simulate_cb(m, x0, n_rep = 3, seed = 4)
+  expect_true(all(!is.na(sim$extinct_day)))
+  hosts <- grep("^H", dimnames(sim$state)[[2]])
+  last <- dim(sim$state)[1]
+  expect_true(all(apply(sim$state[last, hosts, , drop = FALSE], 3, sum) > 0))
+  fly <- seq_len(min(hosts) - 1)
+  expect_true(all(sim$state[last, fly, ] == 0))
 })
