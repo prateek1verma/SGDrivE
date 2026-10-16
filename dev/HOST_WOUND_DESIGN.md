@@ -276,19 +276,139 @@ cases.
   stops with a message naming both.
 * Flow balance (sg_flow_balance) still closes.
 
-## 8. Implementation sketch (work packages)
+## 8. Implementation plan (work packages)
 
-1. Parameters, validation, presets (`"static"` default), param table.
-2. State layout: a host block with S, W and I_1 … I_n per node and host
-   class (`n_host` = 1), state names, `sg_init()` methods place hosts at
-   W = p₀ N_H (constant start) or at the host steady state (burn-in,
-   equilibrium).
-3. R reference rates and ODE (S7, S8, host equations, counters).
-4. C++ rates and ODE; backend equivalence tests.
-5. Chain-binomial step (R reference and C++): host moves, occupancy draw.
-6. Equilibrium, threshold and `adult_females` with the host block.
-7. Outputs (`sg_hosts()`, `sg_cases()`, plots, `check_model()`).
-8. Scenario 04 (small farm), MODEL_SPEC section, D-030, NEWS.
+One branch (`host-wound`), one commit per work package, one PR at the end,
+as for the milestones. Each WP ends with tests, `dev/style.R`, lint and the
+full `dev/check.R`. The R reference code (the oracle) is written before the
+C++ code that must reproduce it (as in M2–M4).
+
+**Completion criteria for stage 1**
+
+1. `wound_model = "static"` gives numerically identical results to the
+   current package (all existing tests and the GP2014 regression pass;
+   only parameter-print snapshots and model hashes change, because the
+   parameter list grows).
+2. Hosts are conserved (S + W + Σ I_j constant) in the ODE and in every
+   stochastic replicate; I ≤ N_H and new infestations ≤ W in every
+   stochastic step.
+3. C++ = R reference: ODE to 1e-8; chain-binomial with the same draws.
+4. The host-mode equilibrium is a fixed point of the ODE; `adult_females =`
+   is exact in host mode; R0 is unchanged.
+5. Scenario 04 shows a 2-animal farm with at most 2 animals infested at once
+   and repeated infestations over a year.
+
+### WP1. Parameters
+
+* New rows in `R/param-table.R` (group "hosts"): `wound_model`
+  (`"static"`/`"hosts"`), `host_density`, `wounded_fraction`,
+  `wound_healing_days`, `infestation_days`, `infestation_substages`,
+  `infested_wound_attractiveness`, `treatment_rate`; new choice
+  `"per_infested_host"` for `larval_crowding_mode`.
+* Required values (decision 7): `host_density` and `wounded_fraction` default
+  to NA; the parameter system learns "NA allowed, required when
+  `wound_model = "hosts"`". `sg_params(wound_model = "hosts")` without them
+  stops with a message naming both and suggesting
+  host_density × wounded_fraction = 5 per km².
+* Cross-checks: `wounded_fraction` in (0, 1); `infestation_substages` a whole
+  number 1–10 (D-003); `"per_infested_host"` only with `"hosts"`; host
+  parameters given in `"static"` mode give a warning that they are unused.
+* `gp2014` preset stays `"static"`.
+* Tests: defaults, validation messages, required values, param table and
+  print snapshots (updated).
+
+### WP2. State layout and model assembly
+
+* Host block appended after F in `.sg_layout()`: H_S, H_W, H_I1 … H_In per
+  node and host class (`n_host` = 1); length 0 in `"static"` mode, so static
+  state vectors are unchanged. State names e.g. `H_W[1]`, `H_I[1,3]`;
+  `sg_state_index()` gains the host blocks.
+* `sg_model()`: host counts per node (N_H = host_density × area), derived
+  rates (ω, γ_W, q_I, κ) in `model$counts` / the setup; `print()` shows the
+  host model; hash covers the new inputs.
+* `sg_init()`: `"constant"` places hosts at the fly-free steady state
+  (W = p₀ N_H, S = (1 − p₀) N_H, I = 0); `"state"` accepts the longer
+  vector; state rounding in stochastic runs keeps each host compartment a
+  whole number (the host total is then fixed per replicate).
+* Model view (`R/model-view.R`, `src/model_view.*`): flag, host rates, n_I,
+  block offsets.
+* Tests: layout lengths and names in both modes, static layout unchanged,
+  initial host state, view contents.
+
+### WP3. R reference ODE (oracle)
+
+* `R/reference-rates.R`: attractive sites A_s = W + α I replace H in Ψ (S8);
+  new infestations C = F W / A_s; host derivatives (section 3.4, Erlang
+  chain); larval hazard + `treatment_rate` and the `"per_infested_host"`
+  crowding (3.5).
+* New counters: `infestations`, `superinfestations`, `infestations_ended`,
+  `treatments` (host flows), alongside the existing ones.
+* `simulate_ode(backend = "R")` runs host mode.
+* Tests: conservation; relaxation to W = p₀ N_H without flies; at low fly
+  density Ψ equals the static Ψ with H = host_density × wounded_fraction;
+  infestation chain mean and variance; treatment lowers prevalence and
+  larvae; `"static"` unchanged.
+
+### WP4. C++ ODE kernel
+
+* `src/rates.cpp` / `rates.h`: the same terms in the aggregates and
+  derivatives; host rates in `max_rate` and the stiffness diagnostics.
+* Backend equivalence to 1e-8 (R vs C++) in both modes and with treatment,
+  crowding and α > 1; speed check on the McAllen year (host mode should
+  cost little extra).
+
+### WP5. Chain-binomial step
+
+* R reference step (`R/cb-reference.R`), then C++ (`src/cb_step.*`), in the
+  order of section 3.6: fertile batches → batches on uninfested wounds
+  (binomial) → distinct hosts hit (occupancy draw, k ≤ W) → healing →
+  infestation chain moves (S16 with treatment as the hazard) → wounding;
+  moves applied at the end of the step.
+* Tests: R and C++ steps identical with the same seed; I ≤ N_H and k ≤ W in
+  every step (including N_H = 2); deterministic map → ODE as dt → 0;
+  statistical test of the occupancy draw; replicate means vs ODE.
+
+### WP6. Initial states, equilibrium, scaling, calibration
+
+* `"burn_in"` runs the host block with the flies.
+* `"equilibrium"` and `"threshold"`: nested root search with the host steady
+  state (section 3.7, mean infested time D); with α > 1, scan for several
+  roots and return the stable upper one, with a message if there are more.
+* `adult_females =` in host mode (exact by homogeneity).
+* `calibrate_wound_density()` in host mode: scales `host_density` (exact
+  without an Allee effect, as now for H) and says so; to be confirmed.
+* Tests: equilibrium is an ODE fixed point; area scaling; R0 unchanged;
+  α > 1 cases.
+
+### WP7. Outputs and checks
+
+* `sg_hosts(sim)`: S, W, I per day, per node or km², prevalence I / N_H
+  (replicates for stochastic runs).
+* `sg_cases()` in host mode: cases = infestations, `superinfestations`
+  column, `cases_per_host` from the model's host density (`host_density`
+  argument an error); `wound_fraction` = infestations per wounded host and
+  day. Static mode unchanged.
+* `plot(sim, "hosts")`; `check_model()` reports host rates and the largest
+  host rate × dt; `sg_flow_balance()` adds a host conservation check.
+* Tests and plot snapshots.
+
+### WP8. Scenarios, documentation, PR
+
+* `inst/scenarios/04_host_limited_cases.R`: a farm with 2 animals (fixed
+  area and host density so N_H = 2), stochastic runs showing 0–2 animals
+  infested at once and repeated infestations over a year, compared with the
+  static model's case counts for the same flies.
+* MODEL_SPEC: host section (equations of sections 3.3–3.7), S7/S8/S17
+  amendments, parameter table; DECISIONS: D-030 (this note's decisions);
+  NEWS; scenario README; pkgdown reference; roxygen for new functions.
+* Full check, then the PR.
+
+### Points to settle during implementation
+
+* Names of the host blocks and counters (proposed above).
+* Whether `calibrate_wound_density()` scales `host_density` in host mode or
+  a separate `calibrate_host_density()` is clearer.
+* How many roots to search for with α > 1 (bistability), and what to report.
 
 ## 9. Decisions (made by the user, 2026-10-16)
 
