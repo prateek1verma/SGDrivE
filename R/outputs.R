@@ -159,7 +159,9 @@ sg_females <- function(sim, per = c("node", "km2")) {
     wild_type = col_sum(block %in% c("U", "F") & geno %in% info$wild_type)
   )
   if (a$level == "state") {
-    sub <- as.integer(sub("^.*,([0-9]+)\\]$", "\\1", nm))
+    fly <- block %in% c("E", "L", "P", "M", "U", "F") # host states have no fly sub-stage
+    sub <- rep(1L, length(nm))
+    sub[fly] <- as.integer(sub("^.*,([0-9]+)\\]$", "\\1", nm[fly]))
     is_f <- block == "F"
     out$egg_laying <- col_sum(is_f & info$laying[pmax(sub, 1L)])
     mate <- sub("^F\\[[^|]+\\|([^,]+),.*$", "\\1", nm)

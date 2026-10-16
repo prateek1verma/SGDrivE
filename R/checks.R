@@ -31,7 +31,6 @@ sg_r0 <- function(model, temperature) {
   if (!inherits(model, "sg_model")) {
     .sg_stop("`model` must be an sg_model object; create one with sg_model().")
   }
-  .sg_require_static(model, "sg_r0()")
   if (!is.numeric(temperature) || length(temperature) < 1L || any(!is.finite(temperature))) {
     .sg_stop("`temperature` must be finite numbers (degC).")
   }

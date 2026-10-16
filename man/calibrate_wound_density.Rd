@@ -39,26 +39,15 @@ forcing is repeated.}
 \item{tol}{Relative tolerance of the root search.}
 }
 \value{
-An object of class \code{sg_calibration}, a list with \code{wound_density} (calibrated
-wounds per km^2), \code{params} (the model's parameters with that H),
-\code{model} (the model rebuilt with it), \code{target}, \code{achieved}, \code{stat},
-\code{stages}, \code{method} (\code{"proportional"} or \code{"root search"}) and
-\code{evaluations}.
+An object of class \code{sg_calibration}; see \code{\link[=calibrate_population]{calibrate_population()}}.
+The calibrated value is also in \code{wound_density}.
 }
 \description{
-Finds the wound density \code{wound_density} (wounds per km^2) at which a summary of the
-simulated population, by default the mean adult density over the model's
-forcing period, equals a target.
-}
-\details{
-Each evaluation runs the ODE from a burn-in. With no Allee effect
-(\code{male_density_half_mating = 0}) and no releases every equation is homogeneous of degree one
-in the state and H, so after the burn-in the population is exactly
-proportional to H: one evaluation gives the calibrated H in closed form
-(\code{wound_density * target / value}), checked by a second. Otherwise (Allee effect, or
-releases, which are usually left out of a calibration of the wild
-population) H is found by a one-dimensional root search on log H.
-Because H is per km^2, the result does not depend on the node area.
+Finds the wound density \code{wound_density} (wounds per km^2) at which a
+summary of the simulated population, by default the mean adult density
+over the model's forcing period, equals a target. A shortcut for
+\code{\link[=calibrate_population]{calibrate_population()}} with \code{parameter = "wound_density"}, for models
+with \code{wound_model = "static"}.
 }
 \examples{
 if (requireNamespace("MGDrivE", quietly = TRUE)) {
@@ -72,5 +61,5 @@ if (requireNamespace("MGDrivE", quietly = TRUE)) {
 }
 }
 \seealso{
-\code{\link[=check_model]{check_model()}}, \code{\link[=sg_init]{sg_init()}}
+\code{\link[=calibrate_population]{calibrate_population()}}, \code{\link[=check_model]{check_model()}}, \code{\link[=sg_init]{sg_init()}}
 }

@@ -86,17 +86,9 @@ test_that("a full state is checked against the number of hosts", {
   expect_error(sg_init(m, "state", state = x[-1]), "length")
 })
 
-test_that("dynamic starts and diagnostics refuse host models until implemented", {
+test_that("check_model() refuses host models until WP7", {
   m <- model_of(host_params())
-  expect_error(sg_init(m, "equilibrium"), "not available yet")
-  expect_error(sg_init(m, "threshold"), "not available yet")
   expect_error(check_model(m), "not available yet")
-  expect_error(sg_r0(m, 20), "not available yet")
-  p <- host_params()
-  expect_error(
-    sg_model(p, cube3, sg_forcing(sg_constant_weather(20, days = 10), p), adult_females = 100),
-    "not available yet"
-  )
 })
 
 test_that("the model view carries the host block to C++", {
@@ -465,4 +457,135 @@ test_that("flies can die out while the hosts go on", {
   expect_true(all(apply(sim$state[last, hosts, , drop = FALSE], 3, sum) > 0))
   fly <- seq_len(min(hosts) - 1)
   expect_true(all(sim$state[last, fly, ] == 0))
+})
+
+# ---- equilibria, starts, scaling and calibration (WP6) --------------------------
+# A realistic region: 1000 km^2 with 30 animals per km^2 (30,000 hosts).
+
+region_params <- function(...) {
+  base <- list(
+    wound_model = "hosts", host_density = 30, wounded_fraction = 0.05,
+    wound_search_rate = 0.02
+  )
+  do.call(sg_params, utils::modifyList(base, list(...)))
+}
+region_model <- function(p, temp = 25, days = 30, area = 1000) {
+  sg_model(p, cube3, sg_forcing(sg_constant_weather(temp, days = days), p), area = area)
+}
+
+test_that("the host-mode equilibrium is a fixed point of the ODE", {
+  p <- region_params(
+    infested_wound_attractiveness = 3, treatment_rate = 0.05, infestation_substages = 4,
+    larval_crowding_mode = "per_infested_host", larval_crowding_coef = 1e-4
+  )
+  m <- region_model(p)
+  e <- sg_init(m, "equilibrium")
+  info <- attr(e, "equilibrium")
+  expect_gt(info$adult_females, 1000)
+  hosts <- SGDrivE:::.sg_host_index(m)
+  expect_equal(sum(e[hosts]), 30000, tolerance = 1e-10)
+  sim <- simulate_ode(m, e, rtol = 1e-10, atol = 1e-8)
+  rel <- max(abs(sweep(sim$state, 2, as.numeric(e))) / pmax(as.numeric(e), 1))
+  expect_lt(rel, 1e-6)
+  eq <- sg_equilibria(m)
+  expect_identical(nrow(eq), 2L)
+  expect_identical(eq$stable, c(FALSE, TRUE))
+  expect_equal(eq$adult_females[2], info$adult_females)
+  expect_equal(eq$infested_hosts[2], sum(e[sg_state_index(m, "HI")]), tolerance = 1e-10)
+  expect_equal(eq$prevalence[2], eq$infested_hosts[2] / 30000)
+})
+
+test_that("equilibrium prevalence does not depend on infested-wound attractiveness", {
+  # egg balance fixes the strike rate per wound, so alpha scales the flies only
+  eq1 <- sg_equilibria(region_model(region_params()))
+  eq10 <- sg_equilibria(region_model(region_params(infested_wound_attractiveness = 10)))
+  expect_equal(eq10$prevalence[2], eq1$prevalence[2], tolerance = 1e-8)
+  expect_gt(eq10$adult_females[2], 2 * eq1$adult_females[2])
+})
+
+test_that("with an Allee effect the hosts' region has two stable equilibria", {
+  p <- region_params(male_density_half_mating = 20)
+  m <- region_model(p, days = 365)
+  eq <- sg_equilibria(m)
+  expect_identical(eq$stable, c(TRUE, FALSE, TRUE)) # extinction, threshold, upper
+  thr <- sg_init(m, "threshold")
+  up <- sg_init(m, "equilibrium")
+  expect_equal(attr(thr, "threshold")$adult_females, eq$adult_females[2])
+  expect_equal(attr(up, "equilibrium")$adult_females, eq$adult_females[3])
+  fly <- setdiff(seq_len(m$n_states), SGDrivE:::.sg_host_index(m))
+  start <- function(k) {
+    x <- as.numeric(thr)
+    x[fly] <- k * x[fly]
+    x
+  }
+  females <- function(k) tail(sg_females(simulate_ode(m, start(k)))$females, 1)
+  expect_lt(females(0.9), 0.01 * eq$adult_females[2])
+  expect_equal(females(1.1), eq$adult_females[3], tolerance = 1e-3)
+})
+
+test_that("several stable positive equilibria give a message and the upper one", {
+  m <- region_model(region_params())
+  real <- SGDrivE:::.sg_equilibria_core(m, 25, "test")
+  fake <- real
+  fake$table <- real$table[c(1, 2, 2, 2), ]
+  fake$table$eggs_per_day <- c(0, 1, 2, 3) * real$table$eggs_per_day[2]
+  fake$table$adult_females <- c(0, 10, 20, 30)
+  fake$table$stable <- c(FALSE, TRUE, FALSE, TRUE)
+  fake$states <- real$states[c(1, 2, 2, 2)]
+  local_mocked_bindings(.sg_equilibria_core = function(...) fake)
+  expect_message(x <- sg_init(m, "equilibrium"), "2 stable equilibria at 25 degC")
+  expect_equal(attr(x, "equilibrium")$adult_females, 30)
+  expect_equal(suppressMessages(attr(sg_init(m, "threshold"), "threshold"))$adult_females, 20)
+})
+
+test_that("adult_females sizes a host region exactly", {
+  p <- region_params(treatment_rate = 0.02)
+  m <- sg_model(p, cube3, sg_forcing(sg_constant_weather(25, days = 30), p),
+    adult_females = 50000
+  )
+  e <- sg_init(m, "equilibrium")
+  expect_equal(attr(e, "equilibrium")$adult_females, 50000, tolerance = 1e-8)
+  expect_equal(m$hosts$n, 30 * m$area)
+})
+
+test_that("R0 is unchanged by hosts and lowered by treatment", {
+  m_static <- region_model(sg_params())
+  m_hosts <- region_model(region_params())
+  expect_equal(sg_r0(m_hosts, c(20, 25)), sg_r0(m_static, c(20, 25)))
+  m_treat <- region_model(region_params(treatment_rate = 0.3))
+  expect_true(all(sg_r0(m_treat, c(20, 25)) < sg_r0(m_hosts, c(20, 25))))
+})
+
+test_that("a burn-in runs the hosts with the flies", {
+  m <- region_model(region_params(), days = 365)
+  b <- sg_init(m, "burn_in")
+  expect_lt(attr(b, "burn_in")$start_effect, 1e-3)
+  expect_equal(sum(b[SGDrivE:::.sg_host_index(m)]), 30000, tolerance = 1e-8)
+  e <- sg_init(m, "equilibrium")
+  expect_lt(max(abs(b - e) / pmax(e, 1)), 1e-3) # a year at 25 degC reaches equilibrium
+})
+
+test_that("calibrate_population() calibrates each population-size parameter", {
+  m_static <- region_model(sg_params(), days = 365)
+  a <- calibrate_population(m_static, target = 50)
+  b <- calibrate_wound_density(m_static, target = 50)
+  expect_identical(a$parameter, "wound_density")
+  expect_equal(a$wound_density, b$wound_density)
+  m <- region_model(region_params(), days = 365)
+  wf <- calibrate_population(m, target = 50)
+  expect_identical(wf$parameter, "wounded_fraction")
+  expect_identical(wf$method, "root search")
+  expect_equal(wf$achieved, 50, tolerance = 1e-6)
+  expect_true(wf$value > 0 && wf$value < 1)
+  expect_identical(wf$params$host_density, 30)
+  hd <- calibrate_population(m, target = 50, parameter = "host_density")
+  expect_identical(hd$method, "proportional")
+  expect_identical(hd$evaluations, 2L)
+  expect_equal(hd$achieved, 50, tolerance = 1e-6)
+  expect_equal(hd$model$hosts$n, hd$value * 1000)
+  expect_true(any(grepl("host_density = .* animals per km\\^2", capture.output(print(hd)))))
+  expect_error(calibrate_population(m, 50, parameter = "wound_density"), "is not used")
+  expect_error(calibrate_population(m_static, 50, parameter = "host_density"), "is not used")
+  expect_error(calibrate_wound_density(m, 50), "use calibrate_population")
+  expect_error(calibrate_population(m, 1e9), "No wounded fraction")
 })

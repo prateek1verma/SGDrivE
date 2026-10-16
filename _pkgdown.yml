@@ -29,6 +29,7 @@ reference:
       - sg_model
       - sg_state_index
       - sg_init
+      - sg_equilibria
   - title: Simulation
     contents:
       - simulate_ode
@@ -44,6 +45,7 @@ reference:
       - check_model
       - sg_r0
       - sg_flow_balance
+      - calibrate_population
       - calibrate_wound_density
   - title: Plots
     contents:
