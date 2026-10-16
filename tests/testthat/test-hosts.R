@@ -123,3 +123,156 @@ test_that("the model view carries the host block to C++", {
   bad$host_offsets <- v$host_offsets + 1L
   expect_error(SGDrivE:::sg_model_view_info_cpp(bad), "host block")
 })
+
+# ---- reference ODE (WP3) ------------------------------------------------------
+
+host_cols <- function(sim, block) grep(paste0("^", block, "\\["), colnames(sim$state))
+host_total <- function(sim, block) rowSums(sim$state[, host_cols(sim, block), drop = FALSE])
+run_r <- function(p, init = NULL, days = 120, area = 10, temp = 25) {
+  m <- sg_model(p, cube3, sg_forcing(sg_constant_weather(temp, days = days), p), area = area)
+  x0 <- if (is.null(init)) sg_init(m) else init(m)
+  list(model = m, sim = simulate_ode(m, init = x0, backend = "R"))
+}
+
+test_that("hosts are conserved and host counters account for every move", {
+  r <- run_r(host_params(infested_wound_attractiveness = 2, treatment_rate = 0.05))
+  s <- r$sim
+  tot <- host_total(s, "HS") + host_total(s, "HW") + host_total(s, "HI")
+  expect_lt(max(abs(tot - 500)), 1e-8)
+  k <- colSums(s$counters)
+  change <- function(b) {
+    v <- host_total(s, b)
+    v[length(v)] - v[1]
+  }
+  flow_s <- -k[["hosts_wounded"]] + k[["wounds_healed"]] + k[["infestations_ended"]] +
+    k[["infestations_treated"]]
+  flow_w <- k[["hosts_wounded"]] - k[["wounds_healed"]] - k[["infestations"]]
+  flow_i <- k[["infestations"]] - k[["infestations_ended"]] - k[["infestations_treated"]]
+  expect_equal(change("HS"), flow_s, tolerance = 1e-6)
+  expect_equal(change("HW"), flow_w, tolerance = 1e-6)
+  expect_equal(change("HI"), flow_i, tolerance = 1e-6)
+  expect_gt(k[["infestations"]], 0)
+  # every fertile batch is either a new infestation or a superinfestation
+  expect_equal(
+    k[["infestations"]] + k[["superinfestations"]], k[["fertile_batches"]],
+    tolerance = 1e-8
+  )
+  # the fly flow balance still closes
+  expect_lt(max(abs(sg_flow_balance(s)$residual)), 1e-6)
+  expect_error(simulate_ode(r$model), "backend = \"cpp\"")
+})
+
+test_that("without flies hosts relax to the fly-free steady state", {
+  p <- host_params(host_density = 20, wounded_fraction = 0.2, wound_healing_days = 4)
+  r <- run_r(p, days = 200, area = 1, init = function(m) {
+    x <- numeric(m$n_states)
+    x[sg_state_index(m, "HI", substage = 1)] <- 20 # all hosts infested, no flies
+    x
+  })
+  last <- nrow(r$sim$state)
+  expect_equal(host_total(r$sim, "HW")[last], 4, tolerance = 1e-6)
+  expect_equal(host_total(r$sim, "HS")[last], 16, tolerance = 1e-6)
+  expect_lt(host_total(r$sim, "HI")[last], 1e-8)
+  expect_identical(sum(r$sim$counters[, "infestations"]), 0)
+})
+
+test_that("infestations last infestation_days on average, with Erlang spread", {
+  for (n_i in c(1L, 4L)) {
+    p <- host_params(infestation_days = 6, infestation_substages = n_i)
+    r <- run_r(p, days = 150, area = 1, init = function(m) {
+      x <- numeric(m$n_states)
+      x[sg_state_index(m, "HI", substage = 1)] <- m$hosts$n
+      x
+    })
+    ended <- r$sim$counters[, "infestations_ended"]
+    expect_equal(sum(ended), 50, tolerance = 1e-6)
+    t_mid <- seq_along(ended) - 0.5
+    mean_t <- sum(t_mid * ended) / 50
+    var_t <- sum((t_mid - mean_t)^2 * ended) / 50 - 1 / 12 # minus daily binning
+    expect_equal(mean_t, 6, tolerance = 0.01)
+    expect_equal(var_t, 36 / n_i, tolerance = 0.03)
+  }
+})
+
+test_that("treatment shortens infestations and kills larvae", {
+  start_inf <- function(m) {
+    x <- numeric(m$n_states)
+    x[sg_state_index(m, "HI", substage = 1)] <- m$hosts$n
+    x
+  }
+  kappa <- 0.2
+  r <- run_r(host_params(treatment_rate = kappa, infestation_substages = 4),
+    days = 150, area = 1, init = start_inf
+  )
+  # mean time infested D = (1 - (q / (q + kappa))^n) / kappa (design note 3.7)
+  q <- 4 / 6
+  d_expected <- (1 - (q / (q + kappa))^4) / kappa
+  i_t <- host_total(r$sim, "HI")
+  d_sim <- sum((i_t[-1] + i_t[-length(i_t)]) / 2) / 50 # trapezoid over days
+  expect_equal(d_sim, d_expected, tolerance = 0.01)
+  k <- colSums(r$sim$counters)
+  expect_equal(k[["infestations_treated"]] + k[["infestations_ended"]], 50, tolerance = 1e-6)
+  # with flies: treatment lowers prevalence and larvae
+  base <- run_r(host_params())$sim
+  treated <- run_r(host_params(treatment_rate = 0.3))$sim
+  last <- nrow(base$state)
+  expect_lt(host_total(treated, "HI")[last], host_total(base, "HI")[last])
+  larvae <- function(s) sum(s$state[last, grep("^L\\[", colnames(s$state))])
+  expect_lt(larvae(treated), larvae(base))
+})
+
+test_that("rates: attractive sites replace H, crowding per infested host", {
+  p_h <- host_params(host_density = 50, wounded_fraction = 0.1)
+  p_s <- sg_params(wound_density = 5) # = host_density * wounded_fraction
+  m_h <- model_of(p_h, area = 2)
+  m_s <- model_of(p_s, area = 2)
+  x_s <- as.numeric(sg_init(m_s, values = c(E = 3, L = 3, P = 3, M = 2, F = 2)))
+  x_h <- as.numeric(sg_init(m_h, values = c(E = 3, L = 3, P = 3, M = 2, F = 2)))
+  fly <- seq_len(m_s$n_states)
+  expect_identical(x_h[fly], x_s[fly])
+  r_s <- SGDrivE:::.sg_rates_r(1, x_s, SGDrivE:::.sg_reference_setup(m_s), aux = TRUE)
+  r_h <- SGDrivE:::.sg_rates_r(1, x_h, SGDrivE:::.sg_reference_setup(m_h), aux = TRUE)
+  # no infested hosts: A_s = wounded hosts = H, so the flies see the same rates
+  expect_equal(r_h$aux$sites, 10)
+  expect_equal(r_h$aux$psi, r_s$aux$psi, tolerance = 1e-14)
+  expect_equal(r_h$deriv[fly], r_s$deriv[fly], tolerance = 1e-14)
+  expect_equal(r_h$counters[names(r_s$counters)], r_s$counters, tolerance = 1e-14)
+  expect_false(any(SGDrivE:::.sg_host_counter_names %in% names(r_s$counters)))
+  # crowding per infested host, plus treatment in the larval hazard
+  p_c <- host_params(
+    larval_crowding_mode = "per_infested_host", larval_crowding_coef = 0.02,
+    treatment_rate = 0.1, infested_wound_attractiveness = 3
+  )
+  m_c <- model_of(p_c, area = 2)
+  x_c <- x_h
+  x_c[sg_state_index(m_c, "HI", substage = 2)] <- 4
+  x_c[sg_state_index(m_c, "HS")] <- x_c[sg_state_index(m_c, "HS")] - 4
+  a <- SGDrivE:::.sg_rates_r(1, x_c, SGDrivE:::.sg_reference_setup(m_c), aux = TRUE)$aux
+  l_tot <- sum(x_c[sg_state_index(m_c, "L")])
+  expect_equal(
+    a$mu[["L"]], -log(0.95) + 0.1 + 0.02 * l_tot / (4 + 1e-6 * 100),
+    tolerance = 1e-14
+  )
+  expect_equal(a$sites, 10 + 3 * 4)
+})
+
+test_that("at most N_H hosts are infested, however many flies", {
+  # a wound receives at most wound_finding_max * wound_search_rate * dx batches
+  # per day; with the GP2014 search rate (0.001 per dd) that is about 0.01 per
+  # day, so a fast search rate is used to saturate the two hosts
+  p <- host_params(
+    host_density = 2, wounded_fraction = 0.9, infested_wound_attractiveness = 5,
+    wound_search_rate = 1
+  )
+  r <- run_r(p, days = 60, area = 1, init = function(m) {
+    sg_init(m, values = c(E = 500, L = 500, P = 500, M = 300, F = 300))
+  })
+  i_t <- host_total(r$sim, "HI")
+  expect_lte(max(i_t), 2 + 1e-9)
+  # hosts are infested as soon as they are wounded: infested share about
+  # 6 / (6 + 7 / 9) = 0.89 of the two hosts at wounded_fraction 0.9
+  expect_gt(max(i_t), 1.5)
+  k <- colSums(r$sim$counters)
+  expect_gt(k[["superinfestations"]], 10 * k[["infestations"]])
+  expect_gt(min(r$sim$state), -1e-6)
+})

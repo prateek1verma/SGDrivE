@@ -7,7 +7,9 @@
 # State layout (sg_model(), CONVENTIONS.md): blocks E, L, P, M, U, F; within a
 # block the sub-stage varies fastest, then mate genotype (F only), then
 # genotype. Unpacked as matrices X[substage, genotype] and, for F, an array
-# F[substage, mate, genotype].
+# F[substage, mate, genotype]. With the host-wound model (D-030; design note
+# dev/HOST_WOUND_DESIGN.md section 3, spec tags H1-H2) host blocks HS, HW and
+# HI (infestation sub-stages) follow.
 
 # Static, model-dependent quantities, computed once per simulation.
 .sg_reference_setup <- function(model) {
@@ -49,9 +51,15 @@
     receptive = flag_or_all(fch, "X_rec"),
     mature = flag_or_all(mch, "X_mat"),
     forcing = model$forcing,
-    counter_names = .sg_counter_names(geno)
+    hosts = model$hosts,
+    counter_names = .sg_counter_names(geno, hosts = !is.null(model$hosts))
   )
 }
+
+# Crowding floor of the per-infested-host larval hazard (D-030, design note
+# 3.5): epsilon * N_H keeps the term finite when larvae outlive the
+# infestations in the mean field and keeps the model homogeneous in the area.
+.sg_crowd_floor <- 1e-6
 
 # Oviposition events per wound found (D-024): 1 when a batch is the day's
 # eggs (clutch_size = NA), otherwise R * phi_ov / clutch_size.
@@ -69,8 +77,9 @@
 # offspring of s ih tau for the female x mate pair).
 .sg_fertile_share <- function(viability, clutch) -expm1(-clutch * viability)
 
-# Names of the cumulative counters (rates per day in the rate function).
-.sg_counter_names <- function(geno) {
+# Names of the cumulative counters (rates per day in the rate function); the
+# host-wound model adds one counter per host flow (D-030).
+.sg_counter_names <- function(geno, hosts = FALSE) {
   pairs <- paste0(rep(geno, each = length(geno)), "|", rep(geno, times = length(geno)))
   c(
     paste0("eggs_laid[", geno, "]"),
@@ -78,9 +87,15 @@
     "emergence_deaths",
     paste0("matings[", pairs, "]"),
     "deaths_E", "deaths_L", "deaths_P", "deaths_M", "deaths_U", "deaths_F",
-    "senescence_M", "senescence_U", "senescence_F"
+    "senescence_M", "senescence_U", "senescence_F",
+    if (hosts) .sg_host_counter_names
   )
 }
+
+.sg_host_counter_names <- c(
+  "hosts_wounded", "wounds_healed", "infestations", "infestations_ended",
+  "infestations_treated", "superinfestations"
+)
 
 # Erlang chain with one rate q and hazard mu for all sub-stages
 # (X[substage, genotype]; inflow per genotype into sub-stage 1).
@@ -123,6 +138,14 @@
   mal <- matrix(state[s$idx$M], n_a, n_g)
   unm <- matrix(state[s$idx$U], n_a, n_g)
   fem <- array(state[s$idx$F], c(n_a, n_g, n_g)) # [substage, mate, genotype]
+  h <- s$hosts
+  if (!is.null(h)) { # host-wound model (D-030)
+    h_s <- state[s$idx$HS]
+    h_w <- state[s$idx$HW]
+    h_i <- state[s$idx$HI] # [infestation sub-stage]
+    i_tot <- sum(h_i)
+    sites <- h_w + h$attractiveness * i_tot # attractive sites A_s (H2)
+  }
 
   # ---- daily forcing (S1-S4, S7) ---------------------------------------------
   dx <- f$dx[day]
@@ -145,6 +168,13 @@
   if (p$larval_crowding_mode == "per_wound" && s$counts$H > 0) {
     mu_l <- mu_l + p$larval_crowding_coef * l_tot / s$counts$H
   }
+  if (!is.null(h)) {
+    # treated hosts lose their larvae (H2); crowding per infested host (H2)
+    mu_l <- mu_l + h$treatment
+    if (p$larval_crowding_mode == "per_infested_host") {
+      mu_l <- mu_l + p$larval_crowding_coef * l_tot / (i_tot + .sg_crowd_floor * h$n)
+    }
+  }
   mu_p <- mu_t + p$pupa_drought_mortality * (1 - moisture)
   mu_f <- mu_t + p$female_background_mortality
   mu_m <- mu_t + p$male_background_mortality
@@ -156,8 +186,9 @@
   } else {
     sum(mal) + sum(unm) + sum(fem)
   }
+  wounds <- if (is.null(h)) s$counts$H else sites # fixed H, or A_s (H2)
   psi <- if (n_s > 0) {
-    p$wound_finding_max * (1 - exp(-p$wound_search_rate * dx * s$counts$H / n_s))
+    p$wound_finding_max * (1 - exp(-p$wound_search_rate * dx * wounds / n_s))
   } else {
     p$wound_finding_max
   }
@@ -248,24 +279,47 @@
   deriv[s$idx$U] <- as.vector(d_u)
   deriv[s$idx$F] <- as.vector(d_f)
 
-  # ---- counters (rates per day) -------------------------------------------------
   # egg-laying females weighted by the share of their batches with a viable
   # egg (D-026)
   share <- .sg_fertile_share(rowSums(s$egg_tensor), .sg_clutch(p, phi_ov))
   fertile_w <- sum(as.vector(w_lay) * share)
+  fertile_rate <- psi * .sg_batch_factor(p, phi_ov) * fertile_w # fertile batches per day
+
+  # ---- hosts (H1, H2) ----------------------------------------------------------
+  if (!is.null(h)) {
+    # fertile batches are shared among wounds in proportion to attractiveness:
+    # on an uninfested wound a batch starts an infestation (a case), on an
+    # infested one it only adds larvae (superinfestation)
+    new_inf <- if (sites > 0) fertile_rate * h_w / sites else 0
+    superinf <- if (sites > 0) fertile_rate * h$attractiveness * i_tot / sites else 0
+    n_i <- length(h_i)
+    wounded <- h$wounding * h_s
+    healed <- h$healing * h_w
+    ended <- h$advance * h_i[n_i]
+    treated <- h$treatment * i_tot
+    d_i <- -(h$advance + h$treatment) * h_i
+    d_i[1L] <- d_i[1L] + new_inf
+    if (n_i > 1L) d_i[-1L] <- d_i[-1L] + h$advance * h_i[-n_i]
+    deriv[s$idx$HS] <- -wounded + healed + ended + treated
+    deriv[s$idx$HW] <- wounded - healed - new_inf
+    deriv[s$idx$HI] <- d_i
+  }
+
+  # ---- counters (rates per day) -------------------------------------------------
   # matings[g, m]: virgins of genotype g mating males of genotype m
   matings <- (colSums(mating_flux) + in_f_mated) * pi_gm
   counters <- c(
     unname(births),
     psi * sum(w_lay) * .sg_batch_factor(p, phi_ov), # egg_batches
-    psi * .sg_batch_factor(p, phi_ov) * fertile_w, # fertile_batches
+    fertile_rate, # fertile_batches
     q_e * sum(egg[s$n_E, ]),
     q_l * sum(lar[s$n_L, ]),
     sum(in_m), sum(in_f), emergence_deaths,
     as.vector(t(matings)), # [g, m] with m fastest
     mu_e * sum(egg), mu_l * l_tot, mu_p * sum(pup),
     mu_m * sum(mal), mu_f * sum(unm), mu_f * sum(fem),
-    am$senescence, au$senescence, sen_f
+    am$senescence, au$senescence, sen_f,
+    if (!is.null(h)) c(wounded, healed, new_inf, ended, treated, superinf)
   )
   names(counters) <- s$counter_names
 
@@ -275,7 +329,9 @@
       w_lay = w_lay, n_s = n_s, psi = psi, births = births, m_bar = m_bar,
       g_find = g_find, pi = pi_gm, mating_flux = mating_flux,
       q = c(E = q_e, L = q_l, P = q_p), q_f = q_f, q_m = q_m,
-      mu = c(E = mu_e, L = mu_l, P = mu_p, F = mu_f, M = mu_m)
+      mu = c(E = mu_e, L = mu_l, P = mu_p, F = mu_f, M = mu_m),
+      sites = if (is.null(h)) NA_real_ else sites,
+      infestation_hazard = if (is.null(h) || h_w <= 0) 0 else new_inf / h_w
     )
   }
   out

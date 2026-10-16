@@ -89,8 +89,8 @@ simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
   if (!inherits(model, "sg_model")) {
     .sg_stop("`model` must be an sg_model object; create one with sg_model().")
   }
-  .sg_require_static(model, "simulate_ode()")
   backend <- .sg_match_choice(backend, c("R", "cpp"), "backend")
+  if (backend == "cpp") .sg_require_static(model, "simulate_ode(backend = \"cpp\")")
   if (is.null(method)) method <- if (backend == "cpp") "dopri5" else "lsoda"
   if (!is.character(method) || length(method) != 1L || is.na(method)) {
     .sg_stop("`method` must be a single string, e.g. \"dopri5\" or \"lsoda\".")
@@ -405,10 +405,17 @@ print.sg_sim <- function(x, ...) {
   u_rate <- a$q_f + a$mu[["F"]] + outer(nu_i, as.numeric(mate_ok))
   u_rate <- u_rate[is.finite(setup$w_f)]
   q_m <- a$q_m[is.finite(setup$w_m)]
+  h <- setup$hosts
+  host_rate <- if (is.null(h)) {
+    0
+  } else {
+    max(h$wounding, h$healing + a$infestation_hazard, h$advance + h$treatment)
+  }
   max(
     a$q[["E"]] + a$mu[["E"]], a$q[["L"]] + a$mu[["L"]], a$q[["P"]] + a$mu[["P"]],
     if (length(u_rate)) max(u_rate) else 0,
-    if (length(q_m)) max(q_m) + a$mu[["M"]] else 0
+    if (length(q_m)) max(q_m) + a$mu[["M"]] else 0,
+    host_rate
   )
 }
 
