@@ -187,10 +187,25 @@ area and all host rates are per host, so the model is homogeneous of degree
 one in the state and the area. `adult_females =` and `"threshold"` work in
 host mode too.
 
-**Feedback.** With α > 1 more infestations make the region more attractive
-(A_s grows as hosts move from W to I), a positive feedback that may make the
-host–fly system bistable; the equilibrium search must check for several
-roots and the tests must include α > 1.
+**Several equilibria** (decision 10). With α > 1 more infestations make the
+region more attractive (A_s grows as hosts move from W to I), a positive
+feedback that can bend the balance curve (eggs per egg − 1 as a function of
+the egg input) into an S-shape with more than one crossing. The equilibrium
+search therefore:
+
+1. evaluates the balance function on a fine log grid of the egg input
+   (about 400 points, from near zero to where wounds saturate) and refines
+   every sign change with `uniroot()`;
+2. classifies each root: a crossing from above to below zero is **stable**,
+   from below to above **unstable** (a threshold), the rule the current code
+   already applies implicitly (upper root stable, Allee threshold unstable);
+3. is used for every nonlinear case (crowding, Allee effect, host mode),
+   replacing the current step-down search; existing results must stay the
+   same (tests). Roots closer together than the grid spacing can be missed;
+   this is documented.
+
+Tests confirm the classification with the full ODE: runs started on either
+side of an unstable root go to different stable equilibria.
 
 ## 4. Parameters
 
@@ -228,9 +243,31 @@ Related existing values from the same sources, for later decisions:
 
 ## 5. Outputs
 
-* New counters: `infestations` (cases, W → I) and `superinfestations`;
+* Host blocks (decision 8): `HS` (no attractive wound), `HW` (wounded, not
+  infested), `HI` (infested, sub-stages 1 … n_I). State names follow the
+  fly blocks (`E[AA,1]`), with the host class in place of the genotype:
+  `HS[hosts]`, `HW[hosts]`, `HI[hosts,1]` … `HI[hosts,6]`; in stage 2 the
+  label becomes the class name, e.g. `HI[cattle,3]`.
+* New counters, one per host flow, so host conservation can be checked like
+  the fly flow balance:
+
+  | Counter | Flow |
+  |---|---|
+  | `hosts_wounded` | HS → HW |
+  | `wounds_healed` | HW → HS |
+  | `infestations` | HW → HI (the cases) |
+  | `infestations_ended` | last HI sub-stage → HS (larvae left) |
+  | `infestations_treated` | any HI sub-stage → HS (treatment) |
+  | `superinfestations` | fertile batches on infested hosts (no host move) |
+
   `egg_batches` and `fertile_batches` are kept.
-* `sg_hosts(sim)`: S, W, I per day (per node or km²), prevalence I / N_H.
+* `sg_hosts(sim)`: per day, per node or km², columns `unwounded`, `wounded`,
+  `infested`, `hosts` and `prevalence` (infested / hosts), with `replicate`
+  for stochastic runs.
+* `sg_equilibria(model, temperature)` (new, decision 10): every equilibrium
+  at a constant temperature, one row each, with egg input, adult females,
+  infested hosts (prevalence), wound search Ψ and `stable` (TRUE/FALSE).
+* `calibrate_population()` (new, decision 9), see WP6.
 * `sg_cases()` in host mode: `cases` = infestations; `cases_per_host` uses
   the model's host density (the `host_density` argument is then an error);
   `wound_fraction` becomes infestations per wounded host and day.
@@ -267,7 +304,12 @@ cases.
 * The equilibrium is a fixed point of the ODE; the deterministic map of the
   stochastic step converges to the ODE as dt → 0.
 * Area scaling: `adult_females =` exact in host mode.
-* α > 1: equilibrium search finds the stable root; bistability checked.
+* α > 1: `sg_equilibria()` finds every root and classifies stability; with
+  two stable equilibria, ODE runs from either side of the threshold reach
+  different ones; `sg_init()` returns the upper one with a message.
+* The grid scan leaves existing equilibria and Allee thresholds unchanged.
+* `calibrate_population()` reaches the target for each parameter;
+  `calibrate_wound_density()` results unchanged.
 * Treatment: higher `treatment_rate` lowers prevalence and larvae; the
   steady-state infested time matches D = [1 − (q_I/(q_I + κ))^{n_I}] / κ.
 * Infestation chain: without treatment the mean duration is
@@ -319,10 +361,11 @@ C++ code that must reproduce it (as in M2–M4).
 
 ### WP2. State layout and model assembly
 
-* Host block appended after F in `.sg_layout()`: H_S, H_W, H_I1 … H_In per
-  node and host class (`n_host` = 1); length 0 in `"static"` mode, so static
-  state vectors are unchanged. State names e.g. `H_W[1]`, `H_I[1,3]`;
-  `sg_state_index()` gains the host blocks.
+* Host blocks appended after F in `.sg_layout()`: `HS`, `HW` and `HI`
+  (sub-stages 1 … n_I) per node and host class (`n_host` = 1); length 0 in
+  `"static"` mode, so static state vectors are unchanged. State names
+  `HS[hosts]`, `HW[hosts]`, `HI[hosts,j]` (section 5); `sg_state_index()`
+  gains the host blocks.
 * `sg_model()`: host counts per node (N_H = host_density × area), derived
   rates (ω, γ_W, q_I, κ) in `model$counts` / the setup; `print()` shows the
   host model; hash covers the new inputs.
@@ -341,8 +384,9 @@ C++ code that must reproduce it (as in M2–M4).
   new infestations C = F W / A_s; host derivatives (section 3.4, Erlang
   chain); larval hazard + `treatment_rate` and the `"per_infested_host"`
   crowding (3.5).
-* New counters: `infestations`, `superinfestations`, `infestations_ended`,
-  `treatments` (host flows), alongside the existing ones.
+* New counters (section 5): `hosts_wounded`, `wounds_healed`,
+  `infestations`, `infestations_ended`, `infestations_treated`,
+  `superinfestations`, alongside the existing ones.
 * `simulate_ode(backend = "R")` runs host mode.
 * Tests: conservation; relaxation to W = p₀ N_H without flies; at low fly
   density Ψ equals the static Ψ with H = host_density × wounded_fraction;
@@ -371,25 +415,47 @@ C++ code that must reproduce it (as in M2–M4).
 ### WP6. Initial states, equilibrium, scaling, calibration
 
 * `"burn_in"` runs the host block with the flies.
-* `"equilibrium"` and `"threshold"`: nested root search with the host steady
-  state (section 3.7, mean infested time D); with α > 1, scan for several
-  roots and return the stable upper one, with a message if there are more.
-* `adult_females =` in host mode (exact by homogeneity).
-* `calibrate_wound_density()` in host mode: scales `host_density` (exact
-  without an Allee effect, as now for H) and says so; to be confirmed.
+* Equilibria (decision 10): grid scan and classification of section 3.7,
+  with the host steady state inside (mean infested time D), for all
+  nonlinear cases.
+  * `sg_equilibria(model, temperature)` returns all of them.
+  * `sg_init(model, "equilibrium")` returns the **highest stable**
+    equilibrium, as now; with more than one stable equilibrium it says so,
+    e.g. "2 stable equilibria at 20 degC (1000 and 85 adult females);
+    returning the upper one; see sg_equilibria()", and keeps the table in
+    its attribute.
+  * `sg_init(model, "threshold")` returns the unstable equilibrium just below
+    the returned stable one (the edge of its basin); without host feedback
+    this is the current Allee threshold.
+  * `adult_females =` uses the highest stable equilibrium, with the same
+    message when there are alternatives (exact by homogeneity).
+* Calibration (decision 9): new `calibrate_population(model, target,
+  parameter = NULL, stat = "mean", ...)` with `parameter` one of
+  `"wound_density"` (default in `"static"` mode), `"wounded_fraction"`
+  (default in `"hosts"` mode; root search bounded to (0, 1), with a clear
+  message when the target cannot be reached even with every host wounded)
+  or `"host_density"`. It uses the exact one-step formula when the model is
+  proportional to the parameter (`wound_density` or `host_density`, without
+  an Allee effect or releases) and a root search otherwise.
+  `calibrate_wound_density()` stays, unchanged, as
+  `calibrate_population(parameter = "wound_density")`; on a host-mode model
+  it stops and points to `calibrate_population()`.
 * Tests: equilibrium is an ODE fixed point; area scaling; R0 unchanged;
-  α > 1 cases.
+  existing equilibria and thresholds unchanged by the grid scan; α > 1 with
+  two stable equilibria (ODE runs from either side of the threshold reach
+  different ones); calibration of each parameter.
 
 ### WP7. Outputs and checks
 
-* `sg_hosts(sim)`: S, W, I per day, per node or km², prevalence I / N_H
-  (replicates for stochastic runs).
+* `sg_hosts(sim)`: `unwounded`, `wounded`, `infested`, `hosts`,
+  `prevalence` per day, per node or km² (replicates for stochastic runs).
 * `sg_cases()` in host mode: cases = infestations, `superinfestations`
   column, `cases_per_host` from the model's host density (`host_density`
   argument an error); `wound_fraction` = infestations per wounded host and
   day. Static mode unchanged.
 * `plot(sim, "hosts")`; `check_model()` reports host rates and the largest
-  host rate × dt; `sg_flow_balance()` adds a host conservation check.
+  host rate × dt; `sg_flow_balance()` adds a host conservation check from
+  the host counters.
 * Tests and plot snapshots.
 
 ### WP8. Scenarios, documentation, PR
@@ -402,13 +468,6 @@ C++ code that must reproduce it (as in M2–M4).
   amendments, parameter table; DECISIONS: D-030 (this note's decisions);
   NEWS; scenario README; pkgdown reference; roxygen for new functions.
 * Full check, then the PR.
-
-### Points to settle during implementation
-
-* Names of the host blocks and counters (proposed above).
-* Whether `calibrate_wound_density()` scales `host_density` in host mode or
-  a separate `calibrate_host_density()` is clearer.
-* How many roots to search for with α > 1 (bistability), and what to report.
 
 ## 9. Decisions (made by the user, 2026-10-16)
 
@@ -424,6 +483,19 @@ C++ code that must reproduce it (as in M2–M4).
 6. **Default model:** `"static"` stays the default.
 7. **Host numbers:** `host_density` and `wounded_fraction` have no defaults;
    host mode requires the user to set them.
+8. **Names:** host blocks `HS`, `HW`, `HI`; counters `hosts_wounded`,
+   `wounds_healed`, `infestations`, `infestations_ended`,
+   `infestations_treated`, `superinfestations`; `sg_hosts()` columns
+   `unwounded`, `wounded`, `infested`, `hosts`, `prevalence` (section 5).
+9. **Calibration:** one general `calibrate_population(parameter = )`
+   (`wound_density`, `wounded_fraction`, `host_density`); default
+   `wounded_fraction` in host mode, because host density usually comes from
+   a census; `calibrate_wound_density()` kept as a shortcut (WP6).
+10. **Several equilibria:** grid scan with stability classification for all
+    nonlinear cases; new `sg_equilibria()`; `sg_init("equilibrium")` and
+    `adult_females =` use the highest stable equilibrium with a message when
+    there are others; `"threshold"` is the unstable equilibrium just below it
+    (section 3.7, WP6).
 
 ## References
 
