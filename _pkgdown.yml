@@ -40,6 +40,7 @@ reference:
       - sg_allele_freq
       - sg_females
       - sg_cases
+      - sg_hosts
   - title: Checks and calibration
     contents:
       - check_model

@@ -516,7 +516,7 @@ equilibrium density of adult females (U + F, per km^2) of the wild type at
 the forcing's constant temperature (D-025). The area is scaled rather than
 the wound density H because (1) the densities in the parameters, H in
 particular, are the calibrated biology (GP2014) and stay unchanged, so only
-the size of the region (and with it the number of hosts, H A) changes; and
+the size of the region (and with it the number of wounds, H A) changes; and
 (2) every rate depends on counts only through densities (wounds, half-
 saturation h_M and larval crowding per wound are all scaled by A), so the
 equilibrium is exactly proportional to A for every model option, whereas
@@ -547,6 +547,56 @@ pipeline) grows. The demonstration (scenario 03) therefore starts from
 multiples of the threshold state. Because wounds do not limit at such low
 density (Ψ = σ₀), the threshold is proportional to h_M. Equilibrium and
 threshold states record `adult_females` (U + F) in their attribute.
+
+---
+
+## D-030 Host-wound-case model, stage 1 (Accepted, 2026-10-16)
+
+The static model counts every egg batch with a viable egg as a case, with no
+limit from the number of animals, and keeps a fixed number of wounds. At the
+user's request an optional host-wound model (`wound_model = "hosts"`) adds
+hosts without an attractive wound (HS), wounded (HW) and infested (HI, an
+Erlang chain), coupled to the flies through the attractive sites
+A_s = HW + alpha HI that replace H in wound search; a case is a new
+infestation of a host, so at most N_H hosts are infested at once while hosts
+can be infested again over time. Equations: MODEL_SPEC section 7a (H1-H3);
+design and plan: dev/HOST_WOUND_DESIGN.md. Decisions (user, 2026-10-16):
+
+1. Wounding set by `wounded_fraction` (wounded share without flies) and
+   `wound_healing_days`; host_density x wounded_fraction takes the role of
+   `wound_density`.
+2. After an infestation the host returns to HS (wound healed).
+3. Attractiveness of infested wounds alpha = 1 by default.
+4. Infestation duration: Erlang chain with its own `infestation_days` (6)
+   and `infestation_substages` (6), independent of the egg and larval
+   chains.
+5. `treatment_rate` (default 0) ends infestations and kills their larvae.
+6. `"static"` stays the default; static results are unchanged.
+7. `host_density` and `wounded_fraction` have no defaults; host mode
+   requires them.
+8. Names: blocks HS, HW, HI; counters hosts_wounded, wounds_healed,
+   infestations, infestations_ended, infestations_treated,
+   superinfestations; `sg_hosts()` columns unwounded, wounded, infested,
+   hosts, prevalence.
+9. Calibration: one `calibrate_population(parameter = )` (wound_density,
+   wounded_fraction - the host default, since host density usually comes
+   from a census - or host_density); `calibrate_wound_density()` kept.
+10. Equilibria: a grid scan with stability classification for all
+    nonlinear cases (`sg_equilibria()`); `sg_init()` uses the highest stable
+    equilibrium with a message when there are several; `"threshold"` is the
+    unstable one just below it.
+
+Findings during implementation: (a) a wound receives at most
+sigma0 a_s dx oviposition events per day; with the GP2014 a_s (0.001, set
+for a relative H) that is about 0.01 per day at 25 degC, so with real wound
+counts `wound_search_rate` needs calibrating (scenario 04 uses 0.02); (b)
+at equilibrium egg balance fixes the strike rate per wound, so host
+prevalence does not depend on alpha and alpha does not create alternative
+stable states (it scales the flies); (c) two existing bugs fixed:
+`sg_cases()` with `output_every > 1`, and HS/HW totals with
+`keep = "totals"`. Later stages: superinfestation extending infestations,
+seasonal wounding, several host classes (the `n_host` dimension),
+myiasis mortality, detection and reporting of cases.
 
 ---
 

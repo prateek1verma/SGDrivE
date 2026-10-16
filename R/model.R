@@ -55,7 +55,8 @@
 #' equilibrium density of adult females at the forcing's temperature (from
 #' [sg_init()] with `method = "equilibrium"`). Densities in `params`
 #' (`wound_density`, `male_density_half_mating`) stay as given, so the
-#' number of wounds (hosts) in the node, `wound_density` times the area,
+#' number of wounds in the node (`wound_density` times the area, or with the
+#' host-wound model the number of hosts, `host_density` times the area)
 #' scales with the region. Every rate of the model depends on counts only
 #' through densities, so the equilibrium is exactly proportional to the
 #' area, also with larval crowding or an Allee effect. `print()` shows the

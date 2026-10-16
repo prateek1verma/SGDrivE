@@ -90,7 +90,8 @@ that is. With \code{adult_females}, the area is the target divided by the
 equilibrium density of adult females at the forcing's temperature (from
 \code{\link[=sg_init]{sg_init()}} with \code{method = "equilibrium"}). Densities in \code{params}
 (\code{wound_density}, \code{male_density_half_mating}) stay as given, so the
-number of wounds (hosts) in the node, \code{wound_density} times the area,
+number of wounds in the node (\code{wound_density} times the area, or with the
+host-wound model the number of hosts, \code{host_density} times the area)
 scales with the region. Every rate of the model depends on counts only
 through densities, so the equilibrium is exactly proportional to the
 area, also with larval crowding or an Allee effect. \code{print()} shows the

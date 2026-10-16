@@ -20,7 +20,11 @@ Source tags: **[GP2014]** Gutierrez & Ponti (2014) paper or Pascal code;
   D-022).
 * Daily weather input; temperature-dependent terms precomputed per day and
   held constant within each day.
-* Not in v0.1: movement, host/wound dynamics, larval transport, explicit
+* Wounds: a fixed number of wounds (`wound_model = "static"`, default), or
+  the stage-1 host-wound model (`"hosts"`, section 7a, D-030) with hosts
+  that are wounded, heal and are infested, one host class.
+* Not in v0.1: movement, several host classes, host demography and
+  myiasis mortality, seasonal wounding, larval transport, explicit
   gonotrophic cycle, male mating capacity.
 
 ## 2. Indices and states
@@ -139,6 +143,9 @@ from class 8).
 
     μ_E(t)          from (S3)
     μ_L(t)          = −ln(s_L) [+ optional density dependence]      s_L = 0.95 d⁻¹ survival [GP2014]
+                      density dependence: γ_L L / H ("per_wound"); with the host-wound
+                      model + κ (treatment) and optionally γ_L L / (I + ε N_H)
+                      ("per_infested_host", ε = 1e-6; H2)
     μ_P(t)          = μ_T(T) [+ optional moisture term]
     μ_M(t) = μ_U(t) = μ_F(t) = μ_T(T) + μ_b
 
@@ -159,7 +166,11 @@ act through the sub-stage widths w_{g,i} only (S6).
     Ψ(t)    = σ₀ [1 − exp(−a_s Δx(T) H / N_s)]       (Ψ = σ₀ when N_s = 0)
 
 H = number of wounds available in the node (= wound density × A), a_s =
-search constant (dd⁻¹), σ₀ = baseline search efficiency (default 1).
+search constant (dd⁻¹), σ₀ = baseline search efficiency (default 1). With
+the host-wound model H is replaced by the attractive sites A_s (H2). A wound
+receives at most σ₀ a_s Δx oviposition events per day, however many flies
+there are; with real wound counts a_s therefore needs calibrating (the
+GP2014 value was set for a relative H).
 
 **(S9) Egg production by offspring genotype** [MGDrivE] + [GP2014 Eq. 5]
 
@@ -168,6 +179,57 @@ search constant (dd⁻¹), σ₀ = baseline search efficiency (default 1).
 R = maximum eggs per egg-laying female per day (90 [GP2014]). τ applied at
 egg production (O-001). Implementation: precompute T[g,m,k] = s_g · ih · τ,
 then B = R φ_ov Ψ · (vec(W)ᵀ · matrix(T, n_G², n_G)).
+
+## 7a. Host-wound model (D-030, `wound_model = "hosts"`)
+
+Design note: dev/HOST_WOUND_DESIGN.md. One host class; N_H = host density ×
+A hosts per node.
+
+**(H1) Host states and equations.** S: hosts without an attractive wound;
+W: wounded, not infested; I_1 … I_n: infested, an Erlang chain of
+n = `infestation_substages`. Rates per host and day: healing γ_W =
+1 / `wound_healing_days`; wounding ω = γ_W p₀ / (1 − p₀) with p₀ =
+`wounded_fraction` (the wounded share without flies); q_I = n /
+`infestation_days`; treatment κ = `treatment_rate` (from any sub-stage).
+
+    dS/dt   = −ω S + γ_W W + q_I I_n + κ I
+    dW/dt   =  ω S − γ_W W − C
+    dI_1/dt =  C − (q_I + κ) I_1
+    dI_j/dt =  q_I I_{j−1} − (q_I + κ) I_j          (j = 2, …, n)
+
+with I = Σ_j I_j; S + W + I is constant.
+
+**(H2) Coupling to the flies.** Attractive sites A_s = W + α I (α =
+`infested_wound_attractiveness`) replace H in S8. With F the fertile
+oviposition events per day (S17; the `fertile_batches` rate), batches are
+shared among wounds by attractiveness:
+
+    C = F W / A_s            new infestations (cases; 0 when A_s = 0)
+    F α I / A_s              superinfestations (larvae added, no case)
+
+The larval hazard gains κ (treated hosts lose their larvae) and, with
+`larval_crowding_mode = "per_infested_host"`, γ_L L / (I + ε N_H) (S7).
+Counters: hosts_wounded (ω S), wounds_healed (γ_W W), infestations (C),
+infestations_ended (q_I I_n), infestations_treated (κ I),
+superinfestations.
+
+**(H3) Chain-binomial host step** (after eggs S17, before mating S18; counts
+at the start of the step). With B⁺ the step's fertile oviposition events
+(drawn as Poisson(Ψ f Σ W (1 − e^{−C v}) dt) when `oviposition_mode =
+"eggs"`):
+
+    n_W ~ Binomial(B⁺, W / A_s)                     batches on uninfested wounds
+    k   = distinct hosts hit by n_W batches on W hosts (batch by batch: a new
+          host with probability (W − k) / W)        cases, k ≤ W
+    healed  ~ Binomial(W − k, 1 − e^{−γ_W dt})
+    infestation chain: S16 moves with q_I and hazard κ (both exits to S)
+    wounded ~ Binomial(S, 1 − e^{−ω dt})
+
+New infestations enter I_1 at the end of the step; superinfestations =
+B⁺ − k. In the deterministic map k = W (1 − e^{−n_W / W}). Because new
+infestations enter at the end of a step and the S15 quantities are held
+fixed within it, the deterministic map has about 1.5% more infested hosts
+than the ODE at dt = 0.1 (0.3% at dt = 0.02; McAllen 1971, scenario 04).
 
 ## 8. Life-cycle equations
 
@@ -339,7 +401,8 @@ only when no compatible male is present).
 the rest die at emergence. Survivors arrive in the adult chains (S16, S18).
 
 **Order of draws in a step.** Aggregates (S15); eggs (S17, pairs (g, m) with
-m fastest: events, fertile events, then eggs, then split); mating (S18, genotype then sub-stage); chain moves (S16) block by
+m fastest: events, fertile events, then eggs, then split); hosts (H3, host-wound
+model); mating (S18, genotype then sub-stage); chain moves (S16) block by
 block (E, L, P, M, U, F) and compartment by compartment in state order;
 emergence (S19, by genotype); arrivals block by block in state order (eggs
 by genotype, larvae, pupae, males; then females by genotype: death, mating,
@@ -361,7 +424,8 @@ negative. Random numbers come from R's generator; replicate r uses
 L'Ecuyer-CMRG stream r derived from the seed (D-022).
 
 **Extinction.** No population floors. A stochastic replicate is extinct on
-the first day that ends with every compartment at zero. Eradication
+the first day that ends with every fly compartment at zero (host states do
+not count; host-mode runs continue, as the hosts keep changing). Eradication
 summaries with an extinction threshold (default 1 individual) for the ODE
 follow in M5.
 
@@ -396,15 +460,29 @@ follow in M5.
 
   R0 is the number of eggs per egg at low density; without a positive
   equilibrium (R0 ≤ 1 or no development) the state is empty. With larval
-  crowding (μ_L depends on L, solved by a one-dimensional root) or an Allee
-  effect (g_find depends on M̄) B* is found by a one-dimensional root
-  search, taking the upper (stable) root.
+  crowding (μ_L depends on L, solved by a one-dimensional root), an Allee
+  effect (g_find depends on M̄) or the host-wound model, every equilibrium
+  is found by scanning gap(log B) = log(R φ_ov T_ww Ψ W(B)) − log B on a
+  log grid (20 points per decade over 30 decades below an upper bound),
+  refining each sign change and classifying it: from above to below zero
+  stable, from below to above unstable (D-030, decision 10). The highest
+  stable equilibrium is returned (with a message when there are several).
+  With the host-wound model egg balance fixes F = B · (batch factor) ·
+  (fertile share) / (R φ_ov T_ww) for each B, so the host steady state is
+  solved first: with b = C / W, I = b W D, S = (γ_W + b) W / ω,
+  W = N_H / (1 + (γ_W + b)/ω + b D) and b W (1 + α b D) = F, where
+  D = [1 − (q_I/(q_I + κ))^n] / κ (n / q_I without treatment) is the mean
+  infested time. At equilibrium the strike rate per wound is fixed by Ψ*,
+  so host prevalence does not depend on α. `sg_equilibria()` lists all
+  equilibria, including extinction.
 * `"threshold"` (D-029): with an Allee effect (h_M > 0, mating "rate") egg
   production per egg, R φ_ov T_ww Ψ W(B)/B, falls to zero as B → 0 because
   g_find ≈ M̄/(h_M A) → 0, so the same equation has a lower root: the
   unstable equilibrium (Allee threshold) below which the population
   declines. At such low density Ψ = σ₀, so the threshold is proportional to
-  h_M. Without an Allee effect there is no threshold (empty state).
+  h_M. Without an Allee effect there is no threshold (empty state). In
+  general `"threshold"` is the unstable equilibrium just below the returned
+  stable one.
 
 ## 12. Outputs (D-026)
 
@@ -413,16 +491,21 @@ follow in M5.
 | Totals (`sg_totals()`, `as.data.frame()`) | Counts summed over sub-stages by stage (E, L, P, M, U, F), sex, genotype and mate genotype; per node or per km² (÷ A) |
 | Allele frequencies (`sg_allele_freq()`) | Σ_g N_g a_{g,ℓ} / Σ_{g,ℓ} N_g a_{g,ℓ} over the chosen stages, with a_{g,ℓ} the copies of allele ℓ in genotype g (single-letter alleles in genotype names by default) |
 | Female classes (`sg_females()`) | All adult females U + F; wild type: genotype in the cube's wild type; egg-laying: W = Σ_{g,m} W_{g,m} (S8); fertile-equivalent: Σ_{g,m} F_{g,m} v_{g,m} / v_ref with v_{g,m} = Σ_k T[g,m,k] and v_ref its largest value over wild-type pairs |
-| Case proxy (`sg_cases()`) | Oviposition events with at least one viable egg (fertile_batches counter, S17): wounds newly infested with viable eggs, per km² and period; females mated to sterile males cause no cases; daily wound fraction = cases / (H A days); cases per host = cases per km² / host density. All oviposition events (egg_batches) are also reported. |
+| Case proxy (`sg_cases()`) | Static wounds: oviposition events with at least one viable egg (fertile_batches counter, S17): wounds newly infested with viable eggs, per km² and period; females mated to sterile males cause no cases; daily wound fraction = cases / (H A days); cases per host = cases per km² / host density. Host-wound model: new infestations of hosts (infestations counter, H2), with superinfestations, cases per host = cases / N_H and wound fraction per wounded host. All oviposition events (egg_batches) are also reported. |
+| Hosts (`sg_hosts()`) | Host-wound model: S, W, I (summed over sub-stages), N_H and prevalence I / N_H |
 
 **Checks and calibration.** R0 (`sg_r0()`, `check_model()`) is the eggs per
 egg at low density of the wild type at the day's or a constant temperature:
 R φ_ov T_ww Ψ₀ W(1), with Ψ₀ = σ₀ and W(1) the egg-laying females per unit
-egg input from the chain steady state (section 11). `calibrate_wound_density()` sets H so
-that a summary of the ODE population after a burn-in (default: mean adult
-density per km² over the forcing period) equals a target; without an Allee
-effect or releases all equations are homogeneous of degree one in (state, H),
-so the population is proportional to H and H* = H · target / value.
+egg input from the chain steady state (section 11). `calibrate_population()` (D-030) sets
+`wound_density` (static), `wounded_fraction` (host default) or
+`host_density` so that a summary of the ODE population after a burn-in
+(default: mean adult density per km² over the forcing period) equals a
+target; without an Allee effect or releases all equations are homogeneous
+of degree one in (state, H) or (state, N_H), so the population is
+proportional to that density and value* = value · target / achieved;
+`wounded_fraction` needs a root search. `calibrate_wound_density()` is the
+static shortcut. `sg_flow_balance()` adds a host conservation residual.
 
 ## 13. Parameters
 
@@ -480,6 +563,16 @@ parameters by descriptive names (D-027). Symbol, name, default and units:
 | h_M | `male_density_half_mating` | 0 | males km^-2 |
 | mating | `mating_mode` | "rate" | - |
 | ext_threshold | `extinction_threshold` | 1 | individuals |
+| - | `wound_model` | "static" | - |
+| N_H | `host_density` | NA (required with "hosts") | animals km^-2 |
+| p_0 | `wounded_fraction` | NA (required with "hosts") | - |
+| 1/gamma_W | `wound_healing_days` | 7 | d |
+| n_I/q_I | `infestation_days` | 6 | d |
+| n_I | `infestation_substages` | 6 | - |
+| alpha | `infested_wound_attractiveness` | 1 | - |
+| kappa | `treatment_rate` | 0 | d^-1 |
+
+`larval_crowding_mode` also takes `"per_infested_host"` (host-wound model).
 
 Cube-derived quantities (ℓ_g, φ_g, ξ_F,g, ξ_M,g, s_g, η, ih, τ) come from
 `sg_cube()`; the node area A comes from `sg_model()`.

@@ -1,5 +1,36 @@
 # SGDrivE 0.0.0.9000
 
+## Host-wound-case model (stage 1)
+
+* `sg_params(wound_model = "hosts", host_density = , wounded_fraction = )`
+  switches on the host-wound model (D-030): hosts are wounded, heal and are
+  infested (an Erlang chain of `infestation_substages` over
+  `infestation_days`), attractive sites replace the fixed wound density in
+  wound search, and a case is a new infestation of a host, so at most as
+  many animals are infested at once as there are hosts. Optional
+  `treatment_rate`, `infested_wound_attractiveness` and larval crowding per
+  infested host. The default `wound_model = "static"` is unchanged.
+* Host mode works in `simulate_ode()` (R and C++), `simulate_cb()` (exact
+  occupancy draw: no step infests more hosts than are wounded), `sg_init()`
+  (constant, burn-in, equilibrium, threshold), `adult_females =`,
+  `sg_r0()` and `check_model()`.
+* New `sg_hosts()`, `plot(sim, "hosts")`; `sg_cases()` counts new
+  infestations in host mode, with superinfestations and cases per host;
+  `sg_flow_balance()` checks host conservation.
+* New `sg_equilibria()`: every equilibrium at a constant temperature and
+  its stability (grid scan; also with crowding and an Allee effect).
+* New `calibrate_population(parameter = )` for `wound_density`,
+  `wounded_fraction` or `host_density`; `calibrate_wound_density()` is a
+  shortcut.
+* `check_model()` reports the largest number of oviposition events per
+  wound per day (sigma0 * wound_search_rate * dx): with real wound counts
+  the Gutierrez & Ponti search rate lets a wound be found rarely, so it
+  needs calibrating.
+* New scenario script `inst/scenarios/04_host_limited_cases.R`.
+* Fixed: `sg_cases()` failed when states were recorded less often than
+  daily (`output_every > 1`); stochastic runs with `keep = "totals"` lost
+  totals of host blocks.
+
 ## Allee threshold
 
 * `sg_init(method = "threshold")` gives the Allee threshold of a wild-type

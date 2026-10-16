@@ -1,8 +1,9 @@
 # Host–wound–case model, stage 1 (design note)
 
-Status: **draft**, 2026-10-15; decisions of section 9 made by the user on
-2026-10-16. Nothing here is implemented.
-Proposed decision number: D-030.
+Status: **implemented** on branch `host-wound` (WP1-WP8), 2026-10-16;
+decisions of section 9 made by the user on 2026-10-16. Decision D-030
+(DECISIONS.md); equations in MODEL_SPEC section 7a. Findings during
+implementation are recorded in D-030.
 
 ## 1. Why
 
