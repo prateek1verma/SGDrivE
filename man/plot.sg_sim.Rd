@@ -7,7 +7,7 @@
 \usage{
 \method{plot}{sg_sim}(
   x,
-  what = c("stages", "genotypes", "alleles", "females", "cases"),
+  what = c("stages", "genotypes", "alleles", "females", "cases", "hosts"),
   stages = NULL,
   per = c("km2", "node"),
   period = "week",
@@ -19,7 +19,7 @@
 
 \method{plot}{sg_sim_cb}(
   x,
-  what = c("stages", "genotypes", "alleles", "females", "cases"),
+  what = c("stages", "genotypes", "alleles", "females", "cases", "hosts"),
   stages = NULL,
   per = c("km2", "node"),
   period = "week",
@@ -35,7 +35,9 @@
 \item{what}{What to plot: \code{"stages"} (totals by stage), \code{"genotypes"}
 (totals by genotype of the chosen \code{stages}), \code{"alleles"} (allele
 frequencies, \code{\link[=sg_allele_freq]{sg_allele_freq()}}), \code{"females"} (female classes,
-\code{\link[=sg_females]{sg_females()}}) or \code{"cases"} (cases per period, \code{\link[=sg_cases]{sg_cases()}}).}
+\code{\link[=sg_females]{sg_females()}}), \code{"cases"} (cases per period, \code{\link[=sg_cases]{sg_cases()}}) or \code{"hosts"}
+(hosts without a wound, wounded and infested, \code{\link[=sg_hosts]{sg_hosts()}}; host-wound
+model only).}
 
 \item{stages}{Stages included for \code{"stages"}, \code{"genotypes"} and
 \code{"alleles"} (see \code{\link[=sg_totals]{sg_totals()}}); default all stages for \code{"stages"},
@@ -46,7 +48,8 @@ adults otherwise.}
 \item{period}{For \code{"cases"}: \code{"day"}, \code{"week"} (default), \code{"month"} or
 \code{"year"}.}
 
-\item{host_density}{For \code{"cases"}: hosts per km^2; plots cases per host.}
+\item{host_density}{For \code{"cases"}: hosts per km^2; plots cases per host
+(with the host-wound model cases per host are plotted without it).}
 
 \item{replicates}{For stochastic runs: which replicates to draw (default
 all).}

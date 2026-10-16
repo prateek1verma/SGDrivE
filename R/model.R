@@ -455,18 +455,6 @@ print.sg_model <- function(x, ...) {
   )
 }
 
-# Stop for features of the host-wound model that later work packages of
-# D-030 implement.
-.sg_require_static <- function(model, what) {
-  if (!is.null(model$hosts)) {
-    .sg_stop(
-      what, " is not available yet for wound_model = \"hosts\" (the host-wound ",
-      "model, D-030, is being implemented)."
-    )
-  }
-  invisible(TRUE)
-}
-
 # Release events with the state position they are added to (first sub-stage).
 .sg_release_events <- function(model, releases) {
   ev <- .sg_resolve_releases(releases, model$forcing$dates, model$area, model$cube$genotypes)

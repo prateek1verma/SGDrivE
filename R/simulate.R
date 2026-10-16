@@ -210,6 +210,14 @@ print.sg_sim <- function(x, ...) {
     paste0(names(last), " ", format(last, digits = 4L), collapse = ", "), "\n",
     sep = ""
   )
+  if (!is.null(m$info$hosts)) {
+    hs <- sg_hosts(x)
+    cat(sprintf(
+      "  hosts: %s infested of %s at the end (prevalence %.3g); %s infestations\n",
+      format(hs$infested[nrow(hs)], digits = 4L), format(hs$hosts[nrow(hs)], digits = 6L),
+      hs$prevalence[nrow(hs)], format(sum(x$counters[, "infestations"]), digits = 5L)
+    ))
+  }
   cat(sprintf(
     "  eggs laid %s; adults emerged %s; released %s\n",
     format(sum(x$counters[, grepl("^eggs_laid", colnames(x$counters))]), digits = 5L),

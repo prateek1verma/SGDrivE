@@ -11,14 +11,17 @@
 #' @param what What to plot: `"stages"` (totals by stage), `"genotypes"`
 #'   (totals by genotype of the chosen `stages`), `"alleles"` (allele
 #'   frequencies, [sg_allele_freq()]), `"females"` (female classes,
-#'   [sg_females()]) or `"cases"` (cases per period, [sg_cases()]).
+#'   [sg_females()]), `"cases"` (cases per period, [sg_cases()]) or `"hosts"`
+#'   (hosts without a wound, wounded and infested, [sg_hosts()]; host-wound
+#'   model only).
 #' @param stages Stages included for `"stages"`, `"genotypes"` and
 #'   `"alleles"` (see [sg_totals()]); default all stages for `"stages"`,
 #'   adults otherwise.
 #' @param per `"km2"` (default) or `"node"`.
 #' @param period For `"cases"`: `"day"`, `"week"` (default), `"month"` or
 #'   `"year"`.
-#' @param host_density For `"cases"`: hosts per km^2; plots cases per host.
+#' @param host_density For `"cases"`: hosts per km^2; plots cases per host
+#'   (with the host-wound model cases per host are plotted without it).
 #' @param replicates For stochastic runs: which replicates to draw (default
 #'   all).
 #' @param palette Colour palette, all suitable for colour-blind readers:
@@ -45,7 +48,7 @@
 #'   plot(sim, "alleles")
 #'   plot(sim, "cases", period = "month")
 #' }
-plot.sg_sim <- function(x, what = c("stages", "genotypes", "alleles", "females", "cases"),
+plot.sg_sim <- function(x, what = c("stages", "genotypes", "alleles", "females", "cases", "hosts"),
                         stages = NULL, per = c("km2", "node"), period = "week",
                         host_density = NULL, replicates = NULL,
                         palette = c("okabe_ito", "brewer", "viridis"), ...) {
@@ -54,7 +57,8 @@ plot.sg_sim <- function(x, what = c("stages", "genotypes", "alleles", "females",
 
 #' @rdname plot.sg_sim
 #' @export
-plot.sg_sim_cb <- function(x, what = c("stages", "genotypes", "alleles", "females", "cases"),
+plot.sg_sim_cb <- function(x,
+                           what = c("stages", "genotypes", "alleles", "females", "cases", "hosts"),
                            stages = NULL, per = c("km2", "node"), period = "week",
                            host_density = NULL, replicates = NULL,
                            palette = c("okabe_ito", "brewer", "viridis"), ...) {
@@ -79,10 +83,13 @@ plot.sg_sim_cb <- function(x, what = c("stages", "genotypes", "alleles", "female
 #'   sim <- simulate_ode(sg_model(p, sg_cube(MGDrivE::cubeMendelian()), wx))
 #'   head(sg_plot_data(sim, "genotypes"))
 #' }
-sg_plot_data <- function(sim, what = c("stages", "genotypes", "alleles", "females", "cases"),
+sg_plot_data <- function(sim,
+                         what = c("stages", "genotypes", "alleles", "females", "cases", "hosts"),
                          stages = NULL, per = c("km2", "node"), period = "week",
                          host_density = NULL, replicates = NULL) {
-  what <- .sg_match_choice(what, c("stages", "genotypes", "alleles", "females", "cases"), "what")
+  what <- .sg_match_choice(
+    what, c("stages", "genotypes", "alleles", "females", "cases", "hosts"), "what"
+  )
   per <- .sg_match_choice(per, c("km2", "node"), "per")
   .sg_sim_info(sim)
   unit <- if (per == "km2") "per km^2" else "per node"
@@ -132,8 +139,22 @@ sg_plot_data <- function(sim, what = c("stages", "genotypes", "alleles", "female
         } else {
           paste("cases per host per", period)
         },
-        title = "Wounds newly infested with viable eggs"
+        title = if (is.null(.sg_sim_info(sim)$hosts)) {
+          "Wounds newly infested with viable eggs"
+        } else {
+          "New infestations of hosts"
+        }
       )
+    },
+    hosts = {
+      hs <- sg_hosts(sim, per = per)
+      classes <- c("unwounded", "wounded", "infested")
+      ids <- intersect(c("date", "replicate"), names(hs))
+      out <- do.call(rbind, lapply(classes, function(cl) {
+        cbind(hs[ids], series = cl, value = hs[[cl]])
+      }))
+      out$series <- factor(out$series, levels = classes)
+      structure(out, ylab = paste("hosts", unit), title = "Hosts")
     }
   )
   if (!is.null(replicates) && "replicate" %in% names(d)) {

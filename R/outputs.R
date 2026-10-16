@@ -181,16 +181,19 @@ sg_females <- function(sim, per = c("node", "km2")) {
 
 #' Case proxy: wounds newly infested with viable eggs
 #'
-#' Myiasis cases by period: oviposition events (egg batches) that contain at
-#' least one viable egg (D-026). Eggs of females mated to sterile males cannot
-#' hatch, so their oviposition is not a case.
+#' Myiasis cases by period. With `wound_model = "static"`: oviposition events
+#' (egg batches) that contain at least one viable egg (D-026). With
+#' `wound_model = "hosts"`: new infestations of hosts (D-030), so at most as
+#' many animals are infested at once as there are hosts. Eggs of females
+#' mated to sterile males cannot hatch, so their oviposition is not a case.
 #'
 #' @param sim A simulation from [simulate_ode()] or [simulate_cb()].
 #' @param period `"day"`, `"week"` (seven-day blocks from the first day),
 #'   `"month"` or `"year"` (calendar).
 #' @param per `"km2"` (per km^2, default) or `"node"`.
 #' @param host_density Optional density of hosts (animals per km^2); adds
-#'   cases per host.
+#'   cases per host. Not used with the host-wound model, whose own host
+#'   density gives `cases_per_host`.
 #' @details Cases come from the `fertile_batches` counter: a batch of C eggs
 #'   (the clutch size, R phi_ov by default) laid by a female of genotype g
 #'   mated to a male of genotype m holds at least one viable egg with
@@ -199,12 +202,19 @@ sg_females <- function(sim, per = c("node", "km2")) {
 #'   rate; in stochastic runs batches are drawn and those with viable eggs
 #'   counted (whole numbers). Cases are counted at oviposition; viable eggs
 #'   that later die of temperature are not removed.
+#'
+#'   With the host-wound model cases come from the `infestations` counter:
+#'   fertile batches laid on uninfested wounds, counted once per host they
+#'   infest; fertile batches on hosts already infested are
+#'   `superinfestations`.
 #' @return A data frame with columns `period` (first day), `days`,
 #'   `replicate` (stochastic runs only), `cases` (per km^2 or node), `events`
 #'   (all oviposition events, also those with no viable egg),
 #'   `wound_fraction` (cases per available wound and day: the mean daily
-#'   fraction of wounds newly infested with viable eggs) and, with
-#'   `host_density`, `cases_per_host`.
+#'   fraction of wounds newly infested with viable eggs; with the host-wound
+#'   model, per wounded host, averaged over the recorded days of the period)
+#'   and, with `host_density` or the host-wound model, `cases_per_host`. With
+#'   the host-wound model also `superinfestations`.
 #' @export
 #' @examples
 #' if (requireNamespace("MGDrivE", quietly = TRUE)) {
@@ -223,6 +233,13 @@ sg_cases <- function(sim, period = c("day", "week", "month", "year"), per = c("k
     if (!ok) .sg_stop("`host_density` must be a single positive number (hosts per km^2).")
   }
   info <- .sg_sim_info(sim)
+  hosts <- info$hosts
+  if (!is.null(hosts) && !is.null(host_density)) {
+    .sg_stop(
+      "`host_density` is not used with the host-wound model; cases per host use the ",
+      "model's own host density."
+    )
+  }
   k <- sim$counters
   if (!"fertile_batches" %in% dimnames(k)[[2L]]) {
     .sg_stop("This simulation was made by an older version of SGDrivE; run it again.")
@@ -231,7 +248,8 @@ sg_cases <- function(sim, period = c("day", "week", "month", "year"), per = c("k
     v <- if (length(dim(k)) == 3L) k[, name, ] else k[, name]
     matrix(v, nrow = dim(k)[1L])
   }
-  dates <- sim$date[-1L]
+  # counters are daily even when states are recorded less often (output_every)
+  dates <- sim$date[1L] + seq_len(dim(k)[1L])
   key <- switch(EXPR = period,
     day = format(dates),
     week = format(dates[1L] + 7L * ((seq_along(dates) - 1L) %/% 7L)),
@@ -240,17 +258,41 @@ sg_cases <- function(sim, period = c("day", "week", "month", "year"), per = c("k
   )
   groups <- unique(key)
   agg <- outer(key, groups, `==`) * 1
-  cases <- t(agg) %*% column("fertile_batches") # [period, replicate], per node
+  cases <- t(agg) %*% column(if (is.null(hosts)) "fertile_batches" else "infestations")
   events <- t(agg) %*% column("egg_batches")
   days <- colSums(agg)
   wounds <- info$H * info$area # wounds per node
+  if (!is.null(hosts)) {
+    superinf <- t(agg) %*% column("superinfestations")
+    # wounded hosts on the recorded days of each period, averaged
+    h <- sg_hosts(sim)
+    out_key <- key[match(h$date, dates)]
+    reps <- if (is.null(h$replicate)) rep(1L, nrow(h)) else h$replicate
+    wounded <- vapply(seq_len(ncol(cases)), function(r) {
+      vapply(groups, function(g) {
+        sel <- reps == r & !is.na(out_key) & out_key == g
+        if (any(sel)) mean(h$wounded[sel]) else NA_real_
+      }, 0)
+    }, numeric(length(groups)))
+    wounded <- matrix(wounded, length(groups))
+  }
   scale <- if (per == "km2") 1 / info$area else 1
   out <- lapply(seq_len(ncol(cases)), function(r) {
+    wf <- if (!is.null(hosts)) {
+      ifelse(wounded[, r] > 0, cases[, r] / (wounded[, r] * days), NA_real_)
+    } else if (wounds > 0) {
+      cases[, r] / (wounds * days)
+    } else {
+      NA_real_
+    }
     d <- data.frame(
       period = as.Date(dates[match(groups, key)]), days = as.integer(days),
-      cases = cases[, r] * scale, events = events[, r] * scale,
-      wound_fraction = if (wounds > 0) cases[, r] / (wounds * days) else NA_real_
+      cases = cases[, r] * scale, events = events[, r] * scale, wound_fraction = wf
     )
+    if (!is.null(hosts)) {
+      d$superinfestations <- superinf[, r] * scale
+      d$cases_per_host <- cases[, r] / hosts$n
+    }
     if (!is.null(host_density)) d$cases_per_host <- cases[, r] / info$area / host_density
     if (inherits(sim, "sg_sim_cb")) d <- cbind(d[1:2], replicate = r, d[-(1:2)])
     d
@@ -263,13 +305,55 @@ sg_cases <- function(sim, period = c("day", "week", "month", "year"), per = c("k
 # ---- internal ------------------------------------------------------------------
 
 # Output information stored in a simulation's metadata (D-026).
+#' Hosts of the host-wound model
+#'
+#' Numbers of hosts without an attractive wound, wounded and infested, for a
+#' simulation of a model with `wound_model = "hosts"` (D-030).
+#'
+#' @inheritParams sg_totals
+#' @return A data frame with columns `day`, `date`, `replicate` (stochastic
+#'   runs only), `unwounded`, `wounded`, `infested` (summed over infestation
+#'   sub-stages), `hosts` (all three) and `prevalence` (infested / hosts).
+#'   Counts are per node, or per km^2 with `per = "km2"`.
+#' @seealso [sg_cases()], [sg_params()] (host parameters)
+#' @export
+#' @examples
+#' if (requireNamespace("MGDrivE", quietly = TRUE)) {
+#'   p <- sg_params(wound_model = "hosts", host_density = 30, wounded_fraction = 0.05)
+#'   mod <- sg_model(p, sg_cube(MGDrivE::cubeMendelian()),
+#'     sg_forcing(sg_constant_weather(25, days = 60), p),
+#'     area = 1000
+#'   )
+#'   tail(sg_hosts(simulate_ode(mod, init = sg_init(mod, "equilibrium"))))
+#' }
+sg_hosts <- function(sim, per = c("node", "km2")) {
+  per <- .sg_match_choice(per, c("node", "km2"), "per")
+  info <- .sg_sim_info(sim)
+  if (is.null(info$hosts)) {
+    .sg_stop("sg_hosts() needs a simulation of a model with wound_model = \"hosts\".")
+  }
+  a <- .sg_sim_array(sim)
+  nm <- dimnames(a$array)[[2L]]
+  col_sum <- function(prefix) {
+    w <- matrix(as.numeric(startsWith(nm, prefix)), ncol = 1L)
+    as.vector(.sg_apply_cols(a$array, w)[, 1L, ])
+  }
+  out <- data.frame(unwounded = col_sum("HS["), wounded = col_sum("HW["), infested = col_sum("HI["))
+  out$hosts <- out$unwounded + out$wounded + out$infested
+  out$prevalence <- ifelse(out$hosts > 0, out$infested / out$hosts, NA_real_)
+  if (per == "km2") out[1:4] <- out[1:4] / info$area
+  cbind(.sg_time_columns(sim), out)
+}
+
 .sg_output_info <- function(model) {
   cb <- model$cube
   laying <- model$adult$female$flags$X_ovi
   if (is.null(laying)) laying <- rep(TRUE, model$dims$n_A)
+  h <- model$hosts
   list(
     area = model$area, H = model$params$wound_density, genotypes = cb$genotypes,
-    wild_type = cb$wild_type, laying = as.logical(laying), viability = cb$egg_total
+    wild_type = cb$wild_type, laying = as.logical(laying), viability = cb$egg_total,
+    hosts = if (is.null(h)) NULL else list(n = h$n, classes = h$classes)
   )
 }
 
@@ -315,6 +399,8 @@ sg_cases <- function(sim, period = c("day", "week", "month", "year"), per = c("k
 # replicate] with a descriptor of the columns.
 .sg_stage_array <- function(sim, need_mate = FALSE) {
   a <- .sg_sim_array(sim)
+  fly <- !.sg_is_host_name(dimnames(a$array)[[2L]]) # host states are not fly stages
+  a$array <- a$array[, fly, , drop = FALSE]
   nm <- dimnames(a$array)[[2L]]
   if (a$level == "totals" && need_mate) {
     .sg_stop("Mate genotypes need the full state; run simulate_cb() with keep = \"state\".")
@@ -341,6 +427,9 @@ sg_cases <- function(sim, period = c("day", "week", "month", "year"), per = c("k
   )
   list(array = .sg_apply_cols(a$array, agg), cols = cols)
 }
+
+# Host states of the host-wound model (D-030): "HS[...]", "HW[...]", "HI[...]".
+.sg_is_host_name <- function(nm) grepl("^H[SWI]\\[", nm)
 
 .sg_stage_names <- c("eggs", "larvae", "pupae", "males", "unmated_females", "mated_females")
 

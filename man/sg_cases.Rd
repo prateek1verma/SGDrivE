@@ -20,20 +20,25 @@ sg_cases(
 \item{per}{\code{"km2"} (per km^2, default) or \code{"node"}.}
 
 \item{host_density}{Optional density of hosts (animals per km^2); adds
-cases per host.}
+cases per host. Not used with the host-wound model, whose own host
+density gives \code{cases_per_host}.}
 }
 \value{
 A data frame with columns \code{period} (first day), \code{days},
 \code{replicate} (stochastic runs only), \code{cases} (per km^2 or node), \code{events}
 (all oviposition events, also those with no viable egg),
 \code{wound_fraction} (cases per available wound and day: the mean daily
-fraction of wounds newly infested with viable eggs) and, with
-\code{host_density}, \code{cases_per_host}.
+fraction of wounds newly infested with viable eggs; with the host-wound
+model, per wounded host, averaged over the recorded days of the period)
+and, with \code{host_density} or the host-wound model, \code{cases_per_host}. With
+the host-wound model also \code{superinfestations}.
 }
 \description{
-Myiasis cases by period: oviposition events (egg batches) that contain at
-least one viable egg (D-026). Eggs of females mated to sterile males cannot
-hatch, so their oviposition is not a case.
+Myiasis cases by period. With \code{wound_model = "static"}: oviposition events
+(egg batches) that contain at least one viable egg (D-026). With
+\code{wound_model = "hosts"}: new infestations of hosts (D-030), so at most as
+many animals are infested at once as there are hosts. Eggs of females
+mated to sterile males cannot hatch, so their oviposition is not a case.
 }
 \details{
 Cases come from the \code{fertile_batches} counter: a batch of C eggs
@@ -44,6 +49,11 @@ eggs (sum over offspring of s ih tau). In the ODE this gives the daily
 rate; in stochastic runs batches are drawn and those with viable eggs
 counted (whole numbers). Cases are counted at oviposition; viable eggs
 that later die of temperature are not removed.
+
+With the host-wound model cases come from the \code{infestations} counter:
+fertile batches laid on uninfested wounds, counted once per host they
+infest; fertile batches on hosts already infested are
+\code{superinfestations}.
 }
 \examples{
 if (requireNamespace("MGDrivE", quietly = TRUE)) {

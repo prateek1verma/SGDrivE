@@ -86,11 +86,6 @@ test_that("a full state is checked against the number of hosts", {
   expect_error(sg_init(m, "state", state = x[-1]), "length")
 })
 
-test_that("check_model() refuses host models until WP7", {
-  m <- model_of(host_params())
-  expect_error(check_model(m), "not available yet")
-})
-
 test_that("the model view carries the host block to C++", {
   m <- model_of(host_params(infestation_substages = 3, treatment_rate = 0.2))
   v <- SGDrivE:::.sg_model_view(m)
@@ -588,4 +583,100 @@ test_that("calibrate_population() calibrates each population-size parameter", {
   expect_error(calibrate_population(m_static, 50, parameter = "host_density"), "is not used")
   expect_error(calibrate_wound_density(m, 50), "use calibrate_population")
   expect_error(calibrate_population(m, 1e9), "No wounded fraction")
+})
+
+# ---- outputs and checks (WP7) -----------------------------------------------
+
+out_model <- function(days = 120) {
+  p <- region_params(treatment_rate = 0.02)
+  region_model(p, days = days)
+}
+
+test_that("sg_hosts() reports hosts for ODE and stochastic runs", {
+  m <- out_model()
+  e <- sg_init(m, "equilibrium")
+  s <- simulate_ode(m, e)
+  h <- sg_hosts(s)
+  expect_named(h, c("day", "date", "unwounded", "wounded", "infested", "hosts", "prevalence"))
+  expect_equal(h$hosts, rep(30000, nrow(h)), tolerance = 1e-10)
+  expect_equal(h$prevalence, h$infested / h$hosts)
+  expect_equal(sg_hosts(s, per = "km2")$hosts, rep(30, nrow(h)), tolerance = 1e-10)
+  expect_equal(h$infested[1], sum(e[sg_state_index(m, "HI")]))
+  cb <- simulate_cb(m, e, n_rep = 2, seed = 1, output_every = 10)
+  hc <- sg_hosts(cb)
+  expect_true("replicate" %in% names(hc))
+  expect_true(all(hc$hosts == round(hc$hosts)))
+  hct <- sg_hosts(simulate_cb(m, e, n_rep = 2, seed = 1, output_every = 10, keep = "totals"))
+  expect_equal(hct[names(hc)], hc)
+  s_static <- simulate_ode(region_model(sg_params(), days = 10))
+  expect_error(sg_hosts(s_static), "wound_model = \"hosts\"")
+})
+
+test_that("sg_cases() counts new infestations of hosts in host mode", {
+  m <- out_model()
+  s <- simulate_ode(m, sg_init(m, "equilibrium"))
+  cs <- sg_cases(s, period = "month", per = "node")
+  k <- s$counters
+  expect_equal(sum(cs$cases), sum(k[, "infestations"]))
+  expect_equal(sum(cs$superinfestations), sum(k[, "superinfestations"]))
+  expect_equal(cs$cases_per_host, cs$cases / 30000)
+  expect_equal(sum(cs$events), sum(k[, "egg_batches"]))
+  # at equilibrium the daily infestations per wounded host are constant
+  h <- sg_hosts(s)
+  expect_equal(cs$wound_fraction, rep(unname(k[1, "infestations"]) / h$wounded[2], nrow(cs)),
+    tolerance = 1e-6
+  )
+  expect_error(sg_cases(s, host_density = 20), "not used with the host-wound model")
+})
+
+test_that("sg_cases() uses daily counters when states are recorded less often", {
+  for (p in list(sg_params(), region_params())) {
+    m <- region_model(p, days = 70)
+    x0 <- sg_init(m, "equilibrium")
+    a <- sg_cases(simulate_ode(m, x0), period = "week")
+    b <- sg_cases(simulate_ode(m, x0, output_every = 7), period = "week")
+    expect_equal(b$cases, a$cases, tolerance = 1e-10)
+    expect_identical(b$period, a$period)
+  }
+})
+
+test_that("flow balance checks host conservation", {
+  m <- out_model()
+  e <- sg_init(m, "equilibrium")
+  fb <- sg_flow_balance(simulate_ode(m, e))
+  expect_lt(max(abs(fb$host_residual)), 1e-8 * 30000)
+  expect_lt(max(abs(fb$residual)), 1e-6 * sum(e))
+  fc <- sg_flow_balance(simulate_cb(m, e, n_rep = 2, seed = 3, output_every = 5))
+  expect_identical(max(abs(fc$host_residual)), 0)
+  expect_identical(max(abs(fc$residual)), 0)
+  expect_false("host_residual" %in% names(sg_flow_balance(simulate_ode(
+    region_model(sg_params(), days = 10)
+  ))))
+})
+
+test_that("fly totals leave the hosts out", {
+  m <- out_model(days = 10)
+  s <- simulate_ode(m, sg_init(m, "equilibrium"))
+  tot <- sg_totals(s, by = character(0))
+  fly <- !grepl("^H", colnames(s$state))
+  expect_equal(tot$value, rowSums(s$state[, fly]))
+})
+
+test_that("plots, prints and check_model() show the hosts", {
+  m <- out_model(days = 365)
+  s <- simulate_ode(m, sg_init(m, "equilibrium"))
+  d <- sg_plot_data(s, "hosts")
+  expect_identical(levels(d$series), c("unwounded", "wounded", "infested"))
+  expect_identical(attr(sg_plot_data(s, "cases"), "title"), "New infestations of hosts")
+  skip_if_not_installed("ggplot2")
+  expect_s3_class(plot(s, "hosts"), "ggplot")
+  expect_true(any(grepl("hosts: .* infested of 30000", capture.output(print(s)))))
+  cb <- simulate_cb(m, sg_init(m, "equilibrium"), n_rep = 2, seed = 1, output_every = 30)
+  expect_true(any(grepl("hosts infested at the end", capture.output(print(cb)))))
+  chk <- check_model(m)
+  expect_equal(chk$size$hosts$n, 30000)
+  expect_equal(chk$size$hosts$max_strike_rate, 0.02 * max(m$forcing$dx))
+  out <- capture.output(print(chk))
+  expect_true(any(grepl("30000 hosts", out)))
+  expect_true(any(grepl("oviposition events per wound per day", out)))
 })

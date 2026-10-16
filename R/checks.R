@@ -51,7 +51,11 @@ sg_r0 <- function(model, temperature) {
 #'   output days), `replicate` (stochastic runs only), `change` (change in
 #'   the total), `releases`, `eggs_laid`, `deaths` and `residual` (change
 #'   minus releases and eggs plus deaths). The residual is about 1e-12 of
-#'   the population for the ODE and exactly zero for stochastic runs.
+#'   the population for the ODE and exactly zero for stochastic runs. Host
+#'   states are not counted. With the host-wound model (D-030) a column
+#'   `host_residual` gives the largest mismatch between the change of a host
+#'   block (HS, HW, HI) and its host flows (round-off for the ODE, zero for
+#'   stochastic runs).
 #' @export
 #' @examples
 #' if (requireNamespace("MGDrivE", quietly = TRUE)) {
@@ -74,8 +78,9 @@ sg_flow_balance <- function(sim) {
   cn <- dimnames(k)[[2L]]
   out_days <- sim$day[-1L]
   interval <- findInterval(seq_len(dim(k)[1L]), c(0, out_days) + 1L)
+  host <- .sg_is_host_name(dimnames(a)[[2L]])
   rows <- lapply(seq_len(dim(a)[3L]), function(r) {
-    total <- rowSums(matrix(a[, , r], dim(a)[1L]))
+    total <- rowSums(matrix(a[, !host, r], dim(a)[1L]))
     per_day <- function(cols) rowSums(matrix(k[, cols, r], dim(k)[1L]))
     sum_by <- function(v) as.vector(tapply(v, interval, sum))
     eggs <- sum_by(per_day(grepl("^eggs_laid", cn)))
@@ -86,6 +91,18 @@ sg_flow_balance <- function(sim) {
       day = out_days, change = change, releases = released, eggs_laid = eggs,
       deaths = deaths, residual = change - released - eggs + deaths
     )
+    if (any(host)) {
+      # host conservation (D-030): the change of each host block equals its
+      # flows; the largest absolute mismatch of HS, HW and HI
+      block <- substr(dimnames(a)[[2L]], 1L, 2L)
+      hb <- function(b) diff(rowSums(matrix(a[, block == b, r], dim(a)[1L])))
+      flow <- function(name) sum_by(per_day(cn == name))
+      to_s <- -flow("hosts_wounded") + flow("wounds_healed") + flow("infestations_ended") +
+        flow("infestations_treated")
+      to_w <- flow("hosts_wounded") - flow("wounds_healed") - flow("infestations")
+      to_i <- flow("infestations") - flow("infestations_ended") - flow("infestations_treated")
+      d$host_residual <- pmax(abs(hb("HS") - to_s), abs(hb("HW") - to_w), abs(hb("HI") - to_i))
+    }
     if (stochastic) d <- cbind(d[1L], replicate = r, d[-1L])
     d
   })
@@ -138,7 +155,6 @@ check_model <- function(model, dt = 0.1, scale = TRUE) {
   if (!inherits(model, "sg_model")) {
     .sg_stop("`model` must be an sg_model object; create one with sg_model().")
   }
-  .sg_require_static(model, "check_model()")
   .sg_cb_inputs(model, NULL, dt, stochastic = FALSE, n_days = 1L) # checks dt
   s <- .sg_reference_setup(model)
   p <- s$p
@@ -155,8 +171,20 @@ check_model <- function(model, dt = 0.1, scale = TRUE) {
   )
   options <- p[c(
     "mating_mode", "oviposition_mode", "clutch_size", "wound_competitors",
-    "larval_crowding_mode", "egg_temp_source", "male_density_half_mating"
+    "larval_crowding_mode", "egg_temp_source", "male_density_half_mating", "wound_model"
   )]
+  h <- model$hosts
+  if (!is.null(h)) { # host-wound model (D-030)
+    # a wound receives at most wound_finding_max * wound_search_rate * dx
+    # oviposition events per day, however many flies there are (S8)
+    strike <- p$wound_finding_max * p$wound_search_rate * f$dx
+    size$hosts <- list(
+      n = h$n, wounded_fraction = p$wounded_fraction, wounding = h$wounding,
+      healing = h$healing, infestation_days = p$infestation_days, n_I = h$n_I,
+      treatment = h$treatment, attractiveness = h$attractiveness,
+      max_strike_rate = max(strike), max_strike_date = f$dates[which.max(strike)]
+    )
+  }
 
   # ---- fastest processes (without crowding; mating separately) ------------
   day_max <- vapply(seq_len(f$n_days), function(d) {
@@ -173,6 +201,7 @@ check_model <- function(model, dt = 0.1, scale = TRUE) {
       max(q_m) + f$mu_T[d] + p$male_background_mortality
     )
   }, 0)
+  if (!is.null(h)) day_max <- pmax(day_max, h$wounding, h$healing, h$advance + h$treatment)
   rates <- list(
     max_rate = max(day_max), max_rate_date = f$dates[which.max(day_max)],
     mating_rate = p$mating_rate, mating_probability_per_step = 1 - exp(-p$mating_rate * dt)
@@ -266,7 +295,7 @@ check_model <- function(model, dt = 0.1, scale = TRUE) {
 
   memory <- list(
     state_bytes_per_replicate = 8 * (f$n_days + 1) * s$n_states,
-    totals_bytes_per_replicate = 8 * (f$n_days + 1) * 6 * s$n_g,
+    totals_bytes_per_replicate = 8 * (f$n_days + 1) * (6 * s$n_g + if (is.null(h)) 0 else 3),
     counters_bytes_per_replicate = 8 * f$n_days * length(s$counter_names)
   )
   structure(
@@ -282,10 +311,23 @@ check_model <- function(model, dt = 0.1, scale = TRUE) {
 print.sg_check <- function(x, ...) {
   s <- x$size
   cat("<sg_check>\n")
+  wounds <- if (is.null(s$hosts)) sprintf("%g wounds", s$wounds) else sprintf("%g hosts", s$hosts$n)
   cat(sprintf(
-    "  model: %d genotype(s), %d states, %d days (%s to %s), node %g km^2, %g wounds\n",
-    s$genotypes, s$states, s$days, format(s$period[1L]), format(s$period[2L]), s$area, s$wounds
+    "  model: %d genotype(s), %d states, %d days (%s to %s), node %g km^2, %s\n",
+    s$genotypes, s$states, s$days, format(s$period[1L]), format(s$period[2L]), s$area, wounds
   ))
+  if (!is.null(s$hosts)) {
+    hh <- s$hosts
+    cat(sprintf(
+      paste0(
+        "  hosts: %.3g wounded without flies (wounds heal in %.3g d); infestations %.3g d ",
+        "in %d sub-stages; treatment %.3g per day; infested wounds x%.3g attractive; ",
+        "at most %.3g oviposition events per wound per day (%s)\n"
+      ),
+      hh$wounded_fraction, 1 / hh$healing, hh$infestation_days, hh$n_I, hh$treatment,
+      hh$attractiveness, hh$max_strike_rate, format(hh$max_strike_date)
+    ))
+  }
   cat(sprintf(
     "  releases: %d event(s), %g individuals%s\n", s$release_events, s$released,
     if (length(s$sterile_releases)) {

@@ -14,7 +14,11 @@ A data frame with columns \code{day} (end of each interval between
 output days), \code{replicate} (stochastic runs only), \code{change} (change in
 the total), \code{releases}, \code{eggs_laid}, \code{deaths} and \code{residual} (change
 minus releases and eggs plus deaths). The residual is about 1e-12 of
-the population for the ODE and exactly zero for stochastic runs.
+the population for the ODE and exactly zero for stochastic runs. Host
+states are not counted. With the host-wound model (D-030) a column
+\code{host_residual} gives the largest mismatch between the change of a host
+block (HS, HW, HI) and its host flows (round-off for the ODE, zero for
+stochastic runs).
 }
 \description{
 Checks that every change in the total number of individuals is explained

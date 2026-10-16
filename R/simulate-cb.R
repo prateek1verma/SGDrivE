@@ -211,6 +211,15 @@ print.sg_sim_cb <- function(x, ...) {
       }
     ))
   }
+  if (!is.null(m$info$hosts)) {
+    hs <- sg_hosts(x)
+    last_day <- hs$day == max(hs$day)
+    inf <- hs$infested[last_day]
+    cat(sprintf(
+      "  hosts infested at the end: %s [%s, %s] of %s\n", fmt(mean(inf)), fmt(min(inf)),
+      fmt(max(inf)), fmt(mean(hs$hosts[last_day]))
+    ))
+  }
   ext_line("extinct", x$extinct_day)
   ext_line("wild type eliminated", x$wild_extinct_day)
   egg_cols <- grepl("^eggs_laid", dimnames(x$counters)[[2L]])
@@ -232,7 +241,7 @@ print.sg_sim_cb <- function(x, ...) {
   nm <- sg_state_names(model)
   host <- grepl("^H[SWI]\\[", nm)
   block <- ifelse(host, substr(nm, 1L, 2L), substr(nm, 1L, 1L))
-  geno <- ifelse(host, sub("^H.\\[([^,]+).*$", "\\1", nm), sub("^.\\[([^,|]+).*$", "\\1", nm))
+  geno <- ifelse(host, sub("^H.\\[([^],]+).*$", "\\1", nm), sub("^.\\[([^,|]+).*$", "\\1", nm))
   cols <- as.vector(outer(
     model$cube$genotypes, c("E", "L", "P", "M", "U", "F"),
     function(g, b) paste0(b, "[", g, "]")
