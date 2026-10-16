@@ -1,6 +1,7 @@
 # Host–wound–case model, stage 1 (design note)
 
-Status: **draft for review**, 2026-10-15. Nothing here is implemented.
+Status: **draft**, 2026-10-15; decisions of section 9 made by the user on
+2026-10-16. Nothing here is implemented.
 Proposed decision number: D-030.
 
 ## 1. Why
@@ -27,17 +28,18 @@ In stage 1:
 
 * one host class (the `n_host` dimension of the state layout stays 1);
 * host states S (no attractive wound), W (attractive, uninfested wound),
-  I (infested), counts per node;
+  I (infested, an Erlang chain I_1 … I_n), counts per node;
 * constant wounding and healing rates (no seasonality);
-* exponential infestation duration;
+* Erlang infestation duration with its own mean (`infestation_days`) and
+  number of sub-stages (`infestation_substages`), set by the user;
 * optional treatment of infested hosts (default off);
 * new case definition: a new infestation of a host (W → I);
 * ODE and chain-binomial solvers, equilibrium start, outputs, one scenario;
 * the current model stays the default (`wound_model = "static"`), so existing
   results and the GP2014 regression are unchanged.
 
-Later stages (not here): Erlang infestation stages with superinfestation
-resetting the infestation age; seasonal wounding (calving, shearing);
+Later stages (not here): superinfestation resetting or extending the
+infestation age; seasonal wounding (calving, shearing);
 several host classes (livestock, wildlife, newborns); host mortality from
 myiasis; detection and reporting of cases.
 
@@ -51,7 +53,7 @@ Per node, with N_H = `host_density` × A hosts (A the node area):
 |---|---|
 | S | hosts without an attractive wound |
 | W | hosts with an attractive wound that is not infested |
-| I | hosts with an active infestation (larvae feeding) |
+| I = Σ_j I_j | hosts with an active infestation (eggs or larvae on the wound), in n_I sub-stages |
 
 S + W + I = N_H at all times (no host births or deaths in stage 1).
 
@@ -61,7 +63,7 @@ S + W + I = N_H at all times (no host births or deaths in stage 1).
        ◄───────────────────     ◄─ ─ ─ (not in stage 1) ─ ─ ─
             healing γ_W
     ▲                                                           │
-    └─────────────────── end of infestation ρ ──────────────────┘
+    └──────── end of infestation: last sub-stage (q_I) or treatment (κ) ────────┘
           (larvae leave or the host is treated; the wound heals)
 ```
 
@@ -71,7 +73,8 @@ S + W + I = N_H at all times (no host births or deaths in stage 1).
 |---|---|---|
 | γ_W | healing of an uninfested wound (per day) | 1 / `wound_healing_days` |
 | ω | wounding of a host without a wound (per day) | γ_W p₀ / (1 − p₀), p₀ = `wounded_fraction` |
-| ρ | end of an infestation (per day) | 1 / `infestation_days` + `treatment_rate` |
+| q_I | advance through one infestation sub-stage (per day) | n_I / `infestation_days`, n_I = `infestation_substages` |
+| κ | treatment of an infested host, from any sub-stage (per day) | `treatment_rate` |
 | α | attractiveness of an infested wound relative to an uninfested one | `infested_wound_attractiveness` |
 
 Parameterising wounding by p₀, the fraction of hosts carrying an attractive
@@ -106,9 +109,14 @@ males lay eggs that do not hatch and infest nobody (as decided for D-026).
 
 ### 3.4 Host equations (ODE)
 
-    dS/dt = −ω S + γ_W W + ρ I
-    dW/dt =  ω S − γ_W W − C
-    dI/dt =  C − ρ I
+    dS/dt   = −ω S + γ_W W + q_I I_n + κ I
+    dW/dt   =  ω S − γ_W W − C
+    dI_1/dt =  C − (q_I + κ) I_1
+    dI_j/dt =  q_I I_{j−1} − (q_I + κ) I_j          (j = 2, …, n_I)
+
+with I = Σ_j I_j. Without treatment an infestation lasts on average
+`infestation_days`, with coefficient of variation 1/√n_I; every infestation
+ends by the host returning to S (wound healed, decision 2).
 
 with C = F W / A_s (C = 0 when A_s = 0). The fly equations are unchanged
 except that Ψ uses A_s, and with treatment the larval hazard gains
@@ -145,7 +153,9 @@ the other S15 aggregates):
    (drawn batch by batch: a batch hits a host not yet hit with probability
    (W − k) / W). So **k ≤ W** exactly. These are the cases of the step.
 4. Healing among the other W − k: Binomial(W − k, 1 − e^{−γ_W dt}).
-5. End of infestation: Binomial(I, 1 − e^{−ρ dt}).
+5. Infestation chain: moves as in S16 (exact transitions over dt for the
+   Erlang chain), with treatment in the role of the hazard; hosts leaving
+   the last sub-stage or treated return to S. New infestations enter I_1.
 6. Wounding: Binomial(S, 1 − e^{−ω dt}).
 7. All moves are applied at the end of the step; a host infested in this
    step cannot recover in the same step (bias of order dt, as for other
@@ -160,9 +170,12 @@ same order and random numbers.
 Given the fertile-batch rate F, the host block has a unique steady state.
 With b = C / W, the infestation hazard of a wounded host:
 
-    I = b W / ρ,   S = (γ_W + b) W / ω,   W = N_H / (1 + (γ_W + b)/ω + b/ρ)
+    I = b W D,   S = (γ_W + b) W / ω,   W = N_H / (1 + (γ_W + b)/ω + b D)
 
-and b solves b W(b) (1 + α b / ρ) = F, whose left side increases in b, so a
+where D = I / C is the mean time a host stays infested: D = `infestation_days`
+without treatment and D = [1 − (q_I / (q_I + κ))^{n_I}] / κ with treatment
+(the sub-stages I_j follow the usual Erlang steady state). b solves
+b W(b) (1 + α b D) = F, whose left side increases in b, so a
 bracketed root exists. The fly part is solved as now by a one-dimensional
 root search in the egg input; inside it, A_s (and so Ψ) comes from the host
 steady state. The equilibrium therefore becomes a nested root search (as
@@ -181,18 +194,21 @@ roots and the tests must include α > 1.
 
 ## 4. Parameters
 
-New rows in `sg_param_table()`, group "hosts". Values marked *placeholder*
-have no source yet and must be calibrated or researched before scientific
-use; the defaults keep host_density × wounded_fraction = 5 per km², the
-current `wound_density`.
+New rows in `sg_param_table()`, group "hosts". `host_density` and
+`wounded_fraction` have no default (decision 7): with `wound_model = "hosts"`
+`sg_params()` stops until both are given, and its message suggests
+host_density × wounded_fraction = 5 per km², the current `wound_density`, as
+a starting point. In `"static"` mode they are not used. Values marked
+*assumption* have no source yet.
 
 | Name | Symbol | Default | Units | Basis |
 |---|---|---|---|---|
 | `wound_model` | – | `"static"` | – | `"static"` (current model) or `"hosts"` |
-| `host_density` | N_H/A | 50 | animals km⁻² | *placeholder*; set from livestock census for the region |
-| `wounded_fraction` | p₀ | 0.1 | – | *placeholder*; fraction of hosts with an attractive wound without flies; product with host_density calibrated like `wound_density` |
+| `host_density` | N_H/A | none (required) | animals km⁻² | from livestock census for the region |
+| `wounded_fraction` | p₀ | none (required) | – | fraction of hosts with an attractive wound without flies; product with host_density calibrated like `wound_density` |
 | `wound_healing_days` | 1/γ_W | 7 | d | *assumption*; no source found for how long an uninfested wound (navel, husbandry wound, tick bite) stays attractive |
-| `infestation_days` | 1/ρ (untreated) | 6 | d | eggs hatch within about 24 h; larvae feed 5–7 days after hatching, then leave the wound [WOAH; CFSPH; FAO] |
+| `infestation_days` | n_I / q_I | 6 | d | mean duration without treatment; eggs hatch within about 24 h, larvae feed 5–7 days after hatching, then leave the wound [WOAH; CFSPH; FAO] |
+| `infestation_substages` | n_I | 6 | – | Erlang sub-stages of an infestation (whole number 1–10, D-003); 6 as for larvae (CV 0.41) |
 | `infested_wound_attractiveness` | α | 1 | – | infested wounds attract further gravid females and multiple infestations are common [WOAH; CFSPH]; up to 3000 larvae in one wound, about 15 batches of 200 [FAO]; magnitude unknown, so neutral default, sensitivity 1–10 |
 | `treatment_rate` | κ | 0 | d⁻¹ | management; topical treatments are highly effective in calves [Brazil field study], so κ reflects how fast infestations are found and treated |
 | `larval_crowding_mode` | – | `"none"` | – | adds `"per_infested_host"` (3.5) |
@@ -252,14 +268,19 @@ cases.
   stochastic step converges to the ODE as dt → 0.
 * Area scaling: `adult_females =` exact in host mode.
 * α > 1: equilibrium search finds the stable root; bistability checked.
-* Treatment: higher `treatment_rate` lowers prevalence and larvae.
+* Treatment: higher `treatment_rate` lowers prevalence and larvae; the
+  steady-state infested time matches D = [1 − (q_I/(q_I + κ))^{n_I}] / κ.
+* Infestation chain: without treatment the mean duration is
+  `infestation_days` and its variance `infestation_days`² / n_I.
+* `wound_model = "hosts"` without `host_density` or `wounded_fraction`
+  stops with a message naming both.
 * Flow balance (sg_flow_balance) still closes.
 
 ## 8. Implementation sketch (work packages)
 
 1. Parameters, validation, presets (`"static"` default), param table.
-2. State layout: a host block with S, W, I per node and host class
-   (`n_host` = 1), state names, `sg_init()` methods place hosts at
+2. State layout: a host block with S, W and I_1 … I_n per node and host
+   class (`n_host` = 1), state names, `sg_init()` methods place hosts at
    W = p₀ N_H (constant start) or at the host steady state (burn-in,
    equilibrium).
 3. R reference rates and ODE (S7, S8, host equations, counters).
@@ -269,21 +290,20 @@ cases.
 7. Outputs (`sg_hosts()`, `sg_cases()`, plots, `check_model()`).
 8. Scenario 04 (small farm), MODEL_SPEC section, D-030, NEWS.
 
-## 9. Decisions needed before implementation
+## 9. Decisions (made by the user, 2026-10-16)
 
-1. **Wounding parameterisation:** `wounded_fraction` + `wound_healing_days`
-   (recommended; ties to the current `wound_density`) or a raw wounding rate.
-2. **After an infestation:** host returns to S, wound healed (recommended
-   for stage 1), or to W (still wounded, attractive).
-3. **α default:** 1, neutral (recommended until a value is found), or > 1.
-4. **Infestation duration:** exponential in stage 1 (recommended) or Erlang
-   matched to the egg and larval chains already now.
-5. **Treatment:** include `treatment_rate` in stage 1 (recommended; small,
-   default 0) or defer.
-6. **Default model:** keep `"static"` as default (recommended) until the
-   host parameters are calibrated.
-7. **Placeholders:** accept host_density = 50 and wounded_fraction = 0.1 as
-   placeholders, or require the user to set them in host mode.
+1. **Wounding parameterisation:** `wounded_fraction` + `wound_healing_days`;
+   host_density × wounded_fraction takes the role of `wound_density`.
+2. **After an infestation:** the host returns to S (wound healed).
+3. **α default:** 1, neutral, until a value is found.
+4. **Infestation duration:** Erlang chain with its own mean
+   (`infestation_days`, default 6) and number of sub-stages
+   (`infestation_substages`, default 6), both set by the user, not tied to
+   the egg and larval chains.
+5. **Treatment:** `treatment_rate` included in stage 1, default 0.
+6. **Default model:** `"static"` stays the default.
+7. **Host numbers:** `host_density` and `wounded_fraction` have no defaults;
+   host mode requires the user to set them.
 
 ## References
 
@@ -309,4 +329,4 @@ cases.
 
 The values above were taken from these sources' summaries; the primary
 literature behind them (e.g. on wound attractiveness and healing) still
-needs to be read before the placeholders are replaced.
+needs to be read before the assumptions are replaced.
