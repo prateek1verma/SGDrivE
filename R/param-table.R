@@ -6,6 +6,10 @@
 # Strings are ASCII only (R CMD check portability): "degC" for degrees Celsius,
 # "dd" for degree-days, "d^-1" for per day, "km^-2" for per square kilometre.
 #
+# Spec tags H1-H3 refer to the host-wound model (dev/HOST_WOUND_DESIGN.md,
+# section 3, D-030): H1 host states and equations, H2 coupling to the flies,
+# H3 chain-binomial host step.
+#
 # Source tags: GP2014 = Gutierrez & Ponti (2014) paper or Pascal code;
 # G2019 = Gutierrez, Ponti & Arias (2019); MGDrivE2 = MGDrivE2 lifecycle model;
 # adapted = new for SGDrivE (decision number given in the description).
@@ -25,7 +29,7 @@
 # Display order of groups in print() and in the documentation.
 .sg_param_groups <- c(
   "temperature", "development", "stages", "thresholds", "mortality",
-  "reproduction", "mating", "numerical"
+  "reproduction", "mating", "hosts", "numerical"
 )
 
 .sg_param_rows <- function() {
@@ -175,13 +179,15 @@
     ),
     .prow("larval_crowding_mode", "none", "mortality", "-", "adapted", "S7",
       paste(
-        "Larval density dependence: \"none\" or \"per_wound\"",
-        "(larval hazard + larval_crowding_coef * larvae / wounds)."
+        "Larval density dependence: \"none\", \"per_wound\" (larval hazard +",
+        "larval_crowding_coef * larvae / wounds) or \"per_infested_host\" (+",
+        "larval_crowding_coef * larvae / infested hosts; wound_model = \"hosts\" only,",
+        "D-030)."
       ),
-      type = "choice", choices = "none|per_wound", symbol = "larval_dd"
+      type = "choice", choices = "none|per_wound|per_infested_host", symbol = "larval_dd"
     ),
-    .prow("larval_crowding_coef", 0, "mortality", "d^-1 wound larva^-1", "adapted", "S7",
-      "Larval crowding coefficient, used when larval_crowding_mode = \"per_wound\".",
+    .prow("larval_crowding_coef", 0, "mortality", "d^-1 wound larva^-1", "adapted", "S7, H2",
+      "Larval crowding coefficient, used when larval_crowding_mode is not \"none\".",
       lower = 0, symbol = "gamma_L"
     ),
     .prow("pupa_drought_mortality", 0, "mortality", "d^-1", "adapted", "S7",
@@ -264,6 +270,65 @@
       type = "choice", choices = "rate|instant", symbol = "mating"
     ),
 
+    # ---- hosts: host-wound model (D-030) -------------------------------------
+    .prow("wound_model", "static", "hosts", "-", "adapted", "S8, H1",
+      paste(
+        "\"static\": a fixed number of wounds (wound_density), every fertile egg",
+        "batch counts as a case (Gutierrez & Ponti). \"hosts\": hosts without a",
+        "wound, wounded and infested, with cases as new infestations of hosts, so",
+        "at most host_density * area hosts are infested at once. D-030."
+      ),
+      type = "choice", choices = "static|hosts"
+    ),
+    .prow("host_density", NA_real_, "hosts", "animals km^-2", "adapted", "H1",
+      paste(
+        "Density of hosts (animals). No default: required when wound_model =",
+        "\"hosts\", e.g. from a livestock census."
+      ),
+      lower = 0, bounds = "(]", allow_na = TRUE, symbol = "N_H"
+    ),
+    .prow("wounded_fraction", NA_real_, "hosts", "-", "adapted", "H1",
+      paste(
+        "Fraction of hosts with an attractive wound when there are no flies.",
+        "No default: required when wound_model = \"hosts\";",
+        "host_density * wounded_fraction plays the role of wound_density."
+      ),
+      lower = 0, upper = 1, bounds = "()", allow_na = TRUE, symbol = "p_0"
+    ),
+    .prow("wound_healing_days", 7, "hosts", "d", "adapted", "H1",
+      paste(
+        "Mean time an uninfested wound stays attractive before it heals.",
+        "Assumption: no published value found."
+      ),
+      lower = 0, bounds = "(]", symbol = "1/gamma_W"
+    ),
+    .prow("infestation_days", 6, "hosts", "d", "adapted", "H1",
+      paste(
+        "Mean duration of an untreated infestation: eggs hatch within about a",
+        "day and larvae feed for 5-7 days (WOAH; CFSPH; FAO)."
+      ),
+      lower = 0, bounds = "(]", symbol = "n_I/q_I"
+    ),
+    .prow("infestation_substages", 6L, "hosts", "-", "adapted", "H1",
+      "Erlang sub-stages of an infestation (coefficient of variation 1/sqrt(n)).",
+      type = "integer", lower = 1, upper = 10, symbol = "n_I"
+    ),
+    .prow("infested_wound_attractiveness", 1, "hosts", "-", "adapted", "H2",
+      paste(
+        "Attractiveness of an infested wound to egg-laying females relative to",
+        "an uninfested one; 1 = neutral. Infested wounds attract further females",
+        "(WOAH; CFSPH), but no value is known."
+      ),
+      lower = 0, symbol = "alpha"
+    ),
+    .prow("treatment_rate", 0, "hosts", "d^-1", "adapted", "H1, H2",
+      paste(
+        "Rate at which infested hosts are treated; treatment ends the",
+        "infestation and kills its larvae."
+      ),
+      lower = 0, symbol = "kappa"
+    ),
+
     # ---- numerical ----------------------------------------------------------
     .prow("extinction_threshold", 1, "numerical", "individuals", "adapted", "S10",
       "Extinction threshold for all wild stages combined.",
@@ -290,7 +355,7 @@
 #'     \item{`name`}{Argument name used in [sg_params()].}
 #'     \item{`symbol`}{Mathematical symbol in the model specification.}
 #'     \item{`group`}{Parameter group (temperature, development, stages,
-#'       thresholds, mortality, reproduction, mating, numerical).}
+#'       thresholds, mortality, reproduction, mating, hosts, numerical).}
 #'     \item{`type`}{`"real"`, `"integer"` or `"choice"`.}
 #'     \item{`default`}{Default value, as text.}
 #'     \item{`lower`, `upper`}{Allowed range (numeric parameters).}
@@ -299,7 +364,7 @@
 #'     \item{`choices`}{Allowed values of choice parameters, separated by
 #'       `"|"`.}
 #'     \item{`allow_na`}{Whether `NA` is allowed (meaning "derive
-#'       automatically").}
+#'       automatically", or for the host parameters "not set").}
 #'     \item{`units`}{Units: `degC` degrees Celsius, `dd` degree-days, `d`
 #'       days, `d^-1` per day, `km^-2` per square kilometre.}
 #'     \item{`source`}{`GP2014` (Gutierrez & Ponti 2014), `G2019`

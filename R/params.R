@@ -33,9 +33,16 @@
 #'
 #' Units follow the conventions of the package: temperatures in degrees
 #' Celsius, durations in degree-days (`dd`) or days (`d`), rates per day.
-#' Parameters given per km^2 (`wound_density`, `male_density_half_mating`) are converted to
-#' counts per node
-#' when the model is assembled.
+#' Parameters given per km^2 (`wound_density`, `male_density_half_mating`,
+#' `host_density`) are converted to counts per node when the model is
+#' assembled.
+#'
+#' **Wound model** (D-030). With `wound_model = "static"` (default) the number
+#' of wounds is fixed (`wound_density`) and every fertile egg batch is a case.
+#' With `wound_model = "hosts"` hosts move between having no wound, an
+#' attractive wound and an infestation, and a case is a new infestation of a
+#' host; `host_density` and `wounded_fraction` must then be given (they have
+#' no defaults), and `wound_density` is not used.
 #'
 #' @return An object of class `sg_params`: a named list of parameter values in
 #'   the order of [sg_param_table()], with attribute `preset`.
@@ -245,9 +252,11 @@ sg_params <- function(..., preset = c("default", "gp2014")) {
   if (v$larval_crowding_mode == "none" && v$larval_crowding_coef > 0) {
     .sg_warn(
       "larval_crowding_coef = ", v$larval_crowding_coef,
-      " has no effect unless larval_crowding_mode = \"per_wound\"."
+      " has no effect unless larval_crowding_mode is \"per_wound\" or ",
+      "\"per_infested_host\"."
     )
   }
+  .sg_cross_check_hosts(v)
   if (v$oviposition_mode == "eggs" && !is.na(v$clutch_size)) {
     .sg_warn("clutch_size has no effect unless oviposition_mode = \"batches\".")
   }
@@ -255,6 +264,56 @@ sg_params <- function(..., preset = c("default", "gp2014")) {
     .sg_warn(
       "With mating_mode = \"instant\" females mate at emergence; ",
       "female_receptive_age_dd is ignored."
+    )
+  }
+  invisible(TRUE)
+}
+
+# Host-wound model (D-030): required values in host mode, crowding modes that
+# need a given wound model, and host settings that have no effect.
+.sg_cross_check_hosts <- function(v) {
+  hosts <- v$wound_model == "hosts"
+  if (hosts) {
+    missing <- c("host_density", "wounded_fraction")[
+      c(is.na(v$host_density), is.na(v$wounded_fraction))
+    ]
+    if (length(missing) > 0L) {
+      .sg_stop(
+        "wound_model = \"hosts\" needs ", paste(missing, collapse = " and "),
+        " (no defaults). Set them from the region, e.g. a livestock census for ",
+        "host_density; host_density * wounded_fraction = 5 per km^2 matches the ",
+        "default wound_density."
+      )
+    }
+    if (v$larval_crowding_mode == "per_wound") {
+      .sg_stop(
+        "larval_crowding_mode = \"per_wound\" uses the fixed wounds of wound_model = ",
+        "\"static\"; with wound_model = \"hosts\" use \"per_infested_host\"."
+      )
+    }
+    if (!identical(v$wound_density, .sg_param_defaults()$wound_density)) {
+      .sg_warn(
+        "wound_density has no effect with wound_model = \"hosts\"; the wounds come ",
+        "from host_density and wounded_fraction."
+      )
+    }
+    return(invisible(TRUE))
+  }
+  if (v$larval_crowding_mode == "per_infested_host") {
+    .sg_stop("larval_crowding_mode = \"per_infested_host\" needs wound_model = \"hosts\".")
+  }
+  defaults <- .sg_param_defaults()
+  host_par <- c(
+    "host_density", "wounded_fraction", "wound_healing_days", "infestation_days",
+    "infestation_substages", "infested_wound_attractiveness", "treatment_rate"
+  )
+  changed <- host_par[!vapply(host_par, function(nm) {
+    isTRUE(all.equal(v[[nm]], defaults[[nm]])) || (is.na(v[[nm]]) && is.na(defaults[[nm]]))
+  }, TRUE)]
+  if (length(changed) > 0L) {
+    .sg_warn(
+      paste(changed, collapse = ", "), " has no effect with wound_model = \"static\"; ",
+      "set wound_model = \"hosts\" to use the host-wound model."
     )
   }
   invisible(TRUE)

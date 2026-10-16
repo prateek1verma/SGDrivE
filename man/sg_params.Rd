@@ -46,9 +46,16 @@ dependence) give a warning.
 
 Units follow the conventions of the package: temperatures in degrees
 Celsius, durations in degree-days (\code{dd}) or days (\code{d}), rates per day.
-Parameters given per km^2 (\code{wound_density}, \code{male_density_half_mating}) are converted to
-counts per node
-when the model is assembled.
+Parameters given per km^2 (\code{wound_density}, \code{male_density_half_mating},
+\code{host_density}) are converted to counts per node when the model is
+assembled.
+
+\strong{Wound model} (D-030). With \code{wound_model = "static"} (default) the number
+of wounds is fixed (\code{wound_density}) and every fertile egg batch is a case.
+With \code{wound_model = "hosts"} hosts move between having no wound, an
+attractive wound and an infestation, and a case is a new infestation of a
+host; \code{host_density} and \code{wounded_fraction} must then be given (they have
+no defaults), and \code{wound_density} is not used.
 }
 \examples{
 p <- sg_params()

@@ -94,3 +94,73 @@ test_that("print() shows groups and marks changed values", {
   expect_snapshot(print(sg_params(adult_substages = 8)))
   expect_invisible(print(sg_params()))
 })
+
+test_that("host mode needs host_density and wounded_fraction (D-030)", {
+  expect_identical(sg_params()$wound_model, "static")
+  expect_error(sg_params(wound_model = "hosts"), "needs host_density and wounded_fraction")
+  expect_error(sg_params(wound_model = "hosts", host_density = 50), "needs wounded_fraction")
+  p <- sg_params(wound_model = "hosts", host_density = 50, wounded_fraction = 0.1)
+  expect_identical(p$wound_model, "hosts")
+  expect_identical(p$host_density, 50)
+  expect_identical(attr(sg_params(preset = "gp2014"), "preset"), "gp2014")
+  expect_identical(sg_params(preset = "gp2014")$wound_model, "static")
+})
+
+test_that("host parameters are range-checked", {
+  hosts <- function(...) {
+    base <- list(wound_model = "hosts", host_density = 50, wounded_fraction = 0.1)
+    do.call(sg_params, utils::modifyList(base, list(...)))
+  }
+  expect_error(hosts(wounded_fraction = 1), "outside its allowed range")
+  expect_error(hosts(wounded_fraction = 0), "outside its allowed range")
+  expect_error(sg_params(host_density = 0), "outside its allowed range")
+  expect_error(hosts(infestation_substages = 11), "outside its allowed range")
+  expect_error(hosts(infestation_substages = 2.5), "whole number")
+  expect_error(hosts(infestation_days = 0), "outside its allowed range")
+  expect_error(hosts(wound_healing_days = -1), "outside its allowed range")
+  expect_error(hosts(treatment_rate = -0.1), "outside its allowed range")
+  expect_silent(hosts(infested_wound_attractiveness = 0, treatment_rate = 0.2))
+  expect_identical(hosts(infestation_substages = 3)$infestation_substages, 3L)
+})
+
+test_that("crowding modes must match the wound model", {
+  expect_error(
+    sg_params(larval_crowding_mode = "per_infested_host"),
+    "needs wound_model = \"hosts\""
+  )
+  expect_error(
+    sg_params(
+      wound_model = "hosts", host_density = 50, wounded_fraction = 0.1,
+      larval_crowding_mode = "per_wound"
+    ),
+    "use \"per_infested_host\""
+  )
+  expect_silent(sg_params(
+    wound_model = "hosts", host_density = 50, wounded_fraction = 0.1,
+    larval_crowding_mode = "per_infested_host", larval_crowding_coef = 0.01
+  ))
+  expect_warning(sg_params(larval_crowding_coef = 0.1), "per_infested_host")
+})
+
+test_that("settings without effect in the chosen wound model give warnings", {
+  expect_warning(sg_params(host_density = 20), "host_density has no effect")
+  expect_warning(
+    sg_params(treatment_rate = 0.1, infestation_days = 5),
+    "infestation_days, treatment_rate has no effect"
+  )
+  expect_silent(sg_params(infestation_days = 6))
+  expect_warning(
+    sg_params(wound_model = "hosts", host_density = 50, wounded_fraction = 0.1, wound_density = 8),
+    "wound_density has no effect"
+  )
+  # update() re-runs the checks
+  p <- sg_params(wound_model = "hosts", host_density = 50, wounded_fraction = 0.1)
+  expect_error(update(p, wounded_fraction = NA), "needs wounded_fraction")
+})
+
+test_that("models in host mode are not available before the host block exists", {
+  skip_if_not_installed("MGDrivE")
+  p <- sg_params(wound_model = "hosts", host_density = 50, wounded_fraction = 0.1)
+  f <- sg_forcing(sg_constant_weather(20, days = 10), p)
+  expect_error(sg_model(p, sg_cube(MGDrivE::cubeMendelian()), f), "not available yet")
+})

@@ -119,6 +119,9 @@ sg_model <- function(params, cube, forcing, releases = NULL, area = 1,
   if (!area_ok) {
     .sg_stop("`area` must be a single positive number (node area in km^2).")
   }
+  if (params$wound_model == "hosts") { # WP2-WP7 of D-030 add the host block
+    .sg_stop("wound_model = \"hosts\" is not available yet in this version.")
+  }
   .sg_check_forcing_params(forcing, params)
   adult_segment_substages <- .sg_check_adult_substages_arg(adult_segment_substages)
 
