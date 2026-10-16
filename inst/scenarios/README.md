@@ -27,6 +27,8 @@ source(system.file("scenarios", "01_wild_type_dynamics.R", package = "SGDrivE"),
 | `02_constant_temperature.R` | Wild-type population at a constant 20 degC in a region sized for 1000 adult females (`sg_model(adult_females = )`), started at equilibrium: deterministic and stochastic runs |
 | `03_allee_threshold.R` | Allee threshold at 20 degC for several half-saturation male densities h_M: populations starting just below the threshold (`sg_init(method = "threshold")`) die out, those just above it grow to the equilibrium |
 | `04_host_limited_cases.R` | Host-wound model at McAllen (1971) in a 1000 km^2 region with 30,000 animals: animals newly infested compared with egg batches holding viable eggs, and infested animals in deterministic and stochastic runs |
+| `05_larval_crowding.R` | Constant 25 degC, 1000 km^2: growth from a small population with and without larval crowding (`larval_crowding_mode = "per_wound"`); both grow alike at first, crowding levels the population off lower (`sg_equilibria()`) |
+| `06_rainfall_pupae.R` | Constant 25 degC, 1000 km^2: wet (600 mm per year, no stress) and dry (300 mm per year) climates with drought mortality of pupae (`pupa_drought_mortality`); from the wet equilibrium the dry population falls to a lower level |
 
 ## Conventions
 
