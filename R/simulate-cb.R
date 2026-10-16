@@ -92,6 +92,7 @@ simulate_cb <- function(model, init = NULL, n_rep = 1L, dt = 0.1, output_every =
   if (!inherits(model, "sg_model")) {
     .sg_stop("`model` must be an sg_model object; create one with sg_model().")
   }
+  .sg_require_static(model, "simulate_cb()")
   whole <- function(x, lower) {
     is.numeric(x) && length(x) == 1L && is.finite(x) && x >= lower && x == round(x)
   }

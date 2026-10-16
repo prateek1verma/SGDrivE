@@ -31,6 +31,7 @@ sg_r0 <- function(model, temperature) {
   if (!inherits(model, "sg_model")) {
     .sg_stop("`model` must be an sg_model object; create one with sg_model().")
   }
+  .sg_require_static(model, "sg_r0()")
   if (!is.numeric(temperature) || length(temperature) < 1L || any(!is.finite(temperature))) {
     .sg_stop("`temperature` must be finite numbers (degC).")
   }
@@ -138,6 +139,7 @@ check_model <- function(model, dt = 0.1, scale = TRUE) {
   if (!inherits(model, "sg_model")) {
     .sg_stop("`model` must be an sg_model object; create one with sg_model().")
   }
+  .sg_require_static(model, "check_model()")
   .sg_cb_inputs(model, NULL, dt, stochastic = FALSE, n_days = 1L) # checks dt
   s <- .sg_reference_setup(model)
   p <- s$p

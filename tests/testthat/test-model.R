@@ -7,7 +7,7 @@ test_that("sg_model() assembles a model with the documented components", {
   expect_s3_class(m, "sg_model")
   expect_named(m, c(
     "params", "cube", "forcing", "area", "dims", "adult", "layout", "n_states",
-    "counts", "releases", "meta"
+    "counts", "hosts", "releases", "meta"
   ))
   expect_identical(m$dims$n_genotypes, 3L)
   expect_identical(m$meta$package_version, as.character(utils::packageVersion("SGDrivE")))

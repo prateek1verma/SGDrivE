@@ -76,7 +76,14 @@ ModelView::ModelView(const Rcpp::List& view) {
   if (n_g < 1 || n_E < 1 || n_L < 1 || n_P < 1 || n_A < 1 || n_days < 1) {
     Rcpp::stop("model view: dimensions must be >= 1");
   }
-  const int expected_states = n_g * (n_E + n_L + n_P + 2 * n_A) + n_g * n_g * n_A;
+  host_model = get_int(view, "host_model") == 1;
+  n_I = get_int(view, "n_I");
+  if (host_model && (n_I < 1 || n_I > 10)) {
+    Rcpp::stop("model view: n_I = %d must be between 1 and 10", n_I);
+  }
+  if (!host_model && n_I != 0) Rcpp::stop("model view: n_I must be 0 without hosts");
+  const int fly_states = n_g * (n_E + n_L + n_P + 2 * n_A) + n_g * n_g * n_A;
+  const int expected_states = fly_states + (host_model ? 2 + n_I : 0);
   if (n_states != expected_states) {
     Rcpp::stop("model view: n_states = %d, expected %d", n_states, expected_states);
   }
@@ -96,6 +103,26 @@ ModelView::ModelView(const Rcpp::List& view) {
                  expected_offset);
     }
     expected_offset += block_len[b];
+  }
+  host_offsets = get_ints(view, "host_offsets", 3);
+  const int host_expected[3] = {fly_states, fly_states + 1, fly_states + 2};
+  for (int b = 0; b < 3; ++b) {
+    if (host_offsets[b] != (host_model ? host_expected[b] : -1)) {
+      Rcpp::stop("model view: host block %d starts at %d", b, host_offsets[b]);
+    }
+  }
+  N_H = get_double(view, "N_H");
+  host_wounding = get_double(view, "host_wounding");
+  host_healing = get_double(view, "host_healing");
+  host_advance = get_double(view, "host_advance");
+  host_treatment = get_double(view, "host_treatment");
+  host_attractiveness = get_double(view, "host_attractiveness");
+  if (N_H < 0 || host_wounding < 0 || host_healing < 0 || host_advance < 0 ||
+      host_treatment < 0 || host_attractiveness < 0) {
+    Rcpp::stop("model view: host count and rates must be >= 0");
+  }
+  if (host_model && (N_H <= 0 || host_healing <= 0 || host_advance <= 0)) {
+    Rcpp::stop("model view: host count, healing and infestation rates must be > 0");
   }
 
   mating_instant = get_int(view, "mating_instant") == 1;
@@ -186,5 +213,10 @@ Rcpp::List sg_model_view_info_cpp(const Rcpp::List& view) {
       Rcpp::Named("sum_inv_w_f") = sum_inv_w_f, Rcpp::Named("sum_egg_tensor") = sum_egg,
       Rcpp::Named("sum_dx") = sum_dx,
       Rcpp::Named("idx_F_last") = mv.idx_f(mv.n_g - 1, mv.n_g - 1, mv.n_A - 1),
-      Rcpp::Named("idx_M_first") = mv.idx(sgdrive::kM, 0, 0));
+      Rcpp::Named("idx_M_first") = mv.idx(sgdrive::kM, 0, 0),
+      Rcpp::Named("host_model") = mv.host_model, Rcpp::Named("n_I") = mv.n_I,
+      Rcpp::Named("host_offsets") = mv.host_offsets,
+      Rcpp::Named("host_rates") = Rcpp::NumericVector::create(
+          mv.N_H, mv.host_wounding, mv.host_healing, mv.host_advance, mv.host_treatment,
+          mv.host_attractiveness));
 }

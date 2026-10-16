@@ -7,7 +7,7 @@
 \usage{
 sg_state_index(
   model,
-  block = c("E", "L", "P", "M", "U", "F"),
+  block = c("E", "L", "P", "M", "U", "F", "HS", "HW", "HI"),
   genotype = NULL,
   mate = NULL,
   substage = NULL
@@ -19,10 +19,14 @@ sg_state_names(model)
 \item{model}{An \code{sg_model} object.}
 
 \item{block}{State block: \code{"E"} (eggs), \code{"L"} (larvae), \code{"P"} (pupae),
-\code{"M"} (adult males), \code{"U"} (unmated females) or \code{"F"} (mated females).}
+\code{"M"} (adult males), \code{"U"} (unmated females) or \code{"F"} (mated females);
+with \code{wound_model = "hosts"} also \code{"HS"} (hosts without an attractive
+wound), \code{"HW"} (wounded, not infested) and \code{"HI"} (infested, by
+sub-stage). Host states are named e.g. \code{"HW[hosts]"}, \code{"HI[hosts,2]"}.}
 
 \item{genotype, mate, substage}{Optional genotype names, mate genotype names
-(block \code{"F"} only) and sub-stage numbers. \code{NULL} selects all.}
+(block \code{"F"} only) and sub-stage numbers. \code{NULL} selects all. Host blocks
+have no genotype.}
 }
 \value{
 \code{sg_state_index()}: integer positions (1-based), ordered with the

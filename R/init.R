@@ -183,13 +183,34 @@ print.sg_state <- function(x, ...) {
     ))
   }
   print(round(tot, 6L))
+  host <- grepl("^H[SWI]\\[", names(x))
+  if (any(host)) {
+    v <- unclass(x)[host]
+    cat(sprintf(
+      "hosts: %s without a wound, %s wounded, %s infested (%s in all)\n",
+      format(sum(v[startsWith(names(v), "HS")]), digits = 6L),
+      format(sum(v[startsWith(names(v), "HW")]), digits = 6L),
+      format(sum(v[startsWith(names(v), "HI")]), digits = 6L),
+      format(sum(v), digits = 6L)
+    ))
+  }
   invisible(x)
 }
 
 # ---- internal ------------------------------------------------------------------
 
-# Totals by block (rows) and genotype (columns), from state names.
+# Positions of all host states (D-030); empty without a host block.
+.sg_host_index <- function(model) {
+  if (is.null(model$hosts)) {
+    return(integer(0))
+  }
+  unlist(lapply(.sg_host_blocks, function(b) sg_state_index(model, b)), use.names = FALSE)
+}
+
+# Totals by block (rows) and genotype (columns), from state names; host
+# states are left out.
 .sg_state_block_totals <- function(x) {
+  x <- x[!grepl("^H[SWI]\\[", names(x))]
   nm <- names(x)
   block <- substr(nm, 1L, 1L)
   geno <- sub("^.\\[([^,|]+).*$", "\\1", nm)
@@ -311,6 +332,20 @@ print.sg_state <- function(x, ...) {
       }
     }
   }
+  .sg_init_hosts(model, x)
+}
+
+# Hosts at their steady state without flies (D-030): a fraction
+# wounded_fraction wounded, none infested. No change without a host block.
+.sg_init_hosts <- function(model, x) {
+  h <- model$hosts
+  if (is.null(h)) {
+    return(x)
+  }
+  p0 <- model$params$wounded_fraction
+  x[sg_state_index(model, "HS")] <- (1 - p0) * h$n
+  x[sg_state_index(model, "HW")] <- p0 * h$n
+  x[sg_state_index(model, "HI")] <- 0
   x
 }
 
@@ -328,6 +363,16 @@ print.sg_state <- function(x, ...) {
   }
   if (!is.null(names(state)) && !identical(names(state), sg_state_names(model))) {
     .sg_stop("Names of `state` do not match sg_state_names(model) (same names, same order).")
+  }
+  h <- model$hosts
+  if (!is.null(h)) {
+    total <- sum(state[.sg_host_index(model)])
+    if (abs(total - h$n) > 1e-8 * max(1, h$n)) {
+      .sg_warn(sprintf(
+        "The host states sum to %s, not host_density * area = %s; the number of hosts stays %s.",
+        format(total), format(h$n), format(total)
+      ))
+    }
   }
   as.numeric(state)
 }

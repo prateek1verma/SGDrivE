@@ -69,7 +69,11 @@
 #'   `forcing`, `area`, `dims` (numbers of genotypes, sub-stages, nodes and
 #'   host classes), `adult` (female and male chains), `layout` (one row per
 #'   state block: name, first index, length), `n_states`, `counts` (wound
-#'   number `H`, half-saturation `h_M`, extinction threshold, per node; internal names),
+#'   number `H`, half-saturation `h_M`, extinction threshold, per node; internal names;
+#'   `H` is `NA` with the host-wound model), `hosts` (`NULL` with
+#'   `wound_model = "static"`; otherwise the host class, host count per node
+#'   `n`, infestation sub-stages `n_I` and per-host rates per day `wounding`,
+#'   `healing`, `advance`, `treatment` and `attractiveness`, D-030),
 #'   `releases` (events with day, state index and count) and `meta`
 #'   (package version and hash).
 #' @seealso [sg_state_index()], [sg_state_names()]
@@ -119,9 +123,6 @@ sg_model <- function(params, cube, forcing, releases = NULL, area = 1,
   if (!area_ok) {
     .sg_stop("`area` must be a single positive number (node area in km^2).")
   }
-  if (params$wound_model == "hosts") { # WP2-WP7 of D-030 add the host block
-    .sg_stop("wound_model = \"hosts\" is not available yet in this version.")
-  }
   .sg_check_forcing_params(forcing, params)
   adult_segment_substages <- .sg_check_adult_substages_arg(adult_segment_substages)
 
@@ -142,13 +143,15 @@ sg_model <- function(params, cube, forcing, releases = NULL, area = 1,
     )
   )
 
+  hosts <- p$wound_model == "hosts"
   dims <- list(
     n_genotypes = n_g,
     n_E = p$egg_substages, n_L = p$larva_substages, n_P = p$pupa_substages,
     n_A = p$adult_substages,
+    n_I = if (hosts) p$infestation_substages else 0L,
     n_node = 1L, n_host = 1L
   )
-  layout <- .sg_layout(dims)
+  layout <- .sg_layout(dims, hosts)
   n_states <- sum(layout$length)
 
   model <- list(
@@ -161,9 +164,11 @@ sg_model <- function(params, cube, forcing, releases = NULL, area = 1,
     layout = layout,
     n_states = n_states,
     counts = list(
-      H = p$wound_density * area, h_M = p$male_density_half_mating * area,
+      H = if (hosts) NA_real_ else p$wound_density * area,
+      h_M = p$male_density_half_mating * area,
       ext_threshold = p$extinction_threshold
     ),
+    hosts = if (hosts) .sg_host_setup(p, area) else NULL,
     releases = NULL,
     meta = list(package_version = as.character(utils::packageVersion("SGDrivE")), hash = NA)
   )
@@ -182,9 +187,13 @@ sg_model <- function(params, cube, forcing, releases = NULL, area = 1,
 #'
 #' @param model An `sg_model` object.
 #' @param block State block: `"E"` (eggs), `"L"` (larvae), `"P"` (pupae),
-#'   `"M"` (adult males), `"U"` (unmated females) or `"F"` (mated females).
+#'   `"M"` (adult males), `"U"` (unmated females) or `"F"` (mated females);
+#'   with `wound_model = "hosts"` also `"HS"` (hosts without an attractive
+#'   wound), `"HW"` (wounded, not infested) and `"HI"` (infested, by
+#'   sub-stage). Host states are named e.g. `"HW[hosts]"`, `"HI[hosts,2]"`.
 #' @param genotype,mate,substage Optional genotype names, mate genotype names
-#'   (block `"F"` only) and sub-stage numbers. `NULL` selects all.
+#'   (block `"F"` only) and sub-stage numbers. `NULL` selects all. Host blocks
+#'   have no genotype.
 #' @return `sg_state_index()`: integer positions (1-based), ordered with the
 #'   sub-stage varying fastest. `sg_state_names()`: character vector of length
 #'   `model$n_states`.
@@ -200,14 +209,27 @@ sg_model <- function(params, cube, forcing, releases = NULL, area = 1,
 #'   sg_state_index(mod, "F", genotype = "AA", mate = "aa", substage = 1)
 #'   sg_state_names(mod)[sg_state_index(mod, "M", genotype = "Aa")]
 #' }
-sg_state_index <- function(model, block = c("E", "L", "P", "M", "U", "F"),
+sg_state_index <- function(model, block = c("E", "L", "P", "M", "U", "F", "HS", "HW", "HI"),
                            genotype = NULL, mate = NULL, substage = NULL) {
   if (!inherits(model, "sg_model")) {
     .sg_stop("`model` must be an sg_model object.")
   }
-  block <- .sg_match_choice(block, c("E", "L", "P", "M", "U", "F"), "block")
+  block <- .sg_match_choice(block, c("E", "L", "P", "M", "U", "F", "HS", "HW", "HI"), "block")
   geno <- model$cube$genotypes
   n_sub <- .sg_block_substages(model$dims, block)
+  if (block %in% .sg_host_blocks) {
+    if (is.null(model$hosts)) {
+      .sg_stop("Block ", block, " exists only with wound_model = \"hosts\".")
+    }
+    if (!is.null(genotype) || !is.null(mate)) {
+      .sg_stop("Host block ", block, " has no genotype or mate.")
+    }
+    si <- if (is.null(substage)) seq_len(n_sub) else substage
+    if (!is.numeric(si) || any(si < 1) || any(si > n_sub) || any(si != round(si))) {
+      .sg_stop("`substage` must be whole numbers between 1 and ", n_sub, " for block ", block, ".")
+    }
+    return(as.integer(model$layout$start[model$layout$block == block] + si - 1L))
+  }
   pick_geno <- function(x, what) {
     if (is.null(x)) {
       return(seq_along(geno))
@@ -244,7 +266,14 @@ sg_state_names <- function(model) {
   for (b in model$layout$block) {
     n_sub <- .sg_block_substages(model$dims, b)
     idx <- sg_state_index(model, b)
-    if (b == "F") {
+    if (b %in% .sg_host_blocks) {
+      cls <- model$hosts$classes
+      out[idx] <- if (b == "HI") {
+        paste0("HI[", cls, ",", seq_len(n_sub), "]")
+      } else {
+        paste0(b, "[", cls, "]")
+      }
+    } else if (b == "F") {
       grid <- expand.grid(s = seq_len(n_sub), m = geno, g = geno, stringsAsFactors = FALSE)
       out[idx] <- paste0("F[", grid$g, "|", grid$m, ",", grid$s, "]")
     } else {
@@ -285,10 +314,27 @@ print.sg_model <- function(x, ...) {
     cat(paste0("    ", never), sep = "\n")
   }
   p <- x$params
+  h <- x$hosts
+  wounds <- if (is.null(h)) {
+    sprintf("wounds H = %s per node", format(x$counts$H))
+  } else {
+    sprintf("hosts N_H = %s per node", format(h$n))
+  }
   cat(sprintf(
-    "  node area %s km^2; wounds H = %s per node; mating \"%s\"; search competitors \"%s\"\n",
-    format(x$area), format(x$counts$H), p$mating_mode, p$wound_competitors
+    "  node area %s km^2; %s; mating \"%s\"; search competitors \"%s\"\n",
+    format(x$area), wounds, p$mating_mode, p$wound_competitors
   ))
+  if (!is.null(h)) {
+    cat(sprintf(
+      paste0(
+        "  host-wound model: %.3g of hosts wounded without flies, wounds heal in %g d; ",
+        "infestations %g d in %d sub-stages; infested wounds x%g attractive; ",
+        "treatment %g per day\n"
+      ),
+      p$wounded_fraction, p$wound_healing_days, p$infestation_days, h$n_I,
+      h$attractiveness, h$treatment
+    ))
+  }
   sized <- x$meta$adult_females
   if (!is.null(sized)) {
     cat(sprintf(
@@ -340,7 +386,13 @@ print.sg_model <- function(x, ...) {
   x
 }
 
+# Host-wound blocks (D-030), after the fly blocks in host mode.
+.sg_host_blocks <- c("HS", "HW", "HI")
+
 .sg_block_substages <- function(dims, block) {
+  if (block %in% .sg_host_blocks) {
+    return(if (block == "HI") as.integer(dims$n_I) else 1L)
+  }
   # EXPR is named so that the label E is not partially matched to it
   switch(EXPR = block,
     E = dims$n_E,
@@ -351,17 +403,23 @@ print.sg_model <- function(x, ...) {
 }
 
 # One row per block: name, first position (1-based), length, dimensions.
-.sg_layout <- function(dims) {
-  blocks <- c("E", "L", "P", "M", "U", "F")
+# With host = TRUE the host blocks HS, HW, HI follow the fly blocks (D-030).
+.sg_layout <- function(dims, hosts = FALSE) {
+  blocks <- c("E", "L", "P", "M", "U", "F", if (hosts) .sg_host_blocks)
   n_g <- dims$n_genotypes
   len <- vapply(blocks, function(b) {
+    if (b %in% .sg_host_blocks) {
+      return(as.integer(dims$n_node * dims$n_host * .sg_block_substages(dims, b)))
+    }
     n_m <- if (b == "F") n_g else 1L
     as.integer(dims$n_node * dims$n_host * n_g * n_m * .sg_block_substages(dims, b))
   }, 1L)
   start <- cumsum(c(1L, len[-length(len)]))
   dims_txt <- vapply(blocks, function(b) {
     n_sub <- .sg_block_substages(dims, b)
-    if (b == "F") {
+    if (b %in% .sg_host_blocks) {
+      sprintf("node %d x host %d x sub-stage %d", dims$n_node, dims$n_host, n_sub)
+    } else if (b == "F") {
       sprintf(
         "node %d x host %d x genotype %d x mate %d x sub-stage %d",
         dims$n_node, dims$n_host, n_g, n_g, n_sub
@@ -377,6 +435,36 @@ print.sg_model <- function(x, ...) {
     block = blocks, start = as.integer(start), length = unname(len),
     dims = unname(dims_txt), stringsAsFactors = FALSE
   )
+}
+
+# Host-wound model (D-030, design note section 3.2): host count per node and
+# per-host rates per day. Wounding is set so that, without flies, a fraction
+# wounded_fraction of hosts carries an attractive wound: omega = gamma_W p0 /
+# (1 - p0).
+.sg_host_setup <- function(p, area) {
+  healing <- 1 / p$wound_healing_days
+  list(
+    classes = "hosts",
+    n = p$host_density * area,
+    n_I = p$infestation_substages,
+    wounding = healing * p$wounded_fraction / (1 - p$wounded_fraction),
+    healing = healing,
+    advance = p$infestation_substages / p$infestation_days,
+    treatment = p$treatment_rate,
+    attractiveness = p$infested_wound_attractiveness
+  )
+}
+
+# Stop for features of the host-wound model that later work packages of
+# D-030 implement.
+.sg_require_static <- function(model, what) {
+  if (!is.null(model$hosts)) {
+    .sg_stop(
+      what, " is not available yet for wound_model = \"hosts\" (the host-wound ",
+      "model, D-030, is being implemented)."
+    )
+  }
+  invisible(TRUE)
 }
 
 # Release events with the state position they are added to (first sub-stage).

@@ -50,7 +50,11 @@ An object of class \code{sg_model}: a list with \code{params}, \code{cube},
 \code{forcing}, \code{area}, \code{dims} (numbers of genotypes, sub-stages, nodes and
 host classes), \code{adult} (female and male chains), \code{layout} (one row per
 state block: name, first index, length), \code{n_states}, \code{counts} (wound
-number \code{H}, half-saturation \code{h_M}, extinction threshold, per node; internal names),
+number \code{H}, half-saturation \code{h_M}, extinction threshold, per node; internal names;
+\code{H} is \code{NA} with the host-wound model), \code{hosts} (\code{NULL} with
+\code{wound_model = "static"}; otherwise the host class, host count per node
+\code{n}, infestation sub-stages \code{n_I} and per-host rates per day \code{wounding},
+\code{healing}, \code{advance}, \code{treatment} and \code{attractiveness}, D-030),
 \code{releases} (events with day, state index and count) and \code{meta}
 (package version and hash).
 }

@@ -10,6 +10,7 @@
 # date) or, without it, the model's first 365 days of forcing repeated (the
 # same season, one year later).
 .sg_init_burn_in <- function(model, x_start, years, weather, check_start = TRUE) {
+  .sg_require_static(model, "A burn-in")
   ok <- is.numeric(years) && length(years) == 1L && is.finite(years) && years >= 1 &&
     years == round(years)
   if (!ok) .sg_stop("`years` must be a whole number >= 1.")
@@ -91,6 +92,7 @@
 .sg_init_equilibrium <- function(model, temperature, what = "method = \"equilibrium\"",
                                  root = c("upper", "lower")) {
   root <- match.arg(root)
+  .sg_require_static(model, what)
   ok <- is.numeric(temperature) && length(temperature) == 1L && is.finite(temperature)
   if (!ok) .sg_stop(what, " needs a single `temperature` (degC).")
   w <- .sg_wild_setup(model, what)

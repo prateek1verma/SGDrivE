@@ -89,6 +89,7 @@ simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
   if (!inherits(model, "sg_model")) {
     .sg_stop("`model` must be an sg_model object; create one with sg_model().")
   }
+  .sg_require_static(model, "simulate_ode()")
   backend <- .sg_match_choice(backend, c("R", "cpp"), "backend")
   if (is.null(method)) method <- if (backend == "cpp") "dopri5" else "lsoda"
   if (!is.character(method) || length(method) != 1L || is.na(method)) {

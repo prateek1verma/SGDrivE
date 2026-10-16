@@ -8,7 +8,8 @@
 //   dimensions as [rows, cols];
 // * the state vector holds blocks E, L, P, M, U, F starting at offsets[0..5];
 //   within a block the sub-stage varies fastest, then the mate genotype (F
-//   only), then the genotype.
+//   only), then the genotype. With the host-wound model (D-030) the host
+//   blocks HS, HW, HI (sub-stages 1..n_I) follow, at host_offsets[0..2].
 
 #ifndef SGDRIVE_MODEL_VIEW_H
 #define SGDRIVE_MODEL_VIEW_H
@@ -27,6 +28,13 @@ struct ModelView {
   // dimensions
   int n_g, n_E, n_L, n_P, n_A, n_states, n_days, n_counters;
   std::vector<int> offsets;  // [6], 0-based starts of E, L, P, M, U, F
+
+  // host-wound model (D-030): host count per node and per-host rates per day
+  bool host_model;
+  int n_I;                        // infestation sub-stages (0 without hosts)
+  std::vector<int> host_offsets;  // [3], 0-based starts of HS, HW, HI; -1 without hosts
+  double N_H, host_wounding, host_healing, host_advance, host_treatment,
+      host_attractiveness;
 
   // options
   bool mating_instant, search_all_adults, larval_per_wound;

@@ -157,10 +157,3 @@ test_that("settings without effect in the chosen wound model give warnings", {
   p <- sg_params(wound_model = "hosts", host_density = 50, wounded_fraction = 0.1)
   expect_error(update(p, wounded_fraction = NA), "needs wounded_fraction")
 })
-
-test_that("models in host mode are not available before the host block exists", {
-  skip_if_not_installed("MGDrivE")
-  p <- sg_params(wound_model = "hosts", host_density = 50, wounded_fraction = 0.1)
-  f <- sg_forcing(sg_constant_weather(20, days = 10), p)
-  expect_error(sg_model(p, sg_cube(MGDrivE::cubeMendelian()), f), "not available yet")
-})

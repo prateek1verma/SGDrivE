@@ -51,6 +51,7 @@ calibrate_wound_density <- function(model, target, stat = c("mean", "peak", "min
   if (!inherits(model, "sg_model")) {
     .sg_stop("`model` must be an sg_model object; create one with sg_model().")
   }
+  .sg_require_static(model, "calibrate_wound_density()")
   if (!is.numeric(target) || length(target) != 1L || !is.finite(target) || target <= 0) {
     .sg_stop("`target` must be a single positive density (individuals per km^2).")
   }

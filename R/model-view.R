@@ -26,6 +26,9 @@
     as.numeric(iw)
   }
   rel <- model$releases
+  h <- model$hosts
+  lay <- model$layout
+  host_start <- function(b) if (is.null(h)) -1L else as.integer(lay$start[lay$block == b] - 1L)
   view <- list(
     # dimensions
     n_g = as.integer(s$n_g), n_E = as.integer(s$n_E), n_L = as.integer(s$n_L),
@@ -33,7 +36,18 @@
     n_states = as.integer(s$n_states), n_days = as.integer(f$n_days),
     n_counters = length(s$counter_names),
     # 0-based start of each state block, in the order E, L, P, M, U, F
-    offsets = as.integer(model$layout$start - 1L),
+    offsets = as.integer(lay$start[seq_len(6L)] - 1L),
+    # host-wound model (D-030): flag, infestation sub-stages, 0-based starts of
+    # HS, HW, HI (-1 without hosts), host count per node and per-host rates
+    host_model = as.integer(!is.null(h)),
+    n_I = as.integer(if (is.null(h)) 0L else h$n_I),
+    host_offsets = c(host_start("HS"), host_start("HW"), host_start("HI")),
+    N_H = if (is.null(h)) 0 else h$n,
+    host_wounding = if (is.null(h)) 0 else h$wounding,
+    host_healing = if (is.null(h)) 0 else h$healing,
+    host_advance = if (is.null(h)) 0 else h$advance,
+    host_treatment = if (is.null(h)) 0 else h$treatment,
+    host_attractiveness = if (is.null(h)) 0 else h$attractiveness,
     # options
     mating_instant = as.integer(p$mating_mode == "instant"),
     search_all_adults = as.integer(p$wound_competitors == "all_adults"),
@@ -49,7 +63,8 @@
     gamma_L = p$larval_crowding_coef,
     mu_W = p$pupa_drought_mortality, mu_b_F = p$female_background_mortality,
     mu_b_M = p$male_background_mortality,
-    H = s$counts$H, h_M = s$counts$h_M, h_M_param = p$male_density_half_mating,
+    H = if (is.null(h)) s$counts$H else 0, h_M = s$counts$h_M,
+    h_M_param = p$male_density_half_mating,
     clutch_size = if (is.na(p$clutch_size)) 0 else p$clutch_size,
     # adult chains: [substage, genotype], column-major
     inv_w_f = inv_width(s$w_f), inv_w_m = inv_width(s$w_m),
