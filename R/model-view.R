@@ -52,6 +52,7 @@
     mating_instant = as.integer(p$mating_mode == "instant"),
     search_all_adults = as.integer(p$wound_competitors == "all_adults"),
     larval_per_wound = as.integer(p$larval_crowding_mode == "per_wound"),
+    larval_per_infested_host = as.integer(p$larval_crowding_mode == "per_infested_host"),
     oviposition_batches = as.integer(p$oviposition_mode == "batches"),
     # scalar parameters (counts per node where relevant)
     X_E = p$egg_duration_dd, tau_L = p$larva_duration_days,

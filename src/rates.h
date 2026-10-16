@@ -31,10 +31,13 @@ struct DayRates {
   double batch_factor = 1.0;  // oviposition events per wound found (D-024)
 };
 
-// Quantities that depend on the state (S7 larval crowding, S8, S9, S12).
+// Quantities that depend on the state (S7 larval crowding, S8, S9, S12; host
+// sums H1-H2 of the host-wound model, D-030).
 // Shared by the ODE and chain-binomial solvers.
 struct Aggregates {
   double sum_e = 0.0, sum_l = 0.0, sum_p = 0.0, sum_m = 0.0, sum_u = 0.0, sum_f = 0.0;
+  double host_s = 0.0, host_w = 0.0, sum_hi = 0.0;  // hosts: no wound, wounded, infested
+  double sites = 0.0;   // attractive sites A_s = HW + alpha * sum(HI) (host model)
   double mu_l = 0.0;    // larval hazard, with crowding
   double sum_w = 0.0;   // egg-laying mated females
   double n_s = 0.0;     // wound-search competitors
@@ -83,7 +86,10 @@ class RateKernel {
   std::vector<double> in_m_, in_f_, in_u_, in_f_mated_;  // [n_g]
   std::vector<double> mating_flux_;  // [n_A * n_g]: [substage, genotype]
 
-  double larval_hazard(double sum_l) const;
+  double larval_hazard(double sum_l, double sum_hi) const;
+  // fertile oviposition events per day (D-026): psi * batch factor * sum of
+  // egg-laying females weighted by the share of batches with a viable egg
+  double fertile_rate(const DayRates& r) const;
 };
 
 }  // namespace sgdrive

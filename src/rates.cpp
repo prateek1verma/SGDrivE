@@ -28,10 +28,27 @@ RateKernel::RateKernel(const ModelView& mv)
   }
 }
 
-double RateKernel::larval_hazard(double sum_l) const {
+// Larval hazard (S7); with the host-wound model plus treatment and crowding
+// per infested host (H2, floor 1e-6 * N_H as in .sg_crowd_floor).
+double RateKernel::larval_hazard(double sum_l, double sum_hi) const {
   double mu_l = mv_.mu_L0;
   if (mv_.larval_per_wound && mv_.H > 0) mu_l += mv_.gamma_L * sum_l / mv_.H;
+  if (mv_.host_model) {
+    mu_l += mv_.host_treatment;
+    if (mv_.larval_per_infested_host) {
+      mu_l += mv_.gamma_L * sum_l / (sum_hi + 1e-6 * mv_.N_H);
+    }
+  }
   return mu_l;
+}
+
+double RateKernel::fertile_rate(const DayRates& r) const {
+  const Aggregates& a = agg_;
+  double fertile = 0.0;
+  for (int pair = 0; pair < mv_.n_g * mv_.n_g; ++pair) {
+    fertile += a.w_lay[pair] * -std::expm1(-r.clutch * pair_viability_[pair]);
+  }
+  return a.psi * r.batch_factor * fertile;
 }
 
 DayRates RateKernel::day_rates(int day) const {
@@ -76,8 +93,18 @@ void RateKernel::aggregate(const DayRates& r, const double* y) {
   for (int i = 0; i < ng * nA; ++i) a.sum_u += unm[i];
   for (int i = 0; i < ng * ng * nA; ++i) a.sum_f += fem[i];
 
+  // ---- hosts (H1, H2) ------------------------------------------------------------
+  a.host_s = a.host_w = a.sum_hi = a.sites = 0.0;
+  if (v.host_model) {
+    a.host_s = y[v.host_offsets[0]];
+    a.host_w = y[v.host_offsets[1]];
+    const double* hi = y + v.host_offsets[2];
+    for (int j = 0; j < v.n_I; ++j) a.sum_hi += hi[j];
+    a.sites = a.host_w + v.host_attractiveness * a.sum_hi;
+  }
+
   // ---- larval crowding (S7) ------------------------------------------------------
-  a.mu_l = larval_hazard(a.sum_l);
+  a.mu_l = larval_hazard(a.sum_l, a.sum_hi);
 
   // ---- wound search and egg production (S8, S9) ----------------------------
   a.sum_w = 0.0;
@@ -93,7 +120,8 @@ void RateKernel::aggregate(const DayRates& r, const double* y) {
     }
   }
   a.n_s = v.search_all_adults ? (a.sum_m + a.sum_u + a.sum_f) : a.sum_w;
-  a.psi = a.n_s > 0.0 ? v.sigma0 * (1.0 - std::exp(-v.a_s * r.dx * v.H / a.n_s)) : v.sigma0;
+  const double wounds = v.host_model ? a.sites : v.H;  // fixed H, or A_s (H2)
+  a.psi = a.n_s > 0.0 ? v.sigma0 * (1.0 - std::exp(-v.a_s * r.dx * wounds / a.n_s)) : v.sigma0;
   const int n_cross = ng * ng;
   for (int k = 0; k < ng; ++k) {
     const double* col = v.egg_tensor.data() + static_cast<std::size_t>(k) * n_cross;
@@ -259,6 +287,32 @@ void RateKernel::eval(int day, const double* y, double* dydt, double* counters) 
     }
   }
 
+  // ---- hosts (H1, H2) ------------------------------------------------------------
+  // Fertile batches are shared among wounds by attractiveness: on an uninfested
+  // wound a batch starts an infestation (a case), on an infested one it only
+  // adds larvae (superinfestation).
+  const double fertile = fertile_rate(r);
+  double new_inf = 0.0, superinf = 0.0, wounded = 0.0, healed = 0.0, ended = 0.0;
+  double treated = 0.0;
+  if (v.host_model) {
+    const int nI = v.n_I;
+    const double* hi = y + v.host_offsets[2];
+    double* d_hi = dydt + v.host_offsets[2];
+    if (a.sites > 0.0) {
+      new_inf = fertile * a.host_w / a.sites;
+      superinf = fertile * v.host_attractiveness * a.sum_hi / a.sites;
+    }
+    wounded = v.host_wounding * a.host_s;
+    healed = v.host_healing * a.host_w;
+    ended = v.host_advance * hi[nI - 1];
+    treated = v.host_treatment * a.sum_hi;
+    for (int j = 0; j < nI; ++j) d_hi[j] = -(v.host_advance + v.host_treatment) * hi[j];
+    d_hi[0] += new_inf;
+    for (int j = 1; j < nI; ++j) d_hi[j] += v.host_advance * hi[j - 1];
+    dydt[v.host_offsets[0]] = -wounded + healed + ended + treated;
+    dydt[v.host_offsets[1]] = wounded - healed - new_inf;
+  }
+
   if (counters == nullptr) return;
 
   // ---- counters (rates per day; order of .sg_counter_names()) ---------------------
@@ -272,11 +326,7 @@ void RateKernel::eval(int day, const double* y, double* dydt, double* counters) 
   // egg_batches: oviposition events per day (D-024); fertile_batches: those
   // with at least one viable egg, the case proxy (D-026)
   counters[c++] = psi * a.sum_w * r.batch_factor;
-  double fertile = 0.0;
-  for (int pair = 0; pair < ng * ng; ++pair) {
-    fertile += a.w_lay[pair] * -std::expm1(-r.clutch * pair_viability_[pair]);
-  }
-  counters[c++] = psi * r.batch_factor * fertile;
+  counters[c++] = fertile;
   counters[c++] = q_e * last_e;    // larvae_in
   counters[c++] = q_l * last_l;    // pupae_in
   counters[c++] = sum_in_m;        // emerged_male
@@ -296,6 +346,14 @@ void RateKernel::eval(int day, const double* y, double* dydt, double* counters) 
   counters[c++] = sen_m;
   counters[c++] = sen_u;
   counters[c++] = sen_f;
+  if (v.host_model) {  // host flows (D-030), order of .sg_host_counter_names
+    counters[c++] = wounded;
+    counters[c++] = healed;
+    counters[c++] = new_inf;
+    counters[c++] = ended;
+    counters[c++] = treated;
+    counters[c++] = superinf;
+  }
 }
 
 double RateKernel::max_rate(int day, const double* y) {
@@ -323,6 +381,11 @@ double RateKernel::max_rate(int day, const double* y) {
     if (iw > 0) max_iw_m = std::max(max_iw_m, iw);
   }
   if (max_iw_m > 0) best = std::max(best, dx * max_iw_m + mu_m);
+  if (v.host_model) {  // host rates (D-030): wounding, healing + infestation, chain
+    const double hazard = a.host_w > 0.0 && a.sites > 0.0 ? fertile_rate(r) / a.sites : 0.0;
+    best = std::max({best, v.host_wounding, v.host_healing + hazard,
+                     v.host_advance + v.host_treatment});
+  }
   return best;
 }
 
@@ -367,5 +430,6 @@ Rcpp::List sg_aggregates_cpp(const Rcpp::List& view, int day, const Rcpp::Numeri
       Rcpp::Named("w_lay") = Rcpp::wrap(a.w_lay), Rcpp::Named("n_s") = a.n_s,
       Rcpp::Named("psi") = a.psi, Rcpp::Named("births") = Rcpp::wrap(a.births),
       Rcpp::Named("m_bar") = Rcpp::wrap(a.m_bar), Rcpp::Named("g_find") = a.g_find,
-      Rcpp::Named("pi") = Rcpp::wrap(a.pi), Rcpp::Named("mate_ok") = Rcpp::wrap(a.mate_ok));
+      Rcpp::Named("pi") = Rcpp::wrap(a.pi), Rcpp::Named("mate_ok") = Rcpp::wrap(a.mate_ok),
+      Rcpp::Named("sites") = a.sites, Rcpp::Named("sum_hi") = a.sum_hi);
 }

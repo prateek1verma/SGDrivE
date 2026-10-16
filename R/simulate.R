@@ -90,7 +90,6 @@ simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
     .sg_stop("`model` must be an sg_model object; create one with sg_model().")
   }
   backend <- .sg_match_choice(backend, c("R", "cpp"), "backend")
-  if (backend == "cpp") .sg_require_static(model, "simulate_ode(backend = \"cpp\")")
   if (is.null(method)) method <- if (backend == "cpp") "dopri5" else "lsoda"
   if (!is.character(method) || length(method) != 1L || is.na(method)) {
     .sg_stop("`method` must be a single string, e.g. \"dopri5\" or \"lsoda\".")

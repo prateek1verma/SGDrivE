@@ -38,6 +38,7 @@ struct ModelView {
 
   // options
   bool mating_instant, search_all_adults, larval_per_wound;
+  bool larval_per_infested_host;  // crowding per infested host (host model, D-030)
   bool oviposition_batches;  // chain-binomial egg laying in batches (D-024)
 
   // scalar parameters (counts per node where relevant)

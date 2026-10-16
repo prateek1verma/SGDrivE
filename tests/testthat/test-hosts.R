@@ -86,10 +86,9 @@ test_that("a full state is checked against the number of hosts", {
   expect_error(sg_init(m, "state", state = x[-1]), "length")
 })
 
-test_that("solvers and dynamic starts refuse host models until implemented", {
+test_that("the stochastic solver and dynamic starts refuse host models until implemented", {
   m <- model_of(host_params())
-  expect_error(simulate_ode(m), "not available yet for wound_model = \"hosts\"")
-  expect_error(simulate_cb(m, n_rep = 1, seed = 1), "not available yet")
+  expect_error(simulate_cb(m, n_rep = 1, seed = 1), "not available yet for wound_model = \"hosts\"")
   expect_error(sg_init(m, "equilibrium"), "not available yet")
   expect_error(sg_init(m, "threshold"), "not available yet")
   expect_error(check_model(m), "not available yet")
@@ -159,7 +158,6 @@ test_that("hosts are conserved and host counters account for every move", {
   )
   # the fly flow balance still closes
   expect_lt(max(abs(sg_flow_balance(s)$residual)), 1e-6)
-  expect_error(simulate_ode(r$model), "backend = \"cpp\"")
 })
 
 test_that("without flies hosts relax to the fly-free steady state", {
@@ -275,4 +273,67 @@ test_that("at most N_H hosts are infested, however many flies", {
   k <- colSums(r$sim$counters)
   expect_gt(k[["superinfestations"]], 10 * k[["infestations"]])
   expect_gt(min(r$sim$state), -1e-6)
+})
+
+# ---- C++ kernel (WP4) ---------------------------------------------------------
+
+host_configs <- list(
+  plain = host_params(),
+  full = host_params(
+    infested_wound_attractiveness = 2.5, treatment_rate = 0.05, infestation_substages = 4,
+    larval_crowding_mode = "per_infested_host", larval_crowding_coef = 0.01
+  ),
+  no_attraction = host_params(
+    infested_wound_attractiveness = 0, infestation_substages = 1,
+    male_density_half_mating = 2, wound_competitors = "all_adults"
+  )
+)
+
+test_that("C++ rates match the R reference in host mode", {
+  set.seed(30)
+  for (nm in names(host_configs)) {
+    m <- model_of(host_configs[[nm]], area = 3)
+    setup <- SGDrivE:::.sg_reference_setup(m)
+    view <- SGDrivE:::.sg_model_view(m)
+    for (rep in 1:3) {
+      x <- stats::runif(m$n_states, 0, 20)
+      if (rep == 3) x[sg_state_index(m, "HW")] <- 0 # no uninfested wound
+      r <- SGDrivE:::.sg_rates_r(5, x, setup, aux = TRUE)
+      cc <- SGDrivE:::sg_rates_cpp(view, 5L, x)
+      expect_equal(cc$deriv, r$deriv, tolerance = 1e-12, info = nm)
+      expect_equal(cc$counters, unname(r$counters), tolerance = 1e-12, info = nm)
+      agg <- SGDrivE:::sg_aggregates_cpp(view, 5L, x)
+      expect_equal(agg$sites, r$aux$sites, tolerance = 1e-14, info = nm)
+      expect_equal(agg$psi, r$aux$psi, tolerance = 1e-14, info = nm)
+      expect_equal(agg$mu[2], r$aux$mu[["L"]], tolerance = 1e-14, info = nm)
+      expect_equal(
+        SGDrivE:::sg_max_rate_cpp(view, 5L, x), SGDrivE:::.sg_max_rate(5, x, setup),
+        tolerance = 1e-12, info = nm
+      )
+    }
+  }
+})
+
+test_that("C++ and R backends give the same host-mode simulation", {
+  skip_if_not_installed("deSolve")
+  for (nm in names(host_configs)) {
+    p <- host_configs[[nm]]
+    m <- sg_model(p, cube3, sg_forcing(sg_constant_weather(25, days = 120), p), area = 10)
+    x0 <- sg_init(m)
+    s_r <- simulate_ode(m, x0, backend = "R", rtol = 1e-10, atol = 1e-12)
+    s_c <- simulate_ode(m, x0, rtol = 1e-10, atol = 1e-12)
+    expect_lt(max(abs(s_c$state - s_r$state)) / max(s_r$state), 1e-8)
+    expect_lt(max(abs(s_c$counters - s_r$counters)) / max(abs(s_r$counters)), 1e-8)
+    # deSolve driven by the C++ rates agrees too
+    s_l <- simulate_ode(m, x0, method = "lsoda", rtol = 1e-10, atol = 1e-12)
+    expect_lt(max(abs(s_l$state - s_r$state)) / max(s_r$state), 1e-6)
+    tot <- rowSums(s_c$state[, grep("^H", colnames(s_c$state))])
+    expect_lt(max(abs(tot - m$hosts$n)), 1e-8 * m$hosts$n)
+  }
+})
+
+test_that("the C++ view refuses crowding per infested host without hosts", {
+  v <- SGDrivE:::.sg_model_view(model_of(sg_params()))
+  v$larval_per_infested_host <- 1L
+  expect_error(SGDrivE:::sg_model_view_info_cpp(v), "needs the host model")
 })

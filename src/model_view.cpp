@@ -129,6 +129,10 @@ ModelView::ModelView(const Rcpp::List& view) {
   mating_instant = get_int(view, "mating_instant") == 1;
   search_all_adults = get_int(view, "search_all_adults") == 1;
   larval_per_wound = get_int(view, "larval_per_wound") == 1;
+  larval_per_infested_host = get_int(view, "larval_per_infested_host") == 1;
+  if (larval_per_infested_host && !host_model) {
+    Rcpp::stop("model view: crowding per infested host needs the host model");
+  }
   oviposition_batches = get_int(view, "oviposition_batches") == 1;
 
   X_E = get_double(view, "X_E");
