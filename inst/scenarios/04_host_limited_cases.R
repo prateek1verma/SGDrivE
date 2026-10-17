@@ -33,19 +33,15 @@ p <- sg_params(
 cube <- sg_cube(MGDrivE::cubeMendelian()) # only the wild type (AA) is present
 
 # 2. Weather: McAllen, Texas, 1971 --------------------------------------------
-# weather <- sg_example_weather()
-# forcing <- sg_forcing(weather, p, start = "1971-01-01", end = "1971-12-31")
-
-weather <- sg_constant_weather(temperature = 20, days = 365)
-forcing <- sg_forcing(weather, p)
+weather <- sg_example_weather()
+forcing <- sg_forcing(weather, p, start = "1971-01-01", end = "1971-12-31")
 
 # 3. Model: a region of 1000 km^2 (30,000 animals) ---------------------------
 model <- sg_model(p, cube, forcing, area = 1000)
 check_model(model)
 
 # 4. Start after a one-year burn-in over the weather of 1970 ----------------
-# init <- sg_init(model, "burn_in", weather = weather)
-init <- sg_init(model, "equilibrium")
+init <- sg_init(model, "burn_in", weather = weather)
 
 # 5. Simulate -----------------------------------------------------------------
 ode <- simulate_ode(model, init) # deterministic
@@ -88,4 +84,3 @@ ggplot(hosts_cb, aes(date, infested, group = replicate)) +
     title = "Infested animals: ODE (black) and 10 stochastic replicates (blue)"
   ) +
   theme_minimal()
-
