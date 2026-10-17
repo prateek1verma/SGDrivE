@@ -9,3 +9,10 @@ lib/
 *.tar.gz
 SGDrivE.Rcheck/
 data-raw/reference/*.log
+
+# Slide decks and their figures/scripts (local only)
+slides/
+*.pptx
+*.ppt
+*.key
+~$*
