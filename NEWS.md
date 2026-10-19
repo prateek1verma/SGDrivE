@@ -2,6 +2,20 @@
 
 ## Sterile females no longer compete for wounds (D-031)
 
+
+* Wound searchers are now weighted by the female's fecundity `s` from the
+  cube: females that produce no eggs (`s = 0`, such as irradiated sterile
+  females) no longer search for wounds, lay egg batches or count in
+  `egg_batches`. Before, released sterile females took a share of the
+  wounds and suppressed wild egg laying, overstating SIT with female
+  releases. Females mated to sterile males still search (D-006).
+* Partly fertile genotypes (`0 < s < 1`) lay proportionally fewer egg
+  batches of full viability instead of the same number of smaller ones;
+  mean egg production is unchanged. Genotypes with `s = 1` are unaffected.
+* `sg_cube()` gains the element `batch_viability`.
+
+## Scenario scripts 05 and 06
+
 * Wound searchers are now weighted by the female's fecundity `s` from the
   cube: females that produce no eggs (`s = 0`, such as irradiated sterile
   females) no longer search for wounds, lay egg batches or count in
