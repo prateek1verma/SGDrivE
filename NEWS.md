@@ -13,6 +13,12 @@
   mean egg production is unchanged. Genotypes with `s = 1` are unaffected.
 * `sg_cube()` gains the element `batch_viability`.
 
+## Scenario script 09
+
+* `inst/scenarios/09_gp2014_mcallen.R`: the Gutierrez & Ponti (2014)
+  configuration at McAllen, Texas (1960-1983), with the published
+  cold-stress index reproduced and the simulated seasonal dynamics.
+
 ## Scenario scripts 07 and 08
 
 * `inst/scenarios/07_classic_sit.R`: classic SIT (weekly releases of
