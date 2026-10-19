@@ -84,7 +84,7 @@ sg_test_each_backend("sterile male releases divert matings and suppress the wild
   expect_lt(wild_adults(sit, s1), 0.5 * wild_adults(control, s0))
 })
 
-sg_test_each_backend("releases of infertile females alone leave the wild population unchanged (D-031)", {
+sg_test_each_backend("releasing infertile females alone leaves the wild population as is (D-031)", {
   # S females produce no eggs (s = 0): they mate, but males are not used up
   # and they do not compete for wounds
   cube <- sg_cube(sg_test_cube_sit(residual = 0, s_s = 0))
