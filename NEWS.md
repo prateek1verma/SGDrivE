@@ -27,6 +27,13 @@
   mean egg production is unchanged. Genotypes with `s = 1` are unaffected.
 * `sg_cube()` gains the element `batch_viability`.
 
+## Scenario scripts 05 and 06
+
+* `inst/scenarios/05_larval_crowding.R`: trajectories with and without
+  larval crowding at a constant temperature.
+* `inst/scenarios/06_rainfall_pupae.R`: trajectories in a wet (no drought
+  stress) and a dry climate with rainfall-dependent pupal mortality.
+
 ## Host-wound-case model (stage 1)
 
 * `sg_params(wound_model = "hosts", host_density = , wounded_fraction = )`

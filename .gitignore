@@ -11,7 +11,10 @@ SGDrivE.Rcheck/
 data-raw/reference/*.log
 /slides
 /slides/figures
-*.pdf
-slides/figures/mating_process.png
-slides/figures/mating_process.png
-slides/figures/model_overview.pdf
+# Slide decks and their figures/scripts (local only)
+slides/
+*.pptx
+*.ppt
+*.key
+~$*
+
