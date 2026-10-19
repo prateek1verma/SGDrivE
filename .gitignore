@@ -9,3 +9,4 @@ lib/
 *.tar.gz
 SGDrivE.Rcheck/
 data-raw/reference/*.log
+/slides
