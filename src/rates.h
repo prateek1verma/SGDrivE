@@ -40,6 +40,7 @@ struct Aggregates {
   double sites = 0.0;   // attractive sites A_s = HW + alpha * sum(HI) (host model)
   double mu_l = 0.0;    // larval hazard, with crowding
   double sum_w = 0.0;   // egg-laying mated females
+  double sum_search = 0.0;  // egg-laying females weighted by fecundity s_g (D-031)
   double n_s = 0.0;     // wound-search competitors
   double psi = 0.0;     // wound-finding rate
   double m_tot = 0.0;   // mature males
@@ -74,21 +75,25 @@ class RateKernel {
 
   const ModelView& view() const { return mv_; }
 
-  // Viable eggs per egg for each female x mate pair, sum_k s ih tau
-  // ([n_g * n_g], m fastest).
-  const std::vector<double>& pair_viability() const { return pair_viability_; }
+  // Per female x mate pair ([n_g * n_g], m fastest): viable eggs per egg
+  // laid, sum_k s ih tau; search and batch weight, the female's s_g; and
+  // viable eggs per egg of a batch, sum_k ih tau (D-031).
+  const std::vector<double>& pair_egg_total() const { return pair_egg_total_; }
+  const std::vector<double>& pair_search() const { return pair_search_; }
+  const std::vector<double>& pair_batch_viability() const { return v_batch_; }
 
  private:
   const ModelView& mv_;
   Aggregates agg_;
-  std::vector<double> pair_viability_;
+  std::vector<double> pair_egg_total_, pair_search_, v_batch_;
   // working arrays of eval() (sizes in comments)
   std::vector<double> in_m_, in_f_, in_u_, in_f_mated_;  // [n_g]
   std::vector<double> mating_flux_;  // [n_A * n_g]: [substage, genotype]
 
   double larval_hazard(double sum_l, double sum_hi) const;
   // fertile oviposition events per day (D-026): psi * batch factor * sum of
-  // egg-laying females weighted by the share of batches with a viable egg
+  // searching females (s_g-weighted, D-031) times the share of batches with a
+  // viable egg
   double fertile_rate(const DayRates& r) const;
 };
 

@@ -209,19 +209,23 @@ void CbStepper::step(double* x, double* flows, D& draws) {
   for (int g = 0; g < ng; ++g) {
     for (int m = 0; m < ng; ++m) {
       const int pair = g * ng + m;
-      const double tot = kernel_.pair_viability()[pair];
-      const double share = -std::expm1(-clutch * tot);
+      const double tot = kernel_.pair_egg_total()[pair];
+      // females lay batches (and search) in proportion to s_g; viable eggs
+      // per egg of a batch without s_g (D-031)
+      const double w_search = kernel_.pair_search()[pair] * a.w_lay[pair];
+      const double viab = kernel_.pair_batch_viability()[pair];
+      const double share = -std::expm1(-clutch * viab);
       double n_eggs;
       if (batches) {
-        const double nb = draws.pois(a.psi * factor * a.w_lay[pair] * dt);
+        const double nb = draws.pois(a.psi * factor * w_search * dt);
         n_batches += nb;
         if (nb == 0.0 || share <= 0.0) continue;
         const double nf = draws.binom(nb, share);
         n_fertile += nf;
         if (nf == 0.0) continue;
-        n_eggs = draws.ztp_sum(nf, clutch * tot);
+        n_eggs = draws.ztp_sum(nf, clutch * viab);
       } else {
-        expected_fertile += a.w_lay[pair] * share;
+        expected_fertile += w_search * share;
         if (tot <= 0.0) continue;
         n_eggs = draws.pois(v.R * r_.phi_ov * a.psi * a.w_lay[pair] * tot * dt);
       }
@@ -360,7 +364,7 @@ void CbStepper::step(double* x, double* flows, D& draws) {
   // ---- flows (order of .sg_counter_names()) -----------------------------------
   int c = 0;
   for (int k = 0; k < ng; ++k) flows[c++] = eggs_[k];
-  flows[c++] = batches ? n_batches : a.psi * a.sum_w * factor * dt;  // egg_batches
+  flows[c++] = batches ? n_batches : a.psi * a.sum_search * factor * dt;  // egg_batches
   flows[c++] = (batches || v.host_model) ? n_fertile
                                           : a.psi * factor * expected_fertile * dt;  // fertile_batches
   double sum_out_e = 0.0, sum_out_l = 0.0;

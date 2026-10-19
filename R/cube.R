@@ -21,7 +21,11 @@
 #'     \item{`phi`}{Fraction of emerging adults that are female, per genotype.}
 #'     \item{`xiF`, `xiM`}{Emergence success of females and males, per
 #'       genotype, in \[0, 1\].}
-#'     \item{`s`}{Fecundity multiplier of females, per genotype, >= 0.}
+#'     \item{`s`}{Fecundity multiplier of females, per genotype, >= 0. It
+#'       scales the egg batches a female lays and, with them, her share of
+#'       the wound search (D-031): `s = 0` for females that produce no eggs,
+#'       such as irradiated sterile females, which then do not compete for
+#'       wounds.}
 #'     \item{`omega`}{MGDrivE v1 adult lifespan modifier, per genotype, >= 0
 #'       (daily survival is multiplied by omega).}
 #'     \item{`wildType`}{Name(s) of the wild-type genotype(s).}
@@ -54,7 +58,10 @@
 #' to `egg_tensor[(g, m), k] = s_g * ih[g, m, k] * tau[g, m, k]`, an
 #' n^2 x n matrix whose rows run over crosses with the female genotype g
 #' varying slowest and the mate genotype m fastest (row `(g - 1) * n + m`),
-#' matching the state layout of mated females.
+#' matching the state layout of mated females. Its row sums are
+#' `s_g * batch_viability`: a female of genotype g lays `s_g` times the
+#' batches of a wild-type female (and searches for wounds in proportion),
+#' each batch with `batch_viability[g|m]` viable eggs per egg (D-031).
 #'
 #' **Checks.** Dimensions and genotype names; `ih` slices summing to 1 or 0;
 #' non-negative, finite entries; `phi`, `xiF`, `xiM` in \[0, 1\]; wild-type and
@@ -67,7 +74,9 @@
 #'   per-genotype vectors `phi`, `xiF`, `xiM`, `s`, `omega` and `ell`,
 #'   `ell_source` (`"none"`, `"omega"` or `"user"`), `mu_ref` (the reference mortality),
 #'   `egg_tensor`
-#'   (n^2 x n) and `egg_total` (total viable-egg factor per cross).
+#'   (n^2 x n), `egg_total` (total viable-egg factor per cross) and
+#'   `batch_viability` (viable eggs per egg laid in a batch, per cross: the
+#'   egg total without the female's fecundity `s`, D-031).
 #' @seealso [sg_omega_to_ell()]
 #' @export
 #' @examples
@@ -137,7 +146,8 @@ sg_cube <- function(cube, reference_mortality = NULL, lifespan_fraction = NULL) 
       ell_source = lifespan$source,
       mu_ref = lifespan$mu_ref,
       egg_tensor = egg,
-      egg_total = stats::setNames(rowSums(egg), rownames(egg))
+      egg_total = stats::setNames(rowSums(egg), rownames(egg)),
+      batch_viability = .sg_batch_viability(ih, tau, geno)
     ),
     class = "sg_cube"
   )
@@ -413,6 +423,15 @@ print.sg_cube <- function(x, ...) {
     )
   }
   list(ell = sg_omega_to_ell(omega, mu_ref), source = "omega", mu_ref = mu_ref)
+}
+
+# Viable eggs per egg in a batch for each cross, sum_k ih[g, m, k] *
+# tau[g, m, k], named "g|m" with m fastest (D-031). The female's fecundity
+# s_g sets how many batches she lays (and so how much she searches), not
+# their viability.
+.sg_batch_viability <- function(ih, tau, geno) {
+  egg <- .sg_egg_tensor(ih, tau, rep(1, length(geno)), geno)
+  stats::setNames(rowSums(egg), rownames(egg))
 }
 
 # egg_tensor[(g, m), k] = s_g * ih[g, m, k] * tau[g, m, k]; rows g-major.

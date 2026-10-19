@@ -161,10 +161,13 @@ act through the sub-stage widths w_{g,i} only (S6).
 **(S8) Egg-laying females and wound search** [GP2014 Eq. 4] + [adapted, D-006]
 
     W_{g,m} = Σ_{i laying} F_{g,m,i}                 (egg-laying mated females, S6)
-    N_s     = Σ_{g,m} W_{g,m}                        (default: searching mated females, incl. sterile-mated)
+    N_s     = Σ_{g,m} s_g W_{g,m}                    (default: searching mated females, incl. sterile-mated, D-031)
     N_s     = Σ M + Σ U + Σ F                        (option "all_adults", [GP2014 code])
     Ψ(t)    = σ₀ [1 − exp(−a_s Δx(T) H / N_s)]       (Ψ = σ₀ when N_s = 0)
 
+s_g is the female fecundity of the cube: a female searches, and lays
+batches, in proportion to it, so females that produce no eggs (s_g = 0, e.g.
+irradiated sterile females) do not compete for wounds (D-031).
 H = number of wounds available in the node (= wound density × A), a_s =
 search constant (dd⁻¹), σ₀ = baseline search efficiency (default 1). With
 the host-wound model H is replaced by the attractive sites A_s (H2). A wound
@@ -177,7 +180,9 @@ GP2014 value was set for a relative H).
     B_k(t) = R φ_ov(T) Ψ(t) Σ_g Σ_m s_g · ih[g,m,k] · τ[g,m,k] · W_{g,m}
 
 R = maximum eggs per egg-laying female per day (90 [GP2014]). τ applied at
-egg production (O-001). Implementation: precompute T[g,m,k] = s_g · ih · τ,
+egg production (O-001). Equivalently (D-031), a female of genotype g lays s_g
+times the batches of a wild-type female, each with θ_{g,m} = Σ_k ih[g,m,k]
+τ[g,m,k] viable eggs per egg, so the mean egg production is unchanged. Implementation: precompute T[g,m,k] = s_g · ih · τ,
 then B = R φ_ov Ψ · (vec(W)ᵀ · matrix(T, n_G², n_G)).
 
 ## 7a. Host-wound model (D-030, `wound_model = "hosts"`)
@@ -355,14 +360,16 @@ a step are added at its end.
 T[g,m,k] = s_g · ih[g,m,k] · τ[g,m,k] (S9). With `oviposition_mode = "batches"`
 (default, D-024):
 
-    B_{g,m}         ~ Poisson(Ψ f W_{g,m} dt)                     oviposition events
+    B_{g,m}         ~ Poisson(Ψ f s_g W_{g,m} dt)                 oviposition events
     B⁺_{g,m}        ~ Binomial(B_{g,m}, 1 − e^{−λ_{g,m}})          events with a viable egg (cases)
     N_{g,m}         = sum of B⁺_{g,m} zero-truncated Poisson(λ_{g,m})   viable eggs
     (N_{g,m,k})_k   ~ Multinomial(N_{g,m}; T[g,m,·] / Σ_k T[g,m,k])
 
-with λ_{g,m} = C v_{g,m}, v_{g,m} = Σ_k T[g,m,k] (D-026). This is an exact
+with λ_{g,m} = C θ_{g,m}, θ_{g,m} = Σ_k ih[g,m,k] τ[g,m,k] (D-026, D-031:
+the fecundity s_g sets the number of batches, θ their viability, so
+s_g θ_{g,m} = Σ_k T[g,m,k]). This is an exact
 refinement of N_{g,m} ~ Poisson(B_{g,m} λ_{g,m}): the egg distribution is
-unchanged. For λ > 30 the zero-truncated sum is drawn as one
+unchanged; pairs with s_g = 0 lay no batches. For λ > 30 the zero-truncated sum is drawn as one
 Poisson(B⁺ λ) (truncation below 1e-13), otherwise batch by batch by
 inversion.
 
@@ -375,8 +382,8 @@ C = `clutch_size` and f = R φ_ov / C. With `oviposition_mode = "eggs"`:
 then the same split. Both have mean R φ_ov Ψ W_{g,m} Σ_k T dt (S9); batches
 raise the variance to about (1 + C) times the mean. The eggs arrive in the
 egg chain of genotype k. The egg_batches counter counts events B (ODE rate
-Ψ f Σ W) and the fertile_batches counter events B⁺ (ODE rate
-Ψ f Σ W_{g,m} (1 − e^{−λ_{g,m}})), the case proxy; with `oviposition =
+Ψ f Σ s_g W_{g,m}) and the fertile_batches counter events B⁺ (ODE rate
+Ψ f Σ s_g W_{g,m} (1 − e^{−λ_{g,m}})), the case proxy; with `oviposition =
 "eggs"` both are recorded as expected values.
 
 **(S18) Mating** (before ageing; unmated and mated females share age chain
@@ -467,8 +474,8 @@ follow in M5.
   refining each sign change and classifying it: from above to below zero
   stable, from below to above unstable (D-030, decision 10). The highest
   stable equilibrium is returned (with a message when there are several).
-  With the host-wound model egg balance fixes F = B · (batch factor) ·
-  (fertile share) / (R φ_ov T_ww) for each B, so the host steady state is
+  With the host-wound model egg balance fixes F = B · (batch factor) · s_w ·
+  (fertile share) / (R φ_ov T_ww) for each B (D-031), so the host steady state is
   solved first: with b = C / W, I = b W D, S = (γ_W + b) W / ω,
   W = N_H / (1 + (γ_W + b)/ω + b D) and b W (1 + α b D) = F, where
   D = [1 − (q_I/(q_I + κ))^n] / κ (n / q_I without treatment) is the mean

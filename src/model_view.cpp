@@ -170,6 +170,8 @@ ModelView::ModelView(const Rcpp::List& view) {
   check_flags(mature, "mature");
 
   egg_tensor = get_doubles(view, "egg_tensor", static_cast<R_xlen_t>(n_g) * n_g * n_g);
+  search_weight = get_doubles(view, "search_weight", n_g);
+  batch_viability = get_doubles(view, "batch_viability", static_cast<R_xlen_t>(n_g) * n_g);
   eta = get_doubles(view, "eta", static_cast<R_xlen_t>(n_g) * n_g);
   phi = get_doubles(view, "phi", n_g);
   xiF = get_doubles(view, "xiF", n_g);

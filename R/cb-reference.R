@@ -203,19 +203,24 @@
   expected_fertile <- 0
   for (g in seq_len(n_g)) {
     for (m in seq_len(n_g)) {
-      tgm <- s$egg_tensor[(g - 1L) * n_g + m, ]
+      pair <- (g - 1L) * n_g + m
+      tgm <- s$egg_tensor[pair, ]
       tot <- sum(tgm)
-      share <- .sg_fertile_share(tot, clutch)
+      # females lay batches (and search) in proportion to s_g; viable eggs
+      # per egg of a batch without s_g (D-031)
+      w_search <- s$search_weight[g] * a$w_lay[m, g]
+      viab <- s$batch_viability[pair]
+      share <- .sg_fertile_share(viab, clutch)
       if (batches) {
-        nb <- draw$pois(a$psi * factor * a$w_lay[m, g] * dt)
+        nb <- draw$pois(a$psi * factor * w_search * dt)
         n_batches <- n_batches + nb
         if (nb == 0 || share <= 0) next
         nf <- draw$binom(nb, share)
         n_fertile <- n_fertile + nf
         if (nf == 0) next
-        n_eggs <- draw$ztp_sum(nf, clutch * tot)
+        n_eggs <- draw$ztp_sum(nf, clutch * viab)
       } else {
-        expected_fertile <- expected_fertile + a$w_lay[m, g] * share
+        expected_fertile <- expected_fertile + w_search * share
         if (tot <= 0) next
         n_eggs <- draw$pois(p$eggs_per_day_max * info$phi_ov * a$psi * a$w_lay[m, g] * tot * dt)
       }
@@ -375,7 +380,11 @@
 
   flows <- c(
     eggs,
-    if (batches) n_batches else a$psi * sum(a$w_lay) * factor * dt, # egg_batches
+    if (batches) { # egg_batches
+      n_batches
+    } else {
+      a$psi * sum(sweep(a$w_lay, 2L, s$search_weight, `*`)) * factor * dt
+    },
     if (batches || !is.null(h)) { # fertile_batches
       n_fertile
     } else {

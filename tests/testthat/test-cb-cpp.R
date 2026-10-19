@@ -27,6 +27,12 @@ cases <- list(
     sg_params(oviposition_mode = "eggs", mating_mode = "instant", male_density_half_mating = 1),
     sg_cube(sg_test_cube_mendelian())
   ),
+  "partly fertile S females, clutch size (D-031)" = list(
+    sg_params(clutch_size = 100), sg_cube(sg_test_cube_sit(residual = 0.2, s_s = 0.4))
+  ),
+  "infertile S females, single eggs (D-031)" = list(
+    sg_params(oviposition_mode = "eggs"), sg_cube(sg_test_cube_sit(residual = 0, s_s = 0))
+  ),
   "crowding, clutch size, SIT cube" = list(
     sg_params(larval_crowding_mode = "per_wound", larval_crowding_coef = 0.05, clutch_size = 200),
     sg_cube(sit_raw)

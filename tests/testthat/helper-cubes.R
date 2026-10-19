@@ -1,8 +1,9 @@
 # Minimal hand-built cubes for tests that must not depend on MGDrivE.
 
 # Two genotypes: wild type W and a released sterile genotype S (SIT-like).
-# Crosses with S males produce non-viable offspring (tau = residual).
-sg_test_cube_sit <- function(residual = 0, omega_s = 1) {
+# Crosses with S males produce non-viable offspring (tau = residual); s_s is
+# the fecundity of S females (0: they produce no eggs).
+sg_test_cube_sit <- function(residual = 0, omega_s = 1, s_s = 1) {
   g <- c("W", "S")
   ih <- array(0, c(2, 2, 2), dimnames = list(g, g, g))
   ih[, , "W"] <- 1 # all offspring are W (sterility acts through tau)
@@ -13,7 +14,7 @@ sg_test_cube_sit <- function(residual = 0, omega_s = 1) {
     ih = ih, tau = tau,
     eta = matrix(1, 2, 2, dimnames = list(g, g)),
     phi = c(W = 0.5, S = 0.5), xiF = c(W = 1, S = 1), xiM = c(W = 1, S = 1),
-    s = c(W = 1, S = 1), omega = c(W = 1, S = omega_s)
+    s = c(W = 1, S = s_s), omega = c(W = 1, S = omega_s)
   )
 }
 

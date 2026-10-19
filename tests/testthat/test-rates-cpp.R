@@ -44,7 +44,9 @@ cubes <- list(
   wild = sg_cube(sg_test_cube_wild()),
   sit = sg_cube(sg_test_cube_sit(residual = 1.2e-8), lifespan_fraction = c(W = 1, S = 0.52)),
   mendelian = sg_cube(sg_test_cube_mendelian()),
-  short_lived = sg_cube(sg_test_cube_sit(), lifespan_fraction = c(W = 1, S = 0.25))
+  short_lived = sg_cube(sg_test_cube_sit(), lifespan_fraction = c(W = 1, S = 0.25)),
+  infertile_females = sg_cube(sg_test_cube_sit(residual = 0, s_s = 0)),
+  partly_fertile = sg_cube(sg_test_cube_sit(residual = 0.3, s_s = 0.4))
 )
 
 param_sets <- list(

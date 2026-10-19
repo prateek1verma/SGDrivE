@@ -22,7 +22,11 @@ over male genotypes is also accepted).}
 \item{\code{phi}}{Fraction of emerging adults that are female, per genotype.}
 \item{\code{xiF}, \code{xiM}}{Emergence success of females and males, per
 genotype, in [0, 1].}
-\item{\code{s}}{Fecundity multiplier of females, per genotype, >= 0.}
+\item{\code{s}}{Fecundity multiplier of females, per genotype, >= 0. It
+scales the egg batches a female lays and, with them, her share of
+the wound search (D-031): \code{s = 0} for females that produce no eggs,
+such as irradiated sterile females, which then do not compete for
+wounds.}
 \item{\code{omega}}{MGDrivE v1 adult lifespan modifier, per genotype, >= 0
 (daily survival is multiplied by omega).}
 \item{\code{wildType}}{Name(s) of the wild-type genotype(s).}
@@ -47,7 +51,9 @@ An object of class \code{sg_cube}: a list with \code{genotypes},
 per-genotype vectors \code{phi}, \code{xiF}, \code{xiM}, \code{s}, \code{omega} and \code{ell},
 \code{ell_source} (\code{"none"}, \code{"omega"} or \code{"user"}), \code{mu_ref} (the reference mortality),
 \code{egg_tensor}
-(n^2 x n) and \code{egg_total} (total viable-egg factor per cross).
+(n^2 x n), \code{egg_total} (total viable-egg factor per cross) and
+\code{batch_viability} (viable eggs per egg laid in a batch, per cross: the
+egg total without the female's fecundity \code{s}, D-031).
 }
 \description{
 Checks an inheritance cube from the 'MGDrivE' package (for example
@@ -72,7 +78,10 @@ which recovers L. \code{omega = 0} (immediate death) maps to l_g = 0.001. See
 to \verb{egg_tensor[(g, m), k] = s_g * ih[g, m, k] * tau[g, m, k]}, an
 n^2 x n matrix whose rows run over crosses with the female genotype g
 varying slowest and the mate genotype m fastest (row \code{(g - 1) * n + m}),
-matching the state layout of mated females.
+matching the state layout of mated females. Its row sums are
+\code{s_g * batch_viability}: a female of genotype g lays \code{s_g} times the
+batches of a wild-type female (and searches for wounds in proportion),
+each batch with \code{batch_viability[g|m]} viable eggs per egg (D-031).
 
 \strong{Checks.} Dimensions and genotype names; \code{ih} slices summing to 1 or 0;
 non-negative, finite entries; \code{phi}, \code{xiF}, \code{xiM} in [0, 1]; wild-type and

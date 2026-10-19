@@ -22,9 +22,12 @@ RateKernel::RateKernel(const ModelView& mv)
   agg_.pi.assign(ng * ng, 0.0);
   agg_.mate_ok.assign(ng, 0);
   const std::size_t n_cross = ng * ng;
-  pair_viability_.assign(n_cross, 0.0);
+  pair_egg_total_.assign(n_cross, 0.0);
+  pair_search_.assign(n_cross, 0.0);
+  v_batch_ = mv.batch_viability;
   for (std::size_t pair = 0; pair < n_cross; ++pair) {
-    for (std::size_t k = 0; k < ng; ++k) pair_viability_[pair] += mv.egg_tensor[k * n_cross + pair];
+    for (std::size_t k = 0; k < ng; ++k) pair_egg_total_[pair] += mv.egg_tensor[k * n_cross + pair];
+    pair_search_[pair] = mv.search_weight[pair / ng];  // female genotype g = pair / n_g
   }
 }
 
@@ -46,7 +49,7 @@ double RateKernel::fertile_rate(const DayRates& r) const {
   const Aggregates& a = agg_;
   double fertile = 0.0;
   for (int pair = 0; pair < mv_.n_g * mv_.n_g; ++pair) {
-    fertile += a.w_lay[pair] * -std::expm1(-r.clutch * pair_viability_[pair]);
+    fertile += a.w_lay[pair] * pair_search_[pair] * -std::expm1(-r.clutch * v_batch_[pair]);
   }
   return a.psi * r.batch_factor * fertile;
 }
@@ -107,7 +110,7 @@ void RateKernel::aggregate(const DayRates& r, const double* y) {
   a.mu_l = larval_hazard(a.sum_l, a.sum_hi);
 
   // ---- wound search and egg production (S8, S9) ----------------------------
-  a.sum_w = 0.0;
+  a.sum_w = a.sum_search = 0.0;
   for (int g = 0; g < ng; ++g) {
     for (int m = 0; m < ng; ++m) {
       const double* x = fem + (g * ng + m) * nA;
@@ -117,9 +120,12 @@ void RateKernel::aggregate(const DayRates& r, const double* y) {
       }
       a.w_lay[g * ng + m] = w;
       a.sum_w += w;
+      a.sum_search += v.search_weight[g] * w;
     }
   }
-  a.n_s = v.search_all_adults ? (a.sum_m + a.sum_u + a.sum_f) : a.sum_w;
+  // searching females are weighted by fecundity: females that produce no
+  // eggs do not compete for wounds (D-031)
+  a.n_s = v.search_all_adults ? (a.sum_m + a.sum_u + a.sum_f) : a.sum_search;
   const double wounds = v.host_model ? a.sites : v.H;  // fixed H, or A_s (H2)
   a.psi = a.n_s > 0.0 ? v.sigma0 * (1.0 - std::exp(-v.a_s * r.dx * wounds / a.n_s)) : v.sigma0;
   const int n_cross = ng * ng;
@@ -325,7 +331,7 @@ void RateKernel::eval(int day, const double* y, double* dydt, double* counters) 
   }
   // egg_batches: oviposition events per day (D-024); fertile_batches: those
   // with at least one viable egg, the case proxy (D-026)
-  counters[c++] = psi * a.sum_w * r.batch_factor;
+  counters[c++] = psi * a.sum_search * r.batch_factor;
   counters[c++] = fertile;
   counters[c++] = q_e * last_e;    // larvae_in
   counters[c++] = q_l * last_l;    // pupae_in

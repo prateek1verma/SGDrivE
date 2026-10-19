@@ -125,6 +125,45 @@ test_that("sterile-mated females lay no viable eggs but compete for wounds (D-00
   expect_equal(ra$aux$n_s, sum(x2[adults]))
 })
 
+test_that("females search and lay batches in proportion to their fecundity (D-031)", {
+  # S females: no eggs (s = 0), so they do not compete for wounds
+  m <- mk(cube = sg_cube(sg_test_cube_sit(residual = 0, s_s = 0)))
+  x <- numeric(m$n_states)
+  lay <- which(m$adult$female$flags$X_ovi)
+  x[sg_state_index(m, "F", genotype = "W", mate = "W", substage = lay)] <- 1
+  r1 <- rates(day_warm, x, setup(m), aux = TRUE)
+  x[sg_state_index(m, "F", genotype = "S", mate = "W", substage = lay)] <- 9
+  x[sg_state_index(m, "F", genotype = "S", mate = "S", substage = lay)] <- 4
+  r2 <- rates(day_warm, x, setup(m), aux = TRUE)
+  expect_equal(r2$aux$n_s, r1$aux$n_s)
+  expect_equal(r2$aux$psi, r1$aux$psi)
+  expect_equal(r2$aux$births, r1$aux$births)
+  expect_equal(r2$counters[["egg_batches"]], r1$counters[["egg_batches"]])
+  expect_equal(r2$counters[["fertile_batches"]], r1$counters[["fertile_batches"]])
+
+  # partly fertile S females (s = 0.4): weight 0.4 in the search and in the
+  # batches, each batch with viability sum_k ih tau; mean eggs unchanged (S9)
+  p <- sg_params(clutch_size = 50)
+  m <- mk(p, cube = sg_cube(sg_test_cube_sit(residual = 0.3, s_s = 0.4)))
+  x <- numeric(m$n_states)
+  x[sg_state_index(m, "F", genotype = "W", mate = "W", substage = lay)] <- 2
+  x[sg_state_index(m, "F", genotype = "S", mate = "S", substage = lay)] <- 3
+  r <- rates(day_warm, x, setup(m), aux = TRUE)
+  w_ww <- 2 * length(lay)
+  w_ss <- 3 * length(lay)
+  n_s <- w_ww + 0.4 * w_ss
+  f <- m$forcing
+  psi <- 1 - exp(-p$wound_search_rate * f$dx[day_warm] * m$counts$H / n_s)
+  expect_equal(r$aux$n_s, n_s, tolerance = sg_tol_exact)
+  expect_equal(r$aux$psi, psi, tolerance = sg_tol_exact)
+  factor <- p$eggs_per_day_max * f$phi_ov[day_warm] / 50
+  expect_equal(r$counters[["egg_batches"]], psi * n_s * factor, tolerance = sg_tol_exact)
+  fertile <- psi * factor * (w_ww * -expm1(-50) + 0.4 * w_ss * -expm1(-50 * 0.3))
+  expect_equal(r$counters[["fertile_batches"]], fertile, tolerance = sg_tol_exact)
+  eggs <- p$eggs_per_day_max * f$phi_ov[day_warm] * psi * (w_ww + 0.4 * 0.3 * w_ss)
+  expect_equal(sum(r$aux$births), eggs, tolerance = sg_tol_exact)
+})
+
 test_that("mating shares follow eta-weighted male availability (S12)", {
   raw <- sg_test_cube_sit()
   raw$eta[, "S"] <- 0.35

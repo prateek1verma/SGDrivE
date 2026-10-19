@@ -44,6 +44,14 @@
     idx = idx, n_states = model$n_states,
     p = p, counts = model$counts,
     egg_tensor = cb$egg_tensor, eta = cb$eta, phi = cb$phi, xiF = cb$xiF, xiM = cb$xiM,
+    # D-031: females search and lay batches in proportion to s_g; viable eggs
+    # per egg of a batch, per cross (cubes made before D-031 lack it)
+    search_weight = as.numeric(cb$s),
+    batch_viability = as.numeric(if (is.null(cb$batch_viability)) {
+      .sg_batch_viability(cb$ih, cb$tau, geno)
+    } else {
+      cb$batch_viability
+    }),
     w_f = widths(fch), w_m = widths(mch),
     adv_f = advance(fch), adv_m = advance(mch),
     last_f = fch$last_class, last_m = mch$last_class,
@@ -74,7 +82,7 @@
 
 # Share of oviposition events with at least one viable egg (D-026): a batch
 # of `clutch` eggs, each viable with probability `viability` (sum over
-# offspring of s ih tau for the female x mate pair).
+# offspring of ih tau for the female x mate pair, D-031).
 .sg_fertile_share <- function(viability, clutch) -expm1(-clutch * viability)
 
 # Names of the cumulative counters (rates per day in the rate function); the
@@ -181,8 +189,11 @@
 
   # ---- wound search and egg production (S8, S9) -------------------------------
   w_lay <- apply(fem[s$laying, , , drop = FALSE], c(2L, 3L), sum) # [mate, genotype]
+  # searching females: egg-laying females weighted by their fecundity s_g, so
+  # females that produce no eggs do not compete for wounds (D-031)
+  w_search <- sweep(w_lay, 2L, s$search_weight, `*`)
   n_s <- if (p$wound_competitors == "searching_females") {
-    sum(w_lay)
+    sum(w_search)
   } else {
     sum(mal) + sum(unm) + sum(fem)
   }
@@ -279,10 +290,10 @@
   deriv[s$idx$U] <- as.vector(d_u)
   deriv[s$idx$F] <- as.vector(d_f)
 
-  # egg-laying females weighted by the share of their batches with a viable
-  # egg (D-026)
-  share <- .sg_fertile_share(rowSums(s$egg_tensor), .sg_clutch(p, phi_ov))
-  fertile_w <- sum(as.vector(w_lay) * share)
+  # searching females weighted by the share of their batches with a viable
+  # egg (D-026, D-031)
+  share <- .sg_fertile_share(s$batch_viability, .sg_clutch(p, phi_ov))
+  fertile_w <- sum(as.vector(w_search) * share)
   fertile_rate <- psi * .sg_batch_factor(p, phi_ov) * fertile_w # fertile batches per day
 
   # ---- hosts (H1, H2) ----------------------------------------------------------
@@ -310,7 +321,7 @@
   matings <- (colSums(mating_flux) + in_f_mated) * pi_gm
   counters <- c(
     unname(births),
-    psi * sum(w_lay) * .sg_batch_factor(p, phi_ov), # egg_batches
+    psi * sum(w_search) * .sg_batch_factor(p, phi_ov), # egg_batches
     fertile_rate, # fertile_batches
     q_e * sum(egg[s$n_E, ]),
     q_l * sum(lar[s$n_L, ]),

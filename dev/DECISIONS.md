@@ -77,6 +77,9 @@ Reasoning: with "all adults", released sterile males would compete for wounds
 and suppress wild egg laying, overstating SIT. Males and immature females do
 not seek wounds.
 
+Amended by D-031: searching females are weighted by their own fecundity s_g,
+so females that produce no eggs (released sterile females) do not search.
+
 ## D-007 Licence: GPL (>= 3) (Accepted, 2026-10-06)
 
 Compatible with MGDrivE and MGDrivE2.
@@ -597,6 +600,42 @@ stable states (it scales the flies); (c) two existing bugs fixed:
 `keep = "totals"`. Later stages: superinfestation extending infestations,
 seasonal wounding, several host classes (the `n_host` dimension),
 myiasis mortality, detection and reporting of cases.
+
+## D-031 Searching females weighted by fecundity (Accepted, 2026-10-19)
+
+Amends D-006, D-024 and D-026. Until now every mated female past the
+pre-oviposition age counted as a wound searcher, whatever her genotype, so
+released sterile females (cube fecundity s = 0) took a share of the wounds
+although they produce no eggs. Irradiated screwworm females do not develop
+eggs, so they should not search. Found while comparing classic SIT with the
+mgdrive-nws project (scenario 07): with sterile-female releases, wound
+competition from the released females, not sterile matings, caused most of
+the suppression.
+
+Decision (user, option 1 of three): a female of genotype g searches and lays
+batches in proportion to her fecundity s_g.
+
+* N_s = Σ_{g,m} s_g W_{g,m} (S8; "all_adults" unchanged, benchmark only).
+* Oviposition events per pair at rate Ψ f s_g W_{g,m}; each batch has
+  θ_{g,m} = Σ_k ih τ viable eggs per egg (new cube element
+  `batch_viability`), so fertile batches have rate
+  Ψ f s_g W_{g,m} (1 − e^{−C θ_{g,m}}) (S17). Mean egg production
+  (S9) is unchanged, since s_g θ_{g,m} = Σ_k T[g,m,k].
+* Females mated to sterile males keep searching (D-006): their s_g is that
+  of their own genotype.
+* Effects: s = 1 genotypes are unchanged (all existing results and the
+  GP2014 regression); s = 0 females no longer search, lay batches or count in
+  `egg_batches`; for 0 < s < 1 a female lays fewer full batches instead of
+  the same number of smaller ones, which changes `fertile_batches` and the
+  batch variance but not mean eggs; s > 1 means more batches and more
+  search. The equilibrium solver weights the wild type's searchers and
+  batches by s_w (s_w = 1 in practice).
+
+Tests: rates with and without infertile females (Ψ, eggs, batches
+identical), partly fertile females against hand calculation, C++ = R for
+both cubes, the chain-binomial draw-for-draw test with s = 0.4 and s = 0,
+and ODE runs in which releases of infertile females alone leave the wild
+population unchanged.
 
 ---
 

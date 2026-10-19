@@ -116,8 +116,10 @@
   r0 <- egg_balance * per_b$W * p$wound_finding_max # eggs per egg at low density
   wounds_max <- if (is.null(h)) s$counts$H else max(1, h$attractiveness) * h$n
   pair <- (gi - 1L) * s$n_g + gi
-  fertile_per_egg <- .sg_batch_factor(p, rates$phi_ov) *
-    .sg_fertile_share(sum(s$egg_tensor[pair, ]), .sg_clutch(p, rates$phi_ov)) / egg_balance
+  # fertile batches per egg laid: s_w batches per searching female, each
+  # fertile with the share of its batch viability (D-026, D-031)
+  fertile_per_egg <- .sg_batch_factor(p, rates$phi_ov) * s$search_weight[gi] *
+    .sg_fertile_share(s$batch_viability[pair], .sg_clutch(p, rates$phi_ov)) / egg_balance
 
   psi_of <- function(n_s, wounds) {
     if (n_s > 0) {
@@ -518,7 +520,11 @@ sg_equilibria <- function(model, temperature = NULL) {
   }
   fem <- all_f - unm
   w_lay <- sum(fem[s$laying])
-  n_s <- if (p$wound_competitors == "searching_females") w_lay else sum(mal, unm, fem)
+  n_s <- if (p$wound_competitors == "searching_females") {
+    s$search_weight[gi] * w_lay # weighted by fecundity (D-031)
+  } else {
+    sum(mal, unm, fem)
+  }
 
   x <- numeric(s$n_states)
   idx <- function(block, offset_len) s$idx[[block]][(gi - 1L) * offset_len + seq_len(offset_len)]

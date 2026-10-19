@@ -84,6 +84,23 @@ sg_test_each_backend("sterile male releases divert matings and suppress the wild
   expect_lt(wild_adults(sit, s1), 0.5 * wild_adults(control, s0))
 })
 
+sg_test_each_backend("releases of infertile females alone leave the wild population unchanged (D-031)", {
+  # S females produce no eggs (s = 0): they mate, but males are not used up
+  # and they do not compete for wounds
+  cube <- sg_cube(sg_test_cube_sit(residual = 0, s_s = 0))
+  control <- sg_model(p, cube, wx90)
+  rel <- sg_releases("S", "adult", "female", times = seq(1, 90, by = 3), number = 500)
+  released <- sg_model(p, cube, wx90, rel)
+  s0 <- sim_ode(control, rtol = 1e-10, atol = 1e-12)
+  s1 <- sim_ode(released, rtol = 1e-10, atol = 1e-12)
+  wild <- function(m, s) {
+    s$state[, c(sg_state_index(m, "U", genotype = "W"), sg_state_index(m, "F", genotype = "W"))]
+  }
+  expect_gt(sum(s1$state[91, sg_state_index(released, "F", genotype = "S")]), 100)
+  expect_equal(wild(released, s1), wild(control, s0), tolerance = 1e-7)
+  expect_equal(s1$counters[, "egg_batches"], s0$counters[, "egg_batches"], tolerance = 1e-7)
+})
+
 sg_test_each_backend("a genotype whose lifespan ends before oviposition never lays (D-018)", {
   cube <- sg_cube(sg_test_cube_sit(), lifespan_fraction = c(W = 1, S = 0.25))
   m <- sg_model(p, cube, wx90)

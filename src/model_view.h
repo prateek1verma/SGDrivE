@@ -53,6 +53,8 @@ struct ModelView {
 
   // cube
   std::vector<double> egg_tensor;  // [n_g * n_g, n_g]; rows (g, m) with m fastest
+  std::vector<double> search_weight;    // [n_g]: female fecundity s_g (D-031)
+  std::vector<double> batch_viability;  // [n_g * n_g]: sum_k ih tau per cross (D-031)
   std::vector<double> eta;         // [n_g, n_g]; eta[g, m]
   std::vector<double> phi, xiF, xiM;  // [n_g]
   std::vector<int> wild;              // [n_g]: 1 for the cube's wild type(s)

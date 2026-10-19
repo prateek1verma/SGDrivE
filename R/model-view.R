@@ -74,6 +74,8 @@
     mature = as.integer(s$mature),
     # cube: egg tensor [(g, m) with m fastest, k]; eta [g, m]; per genotype
     egg_tensor = as.numeric(s$egg_tensor), eta = as.numeric(s$eta),
+    search_weight = as.numeric(s$search_weight),
+    batch_viability = as.numeric(s$batch_viability),
     phi = as.numeric(s$phi), xiF = as.numeric(s$xiF), xiM = as.numeric(s$xiM),
     wild = as.integer(s$geno %in% model$cube$wild_type),
     # daily forcing
