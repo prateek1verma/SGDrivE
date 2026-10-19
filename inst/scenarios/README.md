@@ -27,6 +27,10 @@ source(system.file("scenarios", "01_wild_type_dynamics.R", package = "SGDrivE"),
 | `02_constant_temperature.R` | Wild-type population at a constant 20 degC in a region sized for 1000 adult females (`sg_model(adult_females = )`), started at equilibrium: deterministic and stochastic runs |
 | `03_allee_threshold.R` | Allee threshold at 20 degC for several half-saturation male densities h_M: populations starting just below the threshold (`sg_init(method = "threshold")`) die out, those just above it grow to the equilibrium |
 | `04_host_limited_cases.R` | Host-wound model at McAllen (1971) in a 1000 km^2 region with 30,000 animals: animals newly infested compared with egg batches holding viable eggs, and infested animals in deterministic and stochastic runs |
+| `05_larval_crowding.R` | Constant 25 degC, 1000 km^2: growth from a small population with and without larval crowding (`larval_crowding_mode = "per_wound"`); both grow alike at first, crowding levels the population off lower (`sg_equilibria()`) |
+| `06_rainfall_pupae.R` | Constant 25 degC, 1000 km^2: wet (600 mm per year, no stress) and dry (300 mm per year) climates with drought mortality of pupae (`pupa_drought_mortality`); from the wet equilibrium the dry population falls to a lower level |
+| `07_classic_sit.R` | Classic SIT at constant 25 degC as in mgdrive-nws analysis 01: 26 weekly releases of sterile males (eta = 0.4) and sterile females into 20,000 wild adults, two-genotype W/S cube, stochastic replicates of wild-type adult females |
+| `08_classic_sit_mcallen_cycle.R` | The classic SIT releases of scenario 07 under the mean annual temperature cycle of McAllen (each calendar day averaged over 1960-1983), two years from 1 January: region sized for a yearly mean of 20,000 adults, burn-in start, temperature cycle and wild-type females with and without releases |
 
 ## Conventions
 
