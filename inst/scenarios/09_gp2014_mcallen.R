@@ -25,6 +25,8 @@ library(ggplot2) # plots
 
 # 1. Parameters, cube and weather ---------------------------------------------
 p <- sg_params(preset = "gp2014")
+# p$female_background_mortality <- 0.10
+# p$male_background_mortality <- 0.12
 cube <- sg_cube(list( # one wild genotype that breeds true
   genotypesID = "W", wildType = "W",
   ih = array(1, c(1, 1, 1), dimnames = list("W", "W", "W")),

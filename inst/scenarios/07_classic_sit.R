@@ -62,13 +62,13 @@ cube <- sg_cube(list(
   s = c(W = 1, S = 0), # sterile females lay no viable eggs
   omega = c(W = 1, S = 1), # no lifespan cost of irradiation
   wildType = "W", releaseType = "S"
-))
+), lifespan_fraction = c(W = 1, S = 1))
 cube
 
 # 3. Weather and the wild population ------------------------------------------
 # A region holding wild_adults adults (half of them female) at the
 # equilibrium of a constant 25 degC, without releases.
-p <- sg_params(female_background_mortality=0.0)
+p <- sg_params(female_background_mortality=0.1,male_background_mortality=0.12)
 forcing <- sg_forcing(sg_constant_weather(temperature, days = days), p)
 wild <- sg_model(p, cube, forcing, adult_females = wild_adults / 2)
 wild

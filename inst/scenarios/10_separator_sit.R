@@ -35,9 +35,9 @@ n_rep <- 20 # stochastic replicates
 seed <- 20260811 # random seed (as in mgdrive-nws)
 
 # Release strategy (cf. mgdrive-nws R/parameters.R, STRATEGIES_MAIN$separator_sit)
-eta_sterile <- 0.6 # mating competitiveness of sterile males
+eta_sterile <- 0.5 # mating competitiveness of sterile males
 male_ratio <- 1 # nominal released males per wild adult, per release
-female_percent <- 0.1 # released females (contamination), % of the male release
+female_percent <- 0.01 # released females (contamination), % of the male release
 mating_capacity <- 1 # not used here: no sequestration correction (step 4)
 n_releases <- 26 # weekly releases
 release_interval <- 7 # days between releases
@@ -65,13 +65,13 @@ cube <- sg_cube(list(
   s = c(W = 1, S = 0), # sterile females produce no eggs and do not search (D-031)
   omega = c(W = 1, S = 1), # no lifespan cost of irradiation
   wildType = "W", releaseType = "S"
-))
+), lifespan_fraction = c(W = 1, S = 0.6))
 cube
 
 # 3. Weather and the wild population ------------------------------------------
 # A region holding wild_adults adults (half of them female) at the
 # equilibrium of the constant temperature, without releases.
-p <- sg_params(female_background_mortality = 0) # default; raise for field mortality
+p <- sg_params(female_background_mortality=0.1,male_background_mortality=0.12) # default; raise for field mortality
 forcing <- sg_forcing(sg_constant_weather(temperature, days = days), p)
 wild <- sg_model(p, cube, forcing, adult_females = wild_adults / 2)
 wild
