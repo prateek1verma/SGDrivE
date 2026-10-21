@@ -13,6 +13,41 @@
   mean egg production is unchanged. Genotypes with `s = 1` are unaffected.
 * `sg_cube()` gains the element `batch_viability`.
 
+## Scenario scripts 18 and 19
+
+* `inst/scenarios/18_sensitivity_stochastic.R`: the sensitivity analysis
+  with stochastic replicates per sample, giving the elimination
+  probability directly.
+* `inst/scenarios/19_sensitivity_stochastic_figure.R`: boosted regression
+  trees on elimination probability, cases averted and the lowest
+  population reached.
+
+## Scenario scripts 16 and 17
+
+* `inst/scenarios/16_sensitivity_simulations.R`: Latin hypercube
+  sensitivity analysis of pgSIT control, deterministic runs with a
+  stochastic subsample that validates the deterministic proxy.
+* `inst/scenarios/17_sensitivity_brt_figure.R`: boosted regression trees
+  on those samples, with the relative influence of the biological and the
+  engineering parameters.
+
+## Scenario scripts 14 and 15
+
+* `inst/scenarios/14_release_threshold.R`: the release effort each strategy
+  needs for a 90% chance of elimination, found by a logistic fit to a ladder
+  of release ratios, with the time to elimination and the cases averted at
+  that effort; cached per cell and run in parallel.
+* `inst/scenarios/15_release_threshold_figure.R`: the poster figure of that
+  comparison, with 95% intervals.
+
+## Scenario scripts 10 to 13
+
+* `inst/scenarios/10_separator_sit.R`, `11_pgsit.R` and `12_fsridl.R`:
+  male-only release strategies (sex-sorted SIT with female contamination,
+  pgSIT, fsRIDL) at a constant temperature.
+* `inst/scenarios/13_strategy_comparison.R`: the four strategies side by
+  side, with poster-ready figures saved as PNG and PDF.
+
 ## Scenario script 09
 
 * `inst/scenarios/09_gp2014_mcallen.R`: the Gutierrez & Ponti (2014)

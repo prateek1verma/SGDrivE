@@ -19,3 +19,9 @@ slides/
 ~$*
 
 /inst/scenarios/scenario13_figures
+/inst/scenarios/scenario14_threshold/cells
+/inst/scenarios/scenario14_threshold
+/inst/scenarios/scenario15_figures
+/inst/scenarios/scenario16_sensitivity
+/inst/scenarios/scenario18_stochastic
+/inst/scenarios/scenario17_figures
