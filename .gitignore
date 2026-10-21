@@ -18,3 +18,4 @@ slides/
 *.key
 ~$*
 
+/inst/scenarios/scenario13_figures
