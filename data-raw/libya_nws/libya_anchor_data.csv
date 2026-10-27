@@ -11,6 +11,7 @@ sterile_flies_total,release,flies released,1300000000,flies,1990-12-15 to 1991-1
 sterile_flies_first_shipment,release,flies shipped,10500000,flies,1991-02,Tripoli,IAEA Bulletin 4/1992 p.22,first shipment from Mexico
 sterile_flies_initial_dispersal,release,flies per week,3500000,flies,1990-12,Libya,IAEA Bulletin 4/1992 p.19,pre-release phase
 sterile_supply_source,release,supplier,MACES Tuxtla Gutierrez Chiapas,,,Mexico,IAEA Bulletin 4/1992 p.18,
+interruption_rule,release,delay after one missed week,2,months,early programme,Libya,IAEA Bulletin 4/1992 p.18,one week with no release early on may need about two extra months of dispersal to restore sterility
 infested_zone_initial_area,spatial,area,28000,km2,1991-02,northwest Libya,IAEA Bulletin 4/1992 p.19,earlier paragraph on p.20 gives 26000 km2
 barrier_area,spatial,area,15000,km2,1991-05 onward,Libya east/south/west,IAEA Bulletin 4/1992 p.19,biological barrier within the 40000 km2 release area
 tunisia_barrier_area,spatial,area,2500,km2,1990-1991,Tunisia,IAEA Bulletin 4/1992 p.19,protective barrier inside Tunisia on the western edge
