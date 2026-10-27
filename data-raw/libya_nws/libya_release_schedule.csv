@@ -1,0 +1,5 @@
+phase,start_date,end_date,flies_per_week,dispersals_per_week,flies_per_dispersal,area_km2,density_per_km2_per_week,date_precision,source,notes
+pre_release,1990-12-15,1991-01-01,3500000,1,3500000,7000,500,approximate,IAEA Bulletin 4/1992 (Lindquist & Abusowa) p.19,"3.5 M over 25% of infested area; 7000 km2 derived as 25% of 28000 km2 (the paper does not give this area directly). Release start 'mid-December 1990'."
+ramp_up,1991-01-01,1991-02-01,7500000,1,7500000,,,approximate,IAEA Bulletin 4/1992 p.19,"Weekly, 7.5 M by 1 January 1991. Area not stated; density not computable."
+full_phase_1,1991-02-01,1991-05-01,28000000,2,14000000,28000,1000,approximate,IAEA Bulletin 4/1992 pp.19-20,"Early February 1991; 28 M received weekly and released twice a week over the entire infested area. Density 1000/km2/week is derived."
+full_phase_2,1991-05-01,1991-10-18,40000000,2,20000000,40000,1000,approximate,IAEA Bulletin 4/1992 p.20,"Early May 1991; 40 M/week over 40000 km2 including ~15000 km2 biological barrier to the east, south and west. Density derived. Final release date 18 October 1991 per IAEA; PubMed 1600222 gives 17 October 1991."

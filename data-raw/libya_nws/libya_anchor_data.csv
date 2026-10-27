@@ -1,0 +1,32 @@
+id,category,quantity,value,unit,period_or_date,location,source,notes
+cases_1989_total,epidemiology,NWS cases,1938,cases,1989-07 to 1989-12,Libya,Figure (IAEA Bulletin 4/1992),sums to bar values
+cases_1990_total,epidemiology,NWS cases,12068,cases,1990-01 to 1990-12,Libya,Figure (IAEA Bulletin 4/1992),sums to bar values; text says 'more than 12 000'
+cases_pre_release_total,epidemiology,NWS cases,14006,cases,1989-07 to 1990-12,Libya,Figure and IAEA Bulletin 4/1992 p.21,text says 'more than 14 000' before the full programme
+cases_1991_total,epidemiology,NWS cases,6,cases,1991-01 to 1991-08,Libya,Figure (IAEA Bulletin 4/1992),
+last_case_date,epidemiology,last recorded case,1991-04-07,date,,Libya,IAEA Bulletin 4/1992 p.17 and p.21,
+seasonal_decline_1989_90,epidemiology,cases Dec 1989 to Jan 1990,607 -> 102,cases,1989-12 to 1990-01,Libya,Figure,no sterile releases in this period
+seasonal_decline_1990_91,epidemiology,cases Dec 1990 to Jan 1991,191 -> 3,cases,1990-12 to 1991-01,Libya,Figure,releases underway from mid-December 1990 at low volume
+cool_weather_effect,epidemiology,qualitative,dramatic decline in NWS populations,,late Dec 1990 to Jan 1991,Libya,IAEA Bulletin 4/1992 p.21,cooler than usual winter; first full dispersal early Feb 1991 when most wild flies were pupae in the soil
+sterile_flies_total,release,flies released,1300000000,flies,1990-12-15 to 1991-10-18,Libya,IAEA Bulletin 4/1992 p.20,text says 'between mid-December 1990 and mid-October 1991'
+sterile_flies_first_shipment,release,flies shipped,10500000,flies,1991-02,Tripoli,IAEA Bulletin 4/1992 p.22,first shipment from Mexico
+sterile_flies_initial_dispersal,release,flies per week,3500000,flies,1990-12,Libya,IAEA Bulletin 4/1992 p.19,pre-release phase
+sterile_supply_source,release,supplier,MACES Tuxtla Gutierrez Chiapas,,,Mexico,IAEA Bulletin 4/1992 p.18,
+infested_zone_initial_area,spatial,area,28000,km2,1991-02,northwest Libya,IAEA Bulletin 4/1992 p.19,earlier paragraph on p.20 gives 26000 km2
+barrier_area,spatial,area,15000,km2,1991-05 onward,Libya east/south/west,IAEA Bulletin 4/1992 p.19,biological barrier within the 40000 km2 release area
+tunisia_barrier_area,spatial,area,2500,km2,1990-1991,Tunisia,IAEA Bulletin 4/1992 p.19,protective barrier inside Tunisia on the western edge
+surveillance_teams,surveillance,teams,40,teams,mid-1989,Libya,IAEA Bulletin 4/1992 p.17,
+surveillance_teams,surveillance,teams,94,teams,mid-1990,Libya,IAEA Bulletin 4/1992 p.17,
+surveillance_teams,surveillance,teams,100,teams,mid-1991,Libya,IAEA Bulletin 4/1992 p.17,surpassed 100 teams
+surveillance_route_interval,surveillance,days between route visits,21-28,days,ongoing,Libya,IAEA Bulletin 4/1992 p.17,each team covered its route every 21 to 28 days
+quarantine_stations,control,stations,11,stations,by Dec 1990,Libya,IAEA Bulletin 4/1992 p.17,caravan stations at the edge of the infested area
+livestock_sheep,host,head,4194000,animals,1981,Libya national,El-Azazy 1992 (citing Europa Year Book 1984),national total; northwest census needed
+livestock_goats,host,head,1237000,animals,1981,Libya national,El-Azazy 1992,national total
+livestock_cattle,host,head,132000,animals,1981,Libya national,El-Azazy 1992,national total
+livestock_camels,host,head,132000,animals,1981,Libya national,El-Azazy 1992,national total
+strain_compatibility,biology,Libyan vs Mexican strain,completely compatible,,1991,Libya/Mexico,IAEA Bulletin 4/1992 p.18 (Taylor et al. 1991),supports one genotype parameter set for the wild population
+sterile_fly_dispersal_longevity,release,measured in Libya,not published here,,1991,Libya,IAEA Bulletin 4/1992 p.19,the programme measured dispersal and longevity of sterile flies in the wild; data 'anticipated to be published'
+fly_trap_data,surveillance,fly trap catches,not public,,1989-1991,Libya,IAEA Bulletin 4/1992 p.20,used in programme decisions; request from FAO or Libyan Veterinary Services
+curacao_density,release,flies per week per unit area,1000,flies per square mile,1954-1955,Curacao,USDA ARS timeline (search snippet),unverified; about 386 per km2
+eradication_declared,outcome,declared free,1992-06,month,June 1992,Libya,IAEA Bulletin 4/1992 p.17,FAO chapter gives 22 June 1992 (not checked against source)
+treatment_coumaphos,control,treatment,coumaphos sprays and wound treatment,,1989-1991,Libya,IAEA Bulletin 4/1992 p.17,residual activity prevents new eggs establishing myiasis; not in model yet
+economic_cost_per_animal,economic,annual inspection and treatment cost,4-10,USD per animal,per year,North Africa,IAEA Bulletin 4/1992 p.19,not model-relevant
