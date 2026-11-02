@@ -1,0 +1,2 @@
+county,state,year,column,value,source,notes
+Bexar,TX,1962,OBS1962,273,"1962 Confirmed Screwworm Cases county map (USDA, Texas county totals), read from a zoomed crop of the handwritten county value",Missing from texasScrewwormdat1962.xlsx and ALL Myiasis data workbook. Value consistent with the published Texas total of 49,484 once added to OBS1962 (remaining difference 10). Not yet confirmed against the original report.
