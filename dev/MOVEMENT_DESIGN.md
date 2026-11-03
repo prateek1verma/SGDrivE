@@ -131,9 +131,15 @@ v0.1 offset is an offset within a node. Host blocks (D-030) are per node.
 A **movement layer** ℓ has:
 
 * leave rates δ^ℓ_{s,i} [d⁻¹] for each class s and node i, given **per day
-  at the reference temperature T_ref** (default 27 °C, near T_opt);
+  at the reference temperature T_ref** (one model parameter,
+  `movement_t_ref`, default 27 °C, near T_opt; the same for all layers);
 * destination probabilities π^ℓ_{ij}, sparse, π_ii = 0, **Σ_j π_ij ≤ 1**;
-  one matrix for all classes by default, one per class optionally;
+  one matrix for all classes. Class differences ("females disperse
+  farther") come from the rates: a higher female rate in a layer, and with
+  a local and a long-distance layer, class-specific rates in each give
+  class-specific effective kernels. With the diffusion constructor D
+  cancels from π anyway, so per-class matrices would add an option and
+  nothing else;
 * a clock (5.3);
 * a schedule (phase 4): one daily multiplier m^ℓ(t) ≥ 0 for the whole
   layer, the same in every node (e.g. 1 in July–September and 0
@@ -204,6 +210,17 @@ Rows summing to 1 are walls (closed edges); rows summing below 1 are open
 edges. The network total changes by movement only through N2; with closed
 edges it is unchanged.
 
+**Layers are merged inside the model.** Rates of layers that share a clock
+and a schedule add, so R merges them before the run into one group:
+δ^G_{s,i} = Σ_{ℓ∈G} δ^ℓ_{s,i} and π^G_{ij} = Σ_{ℓ∈G} δ^ℓ_{s,i} π^ℓ_{ij} /
+δ^G_{s,i} (per class, as rates differ by class). Layers are a concept of
+the interface; the kernel sees only groups, at most one per (clock,
+schedule) pair: in practice one in phases 1–3 and two or three in phase 4
+(e.g. local on the physiological clock, long distance on the calendar
+clock with a monsoon schedule), however many layers the user gives. The
+ODE then needs one movement pass per group, and the chain-binomial step
+draws once per compartment (5.6).
+
 ### 5.5 Source nodes (inflow from outside)
 
 Inflow from outside the study area comes from **source nodes**: ordinary
@@ -216,25 +233,65 @@ weather at the southern end.
 
 ### 5.6 Chain-binomial step
 
-After the chain moves (S16) and before arrivals, for each layer in order,
-each node i in index order and each adult compartment X of class s:
+After the chain moves (S16) and before arrivals, for each node i in index
+order and each adult compartment X of class s, with the total leave rate
+over the groups of 5.4, λ_{s,i} = Σ_G κ^G_i m^G δ^G_{s,i}, and the
+weights w_G = κ^G_i m^G δ^G_{s,i} / λ_{s,i}:
 
-    E ~ Binomial(X, 1 − exp(−κ δ_{s,i} dt))                       emigrants
-    (E_j)_j, E_lost ~ Multinomial(E; π_{i·}, 1 − Σ_j π_{ij})        destinations, lost
+    E ~ Binomial(X, 1 − exp(−λ_{s,i} dt))                           emigrants
+    p_ij = Σ_G w_G π^G_{ij},  p_lost = Σ_G w_G (1 − Σ_j π^G_{ij})
+    (E_j)_j, E_lost ~ Multinomial(E; p_{i·}, p_lost)                 destinations, lost
 
 drawn as sequential conditional binomials over destinations j in index
-order, then lost. This is first-order operator splitting (movement does not
-change age or genotype, as with mating before ageing in D-022); emigrants
-face the destination's hazards from the next step. Emigration, immigration
+order (the union of the groups' edges, fixed at setup), then lost. One
+emigration draw per compartment, whatever the number of layers, and the
+result does not depend on the order of the layers; p is recomputed only
+when κ or m changes (once per day). This is first-order operator
+splitting (movement does not change age or genotype, as with mating
+before ageing in D-022); emigrants face the destination's hazards from the
+next step. Emigration, immigration
 and losses are counted per node; with closed edges immigration and
 emigration sum to the same network total exactly. The deterministic map
 converges to the ODE as dt → 0.
 
-### 5.7 Later options (not v0.2)
+### 5.7 Small populations in the ODE ("atto-flies")
+
+In the ODE, movement puts tiny amounts (e.g. 10⁻¹² of a fly) into every
+connected node almost at once, and a node dying out in winter decays
+towards zero without reaching it. Without a mating Allee effect (the
+default `male_density_half_mating = 0`) these fractions grow again in
+spring. v0.1 has no population floors and uses the extinction threshold
+only in summaries (MODEL_SPEC section 10, "Extinction"), so an ODE
+landscape would show winter die-back and spring recolonisation made of
+fractions of a fly.
+
+**Node extinction rule** (ODE, optional): at the end of each day, a node
+whose fly population (E, L, P, M, U, F, all genotypes) totals less than
+`extinction_threshold` (default 1 individual) is set to zero. In the
+host-wound model, its infested hosts end their infestation as when the
+larvae leave (exact rule in the MODEL_SPEC section, phase 0). The amount
+removed is counted per node (a counter), so the conservation checks still
+balance. The ODE is integrated one day at a time, so the rule costs
+nothing and does not disturb the step-size control.
+
+* Off by default, so one-node runs reproduce v0.1 exactly
+  (`simulate_ode(..., node_extinction = TRUE)` to switch it on).
+  `check_model()` notes multi-node ODE runs without it.
+* Spread, die-back and recolonisation questions use either the ODE with
+  the rule on or the chain-binomial solver (integer counts, no
+  atto-flies). The phase 3 transect runs both.
+* Whether the rule should be on by default for more than one node is an
+  open point for the user (a default that depends on the run is less
+  predictable).
+
+### 5.8 Later options (not v0.2)
 
 * Female leave rate rising as wounds get scarce (Mayer & Atzeni's
   favourability effect), e.g. a factor of Ψ (S8); nonlinear, so it would
-  break the linear R₀ calculation.
+  break the linear R₀ calculation. Fixed habitat differences (e.g.
+  rangeland vs cropland, the "up to 8× farther in poor habitat" of
+  section 2) are already covered by leave rates per node; this option is
+  needed only when host numbers change within a run.
 * Batch events of many flies carried together (MGDrivE2
   `batch_migration()`), if correlated arrival turns out to matter.
 * Richer time variation (5.2): node × day multipliers, R-function inputs,
@@ -248,11 +305,11 @@ converges to the ODE as dt → 0.
 * `sg_landscape(nodes, forcing, ...)`: per node id, area, coordinates
   (optional), forcing (one `sg_forcing` per node or one shared), wound or
   host density, role ("study" or "source"). Default: one study node.
-* `sg_movement_layer(rate, dest, clock = "physiological", t_ref = 27,
-  dest_by_class = NULL)`: `rate` a named list or matrix of
-  leave rates per day at T_ref for `male`, `virgin`, `mated` (scalar or one
-  per node); `dest` a sparse destination matrix with rows ≤ 1. Validates
-  dimensions, π_ii = 0, rows ≤ 1, rates ≥ 0.
+* `sg_movement_layer(rate, dest, clock = "physiological")`: `rate` a named
+  list or matrix of leave rates per day at T_ref (`movement_t_ref` in
+  `sg_params()`) for `male`, `virgin`, `mated` (scalar or one per node);
+  `dest` a sparse destination matrix with rows ≤ 1, shared by the three
+  classes. Validates dimensions, π_ii = 0, rows ≤ 1, rates ≥ 0.
 * `sg_model(..., landscape = , movement = )`: `movement` is one layer or a
   list of layers; phases 1–3 accept one layer (a clear error for more,
   until phase 4). Single-node calls without these arguments are unchanged.
@@ -376,6 +433,53 @@ Memory, 254 counties over 24 years:
 | Weekly cases per county | about 320,000 (about 2.5 MB) |
 | Adults per county every day | about 2.2 million (about 18 MB) |
 
+**Single node, many genotypes.** The recorder does not depend on movement
+or on the number of nodes; one node is a landscape of length one. It
+matters at one node too when a cube has many genotypes, because mated
+females carry the mate genotype and that block grows as the square of the
+number of genotypes. States per node with the current defaults:
+
+| Cube | Genotypes | States per node | Of which mated females |
+|---|---|---|---|
+| `cubeMendelian` | 3 | 207 | 90 |
+| `cubeHomingDrive` | 10 | 1,390 | 1,000 |
+| `cubeClvR2` | 60 | 38,340 | 36,000 |
+
+Memory, one node over 50 years (about 18,260 days; estimates):
+
+| Request | Homing drive (10) | ClvR2 (60) |
+|---|---|---|
+| Full state every day (v0.1 behaviour) | about 200 MB per run | about 5.6 GB per run |
+| Same, 100 chain-binomial replicates | about 20 GB | about 560 GB |
+| `"totals"` (block × genotype) every day | about 9 MB | about 53 MB |
+| Allele counts by sex, weekly | well under 1 MB | well under 1 MB |
+
+* Quantities over the mate genotype (e.g. females carrying sterile or
+  drive sperm) are single rows of W_x, however large that block is.
+* Long runs can be split into chunks (burn-in, then release years) through
+  the kept final state, with nothing stored in between.
+* The recorder saves memory, not run time: one output costs about one rate
+  evaluation, but each evaluation still costs about 17–18 ns per state
+  (about 0.7 ms per evaluation for ClvR2 at one node). Speed with many
+  genotypes is limited by the female × mate block, which this design does
+  not address.
+
+When to build it (decided by the user, 2026-11-02; decision 10): in
+phases 1–2 as planned (ODE in phase 1, chain-binomial in phase 2), not as
+a stand-alone step before phase 1, although it needs nothing from
+movement.
+
+Open point (for the user to decide when implementation starts):
+
+* **Change from v0.1.** v0.1 returns full states (`sim$state`), read in
+  `R/outputs.R`, `R/checks.R`, `R/init-steady.R`, `R/simulate.R`,
+  `R/simulate-cb.R` and most tests (18 files). With `"totals"` as the
+  default, those uses ask for `record = "state"` explicitly and the
+  summary functions read recorded quantities; one-node results are
+  unchanged, the default output object is not. Recommendation: one
+  default everywhere (`"totals"`), not a default that depends on the size
+  of the run, which would surprise users.
+
 ### 7.2 Summaries and plots
 
 * `sg_totals()`, `sg_cases()`, `sg_hosts()`, allele frequencies: a `node`
@@ -415,12 +519,19 @@ Memory, 254 counties over 24 years:
   females and males leaving per day is about 16% and 10%.
 * Metapopulation (CB): weakly connected nodes go extinct and are
   recolonised; nodes behind a barrier (no edges) stay empty.
+* Node extinction rule (ODE): off reproduces v0.1 bitwise; on, a node below
+  the threshold at the end of a day is zero the next day, the removal
+  counter equals the amount removed, and with closed edges the network
+  total changes only by births, deaths and removals.
 * Recorder: every recorded quantity equals the same sum computed in R
   from a full-state run (`record = "state"`), for both solvers and every
   replicate; period sums of counters equal the sums of the daily
   counters; the default `"totals"` matches the v0.1 totals for one node.
-* Two-node cross-check against MGDrivE2fast in the mosquito-like limit
-  (M6), calendar clock, U rate 0 (MGDrivE2 does not move unmated females).
+* Optional: two-node cross-check against MGDrivE2fast in the
+  mosquito-like limit (M6), calendar clock, U rate 0 (MGDrivE2 does not
+  move unmated females). The costliest test to set up; the symmetric
+  two-node, conservation and diffusion-variance tests above already check
+  the movement terms, so it is done only if time allows.
 
 ## 8a. Performance
 
@@ -439,9 +550,10 @@ aim is to keep it linear and avoid the traps below.
 1. **Dense Jacobian in the stiff fallback** (phase 1).
    `simulate_ode(stiff_fallback = TRUE)` hands stiff days to `lsoda`,
    whose default Jacobian is dense: n² doubles, about 7 GB for 30,000
-   states. For more than one node: fallback off by default, or
-   `deSolve::lsodes` with the model's sparsity pattern (block diagonal by
-   node plus the movement edges, built once in R).
+   states. For more than one node the fallback is off, and asking for it
+   gives a clear error. `deSolve::lsodes` with the model's sparsity
+   pattern (block diagonal by node plus the movement edges, built once in
+   R) is deferred until a multi-node run actually turns out stiff.
 2. **Full states every day** (phase 1 for the ODE, phase 2 for the
    chain-binomial). 30,000 states × 365 days × 24 years is about 260
    million doubles (2 GB) per run, more with replicates; all counters
@@ -458,11 +570,13 @@ aim is to keep it linear and avoid the traps below.
    R's generator when n = 0, skipping consumes the same random numbers:
    the draw-for-draw match with the R reference step holds. Before the
    front arrives, and in northern nodes in winter, most nodes are empty.
-4. **Share daily preparation across nodes with the same forcing**
-   (phases 1–2). Forcing is stored once per distinct series (e.g. per
-   weather station), with a forcing index per node; day rates and the
-   chain matrices of S16 (uniformization) are computed once per distinct
-   forcing and day. 254 counties use 170 stations.
+4. **Forcing stored once per distinct series** (phase 1): e.g. per
+   weather station, with a forcing index per node; 254 counties use 170
+   stations. Cheap and saves memory. **Sharing the daily preparation**
+   (day rates, the chain matrices of S16) across nodes with the same
+   forcing is deferred until the phase 3 profile shows it matters: day
+   rates are computed once per day, not per evaluation, so for the ODE the
+   saving is probably small.
 5. **Larval chains** (phase 2). With larval crowding the larval chain is
    rebuilt every step in every node (n_L = 6, small); profile it and
    optimise only if it shows up.
@@ -513,15 +627,17 @@ and M4, so speed regressions are visible. Targets:
 ## 9. Implementation plan (work packages)
 
 ### Phase 0. Specification
-MODEL_SPEC movement section (N1, N2, 5.3, 5.6); D-032; parameter-table
-entry (`t_ref` default); this note's decisions.
+MODEL_SPEC movement section (N1, N2, 5.3, 5.6, the node extinction rule
+of 5.7 as an exception to "no population floors"); D-032; parameter-table
+entry (`movement_t_ref` default); this note's decisions.
 
 ### Phase 1. Landscape, one layer, ODE
 * `sg_landscape()` with node roles; `sg_movement_layer()`;
   `sg_model(landscape = , movement = )` accepting a list with one layer.
 * `ModelView`: node stride; forcing [n_days, n_nodes]; per-node scalars
-  (H, N_H, h_M, area); per layer: rates [3, n_nodes], destinations in
-  compressed sparse row form, loss shares, clock, T_ref.
+  (H, N_H, h_M, area); per merged group (5.4; one in phases 1–3): rates
+  [3, n_nodes], destinations in compressed sparse row form, loss shares,
+  clock; T_ref once for the model.
 * `RateKernel`: loop over nodes for day rates and aggregates (wound search,
   mating, larval crowding stay local); one movement pass over adult blocks
   along the edges, with losses; no allocation per evaluation. The rate
@@ -530,10 +646,12 @@ entry (`t_ref` default); this note's decisions.
   be added later without touching the movement pass.
 * `.sg_rates_r()`: the same node loop and N1–N2; equivalence tests.
 * `sg_releases(node = )`; `sg_init()` per node and burn-in with movement.
+* Node extinction rule for the ODE (5.7): end-of-day check per node,
+  `node_extinction` argument, removal counter, note in `check_model()`.
 * Performance (8a): forcing stored per distinct series with an index per
-  node, day rates shared; stiff fallback off by default for more than one
-  node (or `lsodes` with the sparsity pattern); `max_memory` check for the
-  ODE; diagnostics report the node that limits the step.
+  node; stiff fallback off for more than one node (an error if asked
+  for); `max_memory` check for the ODE; diagnostics report the node that
+  limits the step.
 * Recorder (7.1) for the ODE: `sg_record()`, `sg_quantity()`,
   `sg_counter()`, `sg_quantity_weights()`; W_x and W_c in compressed
   sparse row form in `ModelView`; the products in the C++ output step;
@@ -542,16 +660,19 @@ entry (`t_ref` default); this note's decisions.
 ### Phase 2. Chain-binomial movement
 Section 5.6 in `.sg_cb_step_r()` and `cb_step.cpp`; counters (emigrants,
 immigrants, losses); draw-for-draw and map tests. Performance (8a): skip
-empty nodes (exact, same random numbers); chain matrices shared across
-nodes with the same forcing; profile the per-step larval chain. Recorder
+empty nodes (exact, same random numbers); profile the per-step larval
+chain. Recorder
 (7.1) for the chain-binomial solver, per replicate, with the memory
 estimate from the recorder's size.
 
 ### Phase 3. Constructors, diagnostics, outputs, first transect
-* `bench/m6_multinode_scaling.R` and the targets of 8a.4; the tolerance
-  study of 8a item 7.
-* `sg_movement_diffusion()`, `sg_movement_from_distance()`,
-  `sg_movement_from_prob()`, conversions.
+* `bench/m6_multinode_scaling.R` and the targets of 8a.4 (on regular
+  grids of 1–254 nodes, built with `sg_movement_diffusion()`); the
+  tolerance study of 8a item 7; profiling for the deferred items of 8a.2
+  (item 4).
+* `sg_movement_diffusion()`, `sg_movement_from_prob()` (needed for the
+  MGDrivE2 check), conversions. `sg_movement_from_distance()` moves to
+  phase 4 with the long-distance layer it mainly serves.
 * `check_movement()` and its place in `check_model()`.
 * Outputs and plots of section 7: counters summed over periods
   (`every = "week"`), `sg_alleles()`, summary functions reading recorded
@@ -561,11 +682,21 @@ estimate from the recorder's size.
   built with `sg_movement_diffusion()` (a few lines of user code, shown in
   the scenario, not a separate function), a source node at the southern
   end with its own weather (section 5.5), weather per node from the
-  1961–62 station data (`data-raw/texas_nws/weather_1961_1962/`). Checks:
+  1961–62 station data (`data-raw/texas_nws/weather_1961_1962/`); run with
+  the chain-binomial solver and with the ODE with the node extinction rule
+  on (5.7), and once with the rule off to show the atto-fly effect. Checks:
   winter die-back in the north, spring recolonisation, front speed against
   80–160 km per generation with local movement only (expected to be too
   slow, section 2); the same run with the calendar clock, to see whether
   the clock choice matters (section 5.3).
+### Phase 4. Several layers
+* Lists of layers in `sg_model()`; a schedule per layer (one daily
+  multiplier, the same in every node; section 5.2). Mostly R work: layers
+  are merged into groups by (clock, schedule) before the run (5.4), so the
+  C++ kernel only loops over two or three groups instead of one.
+* `sg_movement_from_distance()` (user kernel, cutoff for sparsity).
+* A long-distance layer: sparse far edges, calendar clock, monsoon-season
+  schedule, northward destinations; the transect rerun with it.
 * **Documented example of a general network:** Texas counties as nodes.
   Areas, shared border lengths and centroid distances from county shapes
   (user code with `sf` and `tigris`, in a vignette or `data-raw/`, not a
@@ -574,15 +705,10 @@ estimate from the recorder's size.
   share a station); about 1,500 edges. With D ≈ 0.5 km² d⁻¹ and counties
   of about 2,700 km² the rate to each neighbour is about 2 × 10⁻⁴ d⁻¹, so
   local diffusion hardly moves flies between counties and spread on this
-  grid must come from the long-distance layer (phase 4);
-  `check_movement()` shows this as a very small lifetime leave
-  probability.
-
-### Phase 4. Several layers
-* Lists of layers in `sg_model()`; a schedule per layer (one daily
-  multiplier, the same in every node; section 5.2).
-* A long-distance layer: sparse far edges, calendar clock, monsoon-season
-  schedule, northward destinations; the transect rerun with it.
+  grid must come from the long-distance layer; `check_movement()` shows
+  this as a very small lifetime leave probability. Moved here from phase
+  3: without the long-distance layer the example would only show that
+  nothing moves.
 * `sg_release_barrier()`: barrier width and lane spacing to releases per
   node; barrier-width scenario.
 * Texas 1962 county network: `county_station_map_1961_1962.csv` (170
@@ -595,9 +721,10 @@ Infested-host transport with larvae, quarantine; host-dependent dispersal;
 batch events if needed.
 
 Cost: 254 Texas counties with 2 genotypes and n_A = 10 have about 80 adult
-states per node; movement costs O(edges × adult states per node), so
-long-distance layers are kept sparse (cutoff). Realistic host numbers (about
-1000 km² per node or more) as for the host model. Performance rules and
+states per node; movement costs O(edges × adult states per node), with
+edges counted once per merged group (5.4), so long-distance layers are
+kept sparse (cutoff). Realistic host numbers (about 1000 km² per node or
+more) as for the host model. Performance rules and
 targets: section 8a.
 
 ## 10. Decisions (made by the user, 2026-11-02)
@@ -630,6 +757,25 @@ targets: section 8a.
    of states and of counters, computed in C++ during the run; ratios in R
    afterwards), with `"totals"` as the default and full states only on
    request (section 7.1).
+10. The recorder is built in phases 1–2 as planned (ODE in phase 1,
+    chain-binomial in phase 2), not earlier as a stand-alone step; it also
+    serves one-node runs with many genotypes (section 7.1).
+11. Simplifications and additions after review (2026-11-02):
+    * an optional node extinction rule for the ODE against atto-flies,
+      off by default; spread and die-back questions use it or the
+      chain-binomial solver (5.7);
+    * layers are merged inside the model by (clock, schedule); the
+      chain-binomial step draws emigrants once at the total rate (5.4,
+      5.6);
+    * one destination matrix for all classes per layer (no
+      `dest_by_class`) and one `movement_t_ref` for the model (5.2, 6.1);
+    * `sg_movement_from_distance()` and the Texas county example move to
+      phase 4;
+    * stiff fallback off for more than one node, `lsodes` deferred;
+      shared daily preparation deferred until profiled (8a);
+    * fixed habitat differences through per-node rates; host-dependent
+      dispersal stays a later option (5.8);
+    * MGDrivE2fast cross-check optional (section 8).
 
 ## References
 
