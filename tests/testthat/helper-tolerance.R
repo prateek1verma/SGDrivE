@@ -1,4 +1,4 @@
-# Shared numerical tolerances for SGDrivE tests.
+# Shared numerical tolerances for ScrewDrivE tests.
 #
 # Conventions (see dev/CONVENTIONS.md, "Testing"):
 # * sg_tol_exact: identities that should hold to floating-point precision

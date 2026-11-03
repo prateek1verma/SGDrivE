@@ -2,7 +2,7 @@
 # (src/cb_step.h, src/cb_step.cpp) reproduce the R reference step draw for
 # draw with the same seed, and its deterministic map to round-off.
 
-ns <- asNamespace("SGDrivE")
+ns <- asNamespace("ScrewDrivE")
 run_r <- ns$.sg_cb_run_r
 run_cpp <- ns$.sg_cb_run_cpp
 wx_all <- sg_example_weather()

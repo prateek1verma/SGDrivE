@@ -5,7 +5,7 @@
 #include <cmath>
 #include <string>
 
-namespace sgdrive {
+namespace screwdrive {
 
 namespace {
 
@@ -197,13 +197,13 @@ ModelView::ModelView(const Rcpp::List& view) {
   }
 }
 
-}  // namespace sgdrive
+}  // namespace screwdrive
 
 // Build a model view from its R description and report what was read
 // (internal; used by tests to check that R and C++ agree on the layout).
 // [[Rcpp::export]]
 Rcpp::List sg_model_view_info_cpp(const Rcpp::List& view) {
-  const sgdrive::ModelView mv(view);
+  const screwdrive::ModelView mv(view);
   double sum_inv_w_f = 0.0, sum_egg = 0.0, sum_dx = 0.0;
   for (double v : mv.inv_w_f) sum_inv_w_f += v;
   for (double v : mv.egg_tensor) sum_egg += v;
@@ -220,7 +220,7 @@ Rcpp::List sg_model_view_info_cpp(const Rcpp::List& view) {
       Rcpp::Named("sum_inv_w_f") = sum_inv_w_f, Rcpp::Named("sum_egg_tensor") = sum_egg,
       Rcpp::Named("sum_dx") = sum_dx,
       Rcpp::Named("idx_F_last") = mv.idx_f(mv.n_g - 1, mv.n_g - 1, mv.n_A - 1),
-      Rcpp::Named("idx_M_first") = mv.idx(sgdrive::kM, 0, 0),
+      Rcpp::Named("idx_M_first") = mv.idx(screwdrive::kM, 0, 0),
       Rcpp::Named("host_model") = mv.host_model, Rcpp::Named("n_I") = mv.n_I,
       Rcpp::Named("host_offsets") = mv.host_offsets,
       Rcpp::Named("host_rates") = Rcpp::NumericVector::create(

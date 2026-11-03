@@ -242,7 +242,7 @@ sg_cases <- function(sim, period = c("day", "week", "month", "year"), per = c("k
   }
   k <- sim$counters
   if (!"fertile_batches" %in% dimnames(k)[[2L]]) {
-    .sg_stop("This simulation was made by an older version of SGDrivE; run it again.")
+    .sg_stop("This simulation was made by an older version of ScrewDrivE; run it again.")
   }
   column <- function(name) {
     v <- if (length(dim(k)) == 3L) k[, name, ] else k[, name]
@@ -363,7 +363,7 @@ sg_hosts <- function(sim, per = c("node", "km2")) {
   }
   info <- sim$meta$info
   if (is.null(info)) {
-    .sg_stop("This simulation was made by an older version of SGDrivE; run it again.")
+    .sg_stop("This simulation was made by an older version of ScrewDrivE; run it again.")
   }
   info
 }

@@ -1,7 +1,7 @@
 test_that("package loads and reports its version", {
   info <- sg_backend_info()
   expect_type(info, "list")
-  expect_identical(info$package_version, as.character(utils::packageVersion("SGDrivE")))
+  expect_identical(info$package_version, as.character(utils::packageVersion("ScrewDrivE")))
 })
 
 test_that("C++ backend is compiled with at least C++17", {

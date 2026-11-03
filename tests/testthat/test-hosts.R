@@ -74,7 +74,7 @@ test_that("constant starts put hosts at their fly-free steady state", {
   printed <- capture.output(print(x))
   expect_true(any(grepl("hosts: 27 without a wound, 3 wounded, 0 infested", printed)))
   hw <- sg_init(m, "hardy_weinberg", alleles = c(A = 0.5, a = 0.5))
-  expect_equal(sum(hw[SGDrivE:::.sg_host_index(m)]), 30)
+  expect_equal(sum(hw[ScrewDrivE:::.sg_host_index(m)]), 30)
 })
 
 test_that("a full state is checked against the number of hosts", {
@@ -88,8 +88,8 @@ test_that("a full state is checked against the number of hosts", {
 
 test_that("the model view carries the host block to C++", {
   m <- model_of(host_params(infestation_substages = 3, treatment_rate = 0.2))
-  v <- SGDrivE:::.sg_model_view(m)
-  info <- SGDrivE:::sg_model_view_info_cpp(v)
+  v <- ScrewDrivE:::.sg_model_view(m)
+  info <- ScrewDrivE:::sg_model_view_info_cpp(v)
   expect_true(info$host_model)
   expect_identical(info$n_I, 3L)
   expect_identical(info$host_offsets, as.integer(sg_state_index(m, "HS") - 1L) + 0:2)
@@ -100,13 +100,13 @@ test_that("the model view carries the host block to C++", {
   )
   expect_identical(info$dims[6], m$n_states)
   # static models: no host block
-  info0 <- SGDrivE:::sg_model_view_info_cpp(SGDrivE:::.sg_model_view(model_of(sg_params())))
+  info0 <- ScrewDrivE:::sg_model_view_info_cpp(ScrewDrivE:::.sg_model_view(model_of(sg_params())))
   expect_false(info0$host_model)
   expect_identical(info0$host_offsets, rep(-1L, 3))
   # the C++ side checks the host layout
   bad <- v
   bad$host_offsets <- v$host_offsets + 1L
-  expect_error(SGDrivE:::sg_model_view_info_cpp(bad), "host block")
+  expect_error(ScrewDrivE:::sg_model_view_info_cpp(bad), "host block")
 })
 
 # ---- reference ODE (WP3) ------------------------------------------------------
@@ -214,14 +214,14 @@ test_that("rates: attractive sites replace H, crowding per infested host", {
   x_h <- as.numeric(sg_init(m_h, values = c(E = 3, L = 3, P = 3, M = 2, F = 2)))
   fly <- seq_len(m_s$n_states)
   expect_identical(x_h[fly], x_s[fly])
-  r_s <- SGDrivE:::.sg_rates_r(1, x_s, SGDrivE:::.sg_reference_setup(m_s), aux = TRUE)
-  r_h <- SGDrivE:::.sg_rates_r(1, x_h, SGDrivE:::.sg_reference_setup(m_h), aux = TRUE)
+  r_s <- ScrewDrivE:::.sg_rates_r(1, x_s, ScrewDrivE:::.sg_reference_setup(m_s), aux = TRUE)
+  r_h <- ScrewDrivE:::.sg_rates_r(1, x_h, ScrewDrivE:::.sg_reference_setup(m_h), aux = TRUE)
   # no infested hosts: A_s = wounded hosts = H, so the flies see the same rates
   expect_equal(r_h$aux$sites, 10)
   expect_equal(r_h$aux$psi, r_s$aux$psi, tolerance = 1e-14)
   expect_equal(r_h$deriv[fly], r_s$deriv[fly], tolerance = 1e-14)
   expect_equal(r_h$counters[names(r_s$counters)], r_s$counters, tolerance = 1e-14)
-  expect_false(any(SGDrivE:::.sg_host_counter_names %in% names(r_s$counters)))
+  expect_false(any(ScrewDrivE:::.sg_host_counter_names %in% names(r_s$counters)))
   # crowding per infested host, plus treatment in the larval hazard
   p_c <- host_params(
     larval_crowding_mode = "per_infested_host", larval_crowding_coef = 0.02,
@@ -231,7 +231,7 @@ test_that("rates: attractive sites replace H, crowding per infested host", {
   x_c <- x_h
   x_c[sg_state_index(m_c, "HI", substage = 2)] <- 4
   x_c[sg_state_index(m_c, "HS")] <- x_c[sg_state_index(m_c, "HS")] - 4
-  a <- SGDrivE:::.sg_rates_r(1, x_c, SGDrivE:::.sg_reference_setup(m_c), aux = TRUE)$aux
+  a <- ScrewDrivE:::.sg_rates_r(1, x_c, ScrewDrivE:::.sg_reference_setup(m_c), aux = TRUE)$aux
   l_tot <- sum(x_c[sg_state_index(m_c, "L")])
   expect_equal(
     a$mu[["L"]], -log(0.95) + 0.1 + 0.02 * l_tot / (4 + 1e-6 * 100),
@@ -279,21 +279,21 @@ test_that("C++ rates match the R reference in host mode", {
   set.seed(30)
   for (nm in names(host_configs)) {
     m <- model_of(host_configs[[nm]], area = 3)
-    setup <- SGDrivE:::.sg_reference_setup(m)
-    view <- SGDrivE:::.sg_model_view(m)
+    setup <- ScrewDrivE:::.sg_reference_setup(m)
+    view <- ScrewDrivE:::.sg_model_view(m)
     for (rep in 1:3) {
       x <- stats::runif(m$n_states, 0, 20)
       if (rep == 3) x[sg_state_index(m, "HW")] <- 0 # no uninfested wound
-      r <- SGDrivE:::.sg_rates_r(5, x, setup, aux = TRUE)
-      cc <- SGDrivE:::sg_rates_cpp(view, 5L, x)
+      r <- ScrewDrivE:::.sg_rates_r(5, x, setup, aux = TRUE)
+      cc <- ScrewDrivE:::sg_rates_cpp(view, 5L, x)
       expect_equal(cc$deriv, r$deriv, tolerance = 1e-12, info = nm)
       expect_equal(cc$counters, unname(r$counters), tolerance = 1e-12, info = nm)
-      agg <- SGDrivE:::sg_aggregates_cpp(view, 5L, x)
+      agg <- ScrewDrivE:::sg_aggregates_cpp(view, 5L, x)
       expect_equal(agg$sites, r$aux$sites, tolerance = 1e-14, info = nm)
       expect_equal(agg$psi, r$aux$psi, tolerance = 1e-14, info = nm)
       expect_equal(agg$mu[2], r$aux$mu[["L"]], tolerance = 1e-14, info = nm)
       expect_equal(
-        SGDrivE:::sg_max_rate_cpp(view, 5L, x), SGDrivE:::.sg_max_rate(5, x, setup),
+        ScrewDrivE:::sg_max_rate_cpp(view, 5L, x), ScrewDrivE:::.sg_max_rate(5, x, setup),
         tolerance = 1e-12, info = nm
       )
     }
@@ -319,9 +319,9 @@ test_that("C++ and R backends give the same host-mode simulation", {
 })
 
 test_that("the C++ view refuses crowding per infested host without hosts", {
-  v <- SGDrivE:::.sg_model_view(model_of(sg_params()))
+  v <- ScrewDrivE:::.sg_model_view(model_of(sg_params()))
   v$larval_per_infested_host <- 1L
-  expect_error(SGDrivE:::sg_model_view_info_cpp(v), "needs the host model")
+  expect_error(ScrewDrivE:::sg_model_view_info_cpp(v), "needs the host model")
 })
 
 # ---- chain-binomial step (WP5) ------------------------------------------------
@@ -345,7 +345,7 @@ cb_model <- function(p, days = 20, area = 4) {
 cb_init <- function(m) sg_init(m, values = c(E = 5, L = 5, P = 5, M = 3, U = 1, F = 3))
 
 test_that("C++ host steps equal the R reference draw for draw", {
-  ns <- asNamespace("SGDrivE")
+  ns <- asNamespace("ScrewDrivE")
   for (nm in names(cb_configs)) {
     m <- cb_model(cb_configs[[nm]], area = if (nm == "clutch_two_hosts") 1 else 4)
     set.seed(3)
@@ -378,10 +378,10 @@ test_that("a step never infests more hosts than are wounded", {
   x[sg_state_index(m, "HI")] <- 0
   x <- round(x)
   set.seed(5)
-  out <- SGDrivE:::sg_cb_step_rep_cpp(SGDrivE:::.sg_model_view(m), 1L, 0.1, x, 2000L)
+  out <- ScrewDrivE:::sg_cb_step_rep_cpp(ScrewDrivE:::.sg_model_view(m), 1L, 0.1, x, 2000L)
   n <- m$n_states
-  flows <- out[, n + seq_along(SGDrivE:::.sg_counter_names(cube3$genotypes, TRUE))]
-  colnames(flows) <- SGDrivE:::.sg_counter_names(cube3$genotypes, TRUE)
+  flows <- out[, n + seq_along(ScrewDrivE:::.sg_counter_names(cube3$genotypes, TRUE))]
+  colnames(flows) <- ScrewDrivE:::.sg_counter_names(cube3$genotypes, TRUE)
   expect_true(all(flows[, "infestations"] <= 2))
   expect_gt(mean(flows[, "infestations"] == 2), 0.05) # both hosts hit in some steps
   expect_gt(sum(flows[, "superinfestations"]), 0)
@@ -392,20 +392,20 @@ test_that("a step never infests more hosts than are wounded", {
 
 test_that("the occupancy draw has the exact mean of random hits", {
   set.seed(9)
-  occ <- SGDrivE:::.sg_cb_draws(TRUE)$occupancy
+  occ <- ScrewDrivE:::.sg_cb_draws(TRUE)$occupancy
   k <- vapply(1:20000, function(i) occ(5, 3), 0)
   expected <- 3 * (1 - (2 / 3)^5)
   expect_lt(abs(mean(k) - expected), 4 * stats::sd(k) / sqrt(20000))
   expect_true(all(k >= 1 & k <= 3))
   expect_identical(occ(0, 3), 0)
   expect_identical(occ(4, 0), 0)
-  det <- SGDrivE:::.sg_cb_draws(FALSE)$occupancy
+  det <- ScrewDrivE:::.sg_cb_draws(FALSE)$occupancy
   expect_equal(det(0.01, 3), 0.01, tolerance = 1e-2) # few batches: about one host each
   expect_lt(det(1e6, 3), 3 + 1e-12)
 })
 
 test_that("the deterministic host map converges to the ODE as dt shrinks", {
-  ns <- asNamespace("SGDrivE")
+  ns <- asNamespace("ScrewDrivE")
   p <- cb_configs$full_eggs
   m <- cb_model(p, days = 15, area = 40)
   x0 <- cb_init(m)
@@ -477,7 +477,7 @@ test_that("the host-mode equilibrium is a fixed point of the ODE", {
   e <- sg_init(m, "equilibrium")
   info <- attr(e, "equilibrium")
   expect_gt(info$adult_females, 1000)
-  hosts <- SGDrivE:::.sg_host_index(m)
+  hosts <- ScrewDrivE:::.sg_host_index(m)
   expect_equal(sum(e[hosts]), 30000, tolerance = 1e-10)
   sim <- simulate_ode(m, e, rtol = 1e-10, atol = 1e-8)
   rel <- max(abs(sweep(sim$state, 2, as.numeric(e))) / pmax(as.numeric(e), 1))
@@ -507,7 +507,7 @@ test_that("with an Allee effect the hosts' region has two stable equilibria", {
   up <- sg_init(m, "equilibrium")
   expect_equal(attr(thr, "threshold")$adult_females, eq$adult_females[2])
   expect_equal(attr(up, "equilibrium")$adult_females, eq$adult_females[3])
-  fly <- setdiff(seq_len(m$n_states), SGDrivE:::.sg_host_index(m))
+  fly <- setdiff(seq_len(m$n_states), ScrewDrivE:::.sg_host_index(m))
   start <- function(k) {
     x <- as.numeric(thr)
     x[fly] <- k * x[fly]
@@ -520,7 +520,7 @@ test_that("with an Allee effect the hosts' region has two stable equilibria", {
 
 test_that("several stable positive equilibria give a message and the upper one", {
   m <- region_model(region_params())
-  real <- SGDrivE:::.sg_equilibria_core(m, 25, "test")
+  real <- ScrewDrivE:::.sg_equilibria_core(m, 25, "test")
   fake <- real
   fake$table <- real$table[c(1, 2, 2, 2), ]
   fake$table$eggs_per_day <- c(0, 1, 2, 3) * real$table$eggs_per_day[2]
@@ -555,7 +555,7 @@ test_that("a burn-in runs the hosts with the flies", {
   m <- region_model(region_params(), days = 365)
   b <- sg_init(m, "burn_in")
   expect_lt(attr(b, "burn_in")$start_effect, 1e-3)
-  expect_equal(sum(b[SGDrivE:::.sg_host_index(m)]), 30000, tolerance = 1e-8)
+  expect_equal(sum(b[ScrewDrivE:::.sg_host_index(m)]), 30000, tolerance = 1e-8)
   e <- sg_init(m, "equilibrium")
   expect_lt(max(abs(b - e) / pmax(e, 1)), 1e-3) # a year at 25 degC reaches equilibrium
 })

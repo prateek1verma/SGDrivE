@@ -1,5 +1,5 @@
-alloc <- SGDrivE:::.sg_allocate_substages
-chain <- SGDrivE:::.sg_adult_chain
+alloc <- ScrewDrivE:::.sg_allocate_substages
+chain <- ScrewDrivE:::.sg_adult_chain
 
 test_that("sub-stages are allocated in proportion to segment lengths, at least one each", {
   expect_identical(alloc(10, c(61, 141.8)), c(3L, 7L))

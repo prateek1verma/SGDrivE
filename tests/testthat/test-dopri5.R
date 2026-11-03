@@ -3,7 +3,7 @@
 
 dp <- function(problem, y0, t1, rtol = 1e-10, atol = 1e-12, fixed_h = 0, par = 1,
                max_steps = 1e6, t0 = 0) {
-  SGDrivE:::sg_dopri5_test_cpp(problem, y0, t0, t1, rtol, atol, fixed_h, max_steps, par)
+  ScrewDrivE:::sg_dopri5_test_cpp(problem, y0, t0, t1, rtol, atol, fixed_h, max_steps, par)
 }
 
 test_that("exponential decay is solved to the requested accuracy", {

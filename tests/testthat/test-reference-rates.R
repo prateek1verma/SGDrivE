@@ -1,5 +1,5 @@
-rates <- SGDrivE:::.sg_rates_r
-setup <- SGDrivE:::.sg_reference_setup
+rates <- ScrewDrivE:::.sg_rates_r
+setup <- ScrewDrivE:::.sg_reference_setup
 
 wx_all <- sg_example_weather()
 day_warm <- which(wx_all$date == as.Date("1971-07-15"))
@@ -35,7 +35,7 @@ test_that("an empty population has zero rates", {
   r <- rates(day_warm, numeric(m$n_states), setup(m))
   expect_identical(r$deriv, numeric(m$n_states))
   expect_true(all(r$counters == 0))
-  expect_identical(names(r$counters), SGDrivE:::.sg_counter_names(m$cube$genotypes))
+  expect_identical(names(r$counters), ScrewDrivE:::.sg_counter_names(m$cube$genotypes))
 })
 
 test_that("flow accounting closes for the total and for each block", {

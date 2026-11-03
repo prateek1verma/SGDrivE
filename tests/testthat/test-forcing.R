@@ -19,7 +19,7 @@ test_that("McAllen forcing matches the legacy daily terms exactly (gp2014 preset
 test_that("the forcing records the parameter values it used", {
   f <- sg_forcing(wx[1:30, ], sg_params(optimal_survival_temp = 27))
   expect_identical(f$param_values$optimal_survival_temp, 27)
-  expect_named(f$param_values, SGDrivE:::.sg_forcing_param_names())
+  expect_named(f$param_values, ScrewDrivE:::.sg_forcing_param_names())
 })
 
 test_that("start/end select the simulation period; the 5-day mean uses earlier days", {

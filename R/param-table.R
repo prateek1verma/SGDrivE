@@ -12,7 +12,7 @@
 #
 # Source tags: GP2014 = Gutierrez & Ponti (2014) paper or Pascal code;
 # G2019 = Gutierrez, Ponti & Arias (2019); MGDrivE2 = MGDrivE2 lifecycle model;
-# adapted = new for SGDrivE (decision number given in the description).
+# adapted = new for ScrewDrivE (decision number given in the description).
 
 # One row of the table. `default` keeps its exact R value (e.g. log(2)).
 .prow <- function(name, default, group, units, source, spec, description,
@@ -345,7 +345,7 @@
 
 #' Parameter reference table
 #'
-#' Returns the table that defines every SGDrivE model parameter: its name,
+#' Returns the table that defines every ScrewDrivE model parameter: its name,
 #' symbol, default value, allowed range, units, source and the equation of the
 #' model specification that uses it. This table is the single source for the
 #' defaults and checks in [sg_params()].
@@ -368,7 +368,7 @@
 #'     \item{`units`}{Units: `degC` degrees Celsius, `dd` degree-days, `d`
 #'       days, `d^-1` per day, `km^-2` per square kilometre.}
 #'     \item{`source`}{`GP2014` (Gutierrez & Ponti 2014), `G2019`
-#'       (Gutierrez et al. 2019), `MGDrivE2`, or `adapted` (new in SGDrivE).}
+#'       (Gutierrez et al. 2019), `MGDrivE2`, or `adapted` (new in ScrewDrivE).}
 #'     \item{`spec`}{Equation(s) of the model specification using the
 #'       parameter.}
 #'     \item{`description`}{What the parameter does.}

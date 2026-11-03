@@ -7,7 +7,7 @@
 #
 # Run time: a few seconds.
 
-library(SGDrivE)
+library(ScrewDrivE)
 library(MGDrivE)
 library(ggplot2) # plots
 

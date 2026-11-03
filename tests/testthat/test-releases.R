@@ -99,7 +99,7 @@ dates <- as.Date("1971-01-01") + 0:364
 
 test_that("day-number releases resolve to days and counts per node", {
   rel <- sg_releases("S", "adult", "male", times = c(1, 365), number = 10, per = "km2")
-  out <- SGDrivE:::.sg_resolve_releases(rel, dates, area = 2.5, genotypes = c("W", "S"))
+  out <- ScrewDrivE:::.sg_resolve_releases(rel, dates, area = 2.5, genotypes = c("W", "S"))
   expect_identical(out$day, c(1L, 365L))
   expect_identical(out$count, c(25, 25))
   expect_named(out, c("day", "genotype", "stage", "sex", "count"))
@@ -107,21 +107,21 @@ test_that("day-number releases resolve to days and counts per node", {
 
 test_that("date releases resolve relative to the first forcing date (D-015)", {
   rel <- sg_releases("S", "adult", "female", times = c("1971-01-01", "1971-02-01"), number = 3)
-  out <- SGDrivE:::.sg_resolve_releases(rel, dates, area = 1, genotypes = c("W", "S"))
+  out <- ScrewDrivE:::.sg_resolve_releases(rel, dates, area = 1, genotypes = c("W", "S"))
   expect_identical(out$day, c(1L, 32L))
   expect_identical(out$count, c(3, 3)) # per node: area not applied
 })
 
 test_that("resolution checks genotypes and the simulation period", {
   rel <- sg_releases("Z", "adult", "male", times = 1, number = 1)
-  expect_error(SGDrivE:::.sg_resolve_releases(rel, dates, 1, c("W", "S")), "not in the cube: Z")
+  expect_error(ScrewDrivE:::.sg_resolve_releases(rel, dates, 1, c("W", "S")), "not in the cube: Z")
   late <- sg_releases("S", "adult", "male", times = 400, number = 1)
   expect_error(
-    SGDrivE:::.sg_resolve_releases(late, dates, 1, c("W", "S")),
+    ScrewDrivE:::.sg_resolve_releases(late, dates, 1, c("W", "S")),
     "outside the simulation period.*day 400"
   )
   early <- sg_releases("S", "adult", "male", times = "1970-12-31", number = 1)
-  expect_error(SGDrivE:::.sg_resolve_releases(early, dates, 1, c("W", "S")), "1970-12-31")
-  expect_identical(nrow(SGDrivE:::.sg_resolve_releases(NULL, dates, 1, "W")), 0L)
-  expect_error(SGDrivE:::.sg_resolve_releases(list(), dates, 1, "W"), "sg_releases object")
+  expect_error(ScrewDrivE:::.sg_resolve_releases(early, dates, 1, c("W", "S")), "1970-12-31")
+  expect_identical(nrow(ScrewDrivE:::.sg_resolve_releases(NULL, dates, 1, "W")), 0L)
+  expect_error(ScrewDrivE:::.sg_resolve_releases(list(), dates, 1, "W"), "sg_releases object")
 })

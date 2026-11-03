@@ -11,15 +11,15 @@
 //   only), then the genotype. With the host-wound model (D-030) the host
 //   blocks HS, HW, HI (sub-stages 1..n_I) follow, at host_offsets[0..2].
 
-#ifndef SGDRIVE_MODEL_VIEW_H
-#define SGDRIVE_MODEL_VIEW_H
+#ifndef SCREWDRIVE_MODEL_VIEW_H
+#define SCREWDRIVE_MODEL_VIEW_H
 
 #include <Rcpp.h>
 
 #include <string>
 #include <vector>
 
-namespace sgdrive {
+namespace screwdrive {
 
 // Positions of the state blocks in ModelView::offsets.
 enum Block { kE = 0, kL = 1, kP = 2, kM = 3, kU = 4, kF = 5 };
@@ -89,6 +89,6 @@ struct ModelView {
   }
 };
 
-}  // namespace sgdrive
+}  // namespace screwdrive
 
-#endif  // SGDRIVE_MODEL_VIEW_H
+#endif  // SCREWDRIVE_MODEL_VIEW_H

@@ -11,7 +11,7 @@ wild <- sg_cube(sg_test_cube_wild())
 
 # Daily totals of an sg_sim in the column layout of the legacy output.
 legacy_totals <- function(sim) {
-  tot <- SGDrivE:::.sg_sim_block_totals(sim)[-1, , drop = FALSE]
+  tot <- ScrewDrivE:::.sg_sim_block_totals(sim)[-1, , drop = FALSE]
   k <- sim$counters
   data.frame(
     eggs = tot[, "E"], larvae = tot[, "L"], pupae = tot[, "P"],
@@ -50,8 +50,8 @@ test_that("C++ backend: gp2014 matches the legacy ODE over 1960-1983 (relative e
 
 test_that("R backend: gp2014 matches the legacy ODE over 1960-1983 (slow)", {
   skip_if_not(
-    identical(Sys.getenv("SGDRIVE_SLOW_TESTS"), "true"),
-    "slow test: set SGDRIVE_SLOW_TESTS=true to run"
+    identical(Sys.getenv("SCREWDRIVE_SLOW_TESTS"), "true"),
+    "slow test: set SCREWDRIVE_SLOW_TESTS=true to run"
   )
   ref_file <- test_path(
     "..", "..", "data-raw", "reference", "gp2014_mcallen_ode_no_floors_tight.rds"

@@ -1,4 +1,12 @@
-# SGDrivE 0.0.0.9000
+# ScrewDrivE 0.0.0.9000
+
+## Package renamed from SGDrivE to ScrewDrivE
+
+* The package is now called `ScrewDrivE`: use `library(ScrewDrivE)` and
+  `ScrewDrivE::`. The GitHub repository is still `prateek1verma/SGDrivE`.
+* The environment variables `SGDRIVE_SLOW_TESTS` and `SGDRIVE_RAW_WEATHER`
+  are now `SCREWDRIVE_SLOW_TESTS` and `SCREWDRIVE_RAW_WEATHER`.
+* The C++ namespace `sgdrive` is now `screwdrive`.
 
 ## Sterile females no longer compete for wounds (D-031)
 
@@ -138,11 +146,11 @@
 ## Scenario scripts
 
 * New folder `inst/scenarios/` (installed; `system.file("scenarios",
-  package = "SGDrivE")`) with short user-style scripts for scientific testing
+  package = "ScrewDrivE")`) with short user-style scripts for scientific testing
   and future tutorials. First script: `01_wild_type_dynamics.R`, a wild-type
   population at McAllen, Texas (model check, burn-in, deterministic and
   stochastic runs, plots, R0 by temperature).
-* `SGDrivE.Rproj` RStudio project file for local development.
+* `ScrewDrivE.Rproj` RStudio project file for local development.
 
 ## Milestone M5: checks, outputs, calibration and plots
 
@@ -322,7 +330,7 @@
 * Milestone checks of the reference solver: with one wild genotype and the
   `"gp2014"` preset it reproduces the legacy Gutierrez & Ponti ODE to a
   relative error below 1e-6 (1960 in routine tests; 1960-1983 as a slow test,
-  `SGDRIVE_SLOW_TESTS=true`, also available as a manual CI workflow); a
+  `SCREWDRIVE_SLOW_TESTS=true`, also available as a manual CI workflow); a
   neutral Mendelian cube stays at Hardy-Weinberg with constant allele
   frequency; rate mating approaches instant mating as nu grows; sterile-male
   releases divert matings and suppress the wild population; genotype

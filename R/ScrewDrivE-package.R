@@ -1,4 +1,4 @@
-#' SGDrivE: Screwworm Genetic-Control Dynamics Explorer
+#' ScrewDrivE: Screwworm Genetic-Control Dynamics Explorer
 #'
 #' Genotype-resolved population dynamics of the New World screwworm
 #' (*Cochliomyia hominivorax*) under genetic control.
@@ -33,7 +33,7 @@
 "_PACKAGE"
 
 ## usethis namespace: start
-#' @useDynLib SGDrivE, .registration = TRUE
+#' @useDynLib ScrewDrivE, .registration = TRUE
 #' @importFrom Rcpp evalCpp
 #' @importFrom stats update
 ## usethis namespace: end

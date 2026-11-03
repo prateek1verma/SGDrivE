@@ -3,7 +3,7 @@
 
 skip_if_not_installed("deSolve")
 
-ns <- asNamespace("SGDrivE")
+ns <- asNamespace("ScrewDrivE")
 wx_all <- sg_example_weather()
 cube3 <- sg_cube(sg_test_cube_mendelian())
 year <- function(p) sg_forcing(wx_all, p, "1971-01-01", "1971-12-31")

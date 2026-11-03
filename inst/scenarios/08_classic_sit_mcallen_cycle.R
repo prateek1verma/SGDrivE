@@ -21,7 +21,7 @@
 #
 # Run time: a few seconds.
 
-library(SGDrivE)
+library(ScrewDrivE)
 library(ggplot2) # plots
 
 # 1. Settings -----------------------------------------------------------------

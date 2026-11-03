@@ -29,7 +29,7 @@
 # Run time: about twenty minutes with the defaults below on eight workers,
 # a few hours if run sequentially.
 
-library(SGDrivE)
+library(ScrewDrivE)
 
 # 1. Settings and the sampled parameters --------------------------------------
 n_samples <- 5000 # Latin hypercube samples

@@ -2,58 +2,58 @@
 # Generator token: 10BE3573-1514-4C36-9D1C-5A225CD40393
 
 sg_backend_info_cpp <- function() {
-    .Call(`_SGDrivE_sg_backend_info_cpp`)
+    .Call(`_ScrewDrivE_sg_backend_info_cpp`)
 }
 
 sg_cb_step_cpp <- function(view, day, dt, x, stochastic) {
-    .Call(`_SGDrivE_sg_cb_step_cpp`, view, day, dt, x, stochastic)
+    .Call(`_ScrewDrivE_sg_cb_step_cpp`, view, day, dt, x, stochastic)
 }
 
 sg_cb_run_cpp <- function(view, x0, rel_count, dt, stochastic, n_days, record) {
-    .Call(`_SGDrivE_sg_cb_run_cpp`, view, x0, rel_count, dt, stochastic, n_days, record)
+    .Call(`_ScrewDrivE_sg_cb_run_cpp`, view, x0, rel_count, dt, stochastic, n_days, record)
 }
 
 sg_cb_step_rep_cpp <- function(view, day, dt, x, n_rep) {
-    .Call(`_SGDrivE_sg_cb_step_rep_cpp`, view, day, dt, x, n_rep)
+    .Call(`_ScrewDrivE_sg_cb_step_rep_cpp`, view, day, dt, x, n_rep)
 }
 
 sg_chain_advance_cpp <- function(q, last, dt, average = FALSE, mu = 0.0) {
-    .Call(`_SGDrivE_sg_chain_advance_cpp`, q, last, dt, average, mu)
+    .Call(`_ScrewDrivE_sg_chain_advance_cpp`, q, last, dt, average, mu)
 }
 
 sg_dopri5_test_cpp <- function(problem, y0, t0, t1, rtol, atol, fixed_h, max_steps, par) {
-    .Call(`_SGDrivE_sg_dopri5_test_cpp`, problem, y0, t0, t1, rtol, atol, fixed_h, max_steps, par)
+    .Call(`_ScrewDrivE_sg_dopri5_test_cpp`, problem, y0, t0, t1, rtol, atol, fixed_h, max_steps, par)
 }
 
 sg_model_view_info_cpp <- function(view) {
-    .Call(`_SGDrivE_sg_model_view_info_cpp`, view)
+    .Call(`_ScrewDrivE_sg_model_view_info_cpp`, view)
 }
 
 sg_rates_cpp <- function(view, day, state) {
-    .Call(`_SGDrivE_sg_rates_cpp`, view, day, state)
+    .Call(`_ScrewDrivE_sg_rates_cpp`, view, day, state)
 }
 
 sg_max_rate_cpp <- function(view, day, state) {
-    .Call(`_SGDrivE_sg_max_rate_cpp`, view, day, state)
+    .Call(`_ScrewDrivE_sg_max_rate_cpp`, view, day, state)
 }
 
 sg_aggregates_cpp <- function(view, day, state) {
-    .Call(`_SGDrivE_sg_aggregates_cpp`, view, day, state)
+    .Call(`_ScrewDrivE_sg_aggregates_cpp`, view, day, state)
 }
 
 sg_kernel_new_cpp <- function(view) {
-    .Call(`_SGDrivE_sg_kernel_new_cpp`, view)
+    .Call(`_ScrewDrivE_sg_kernel_new_cpp`, view)
 }
 
 sg_kernel_rates_cpp <- function(ptr, day, y) {
-    .Call(`_SGDrivE_sg_kernel_rates_cpp`, ptr, day, y)
+    .Call(`_ScrewDrivE_sg_kernel_rates_cpp`, ptr, day, y)
 }
 
 sg_kernel_max_rate_cpp <- function(ptr, day, x) {
-    .Call(`_SGDrivE_sg_kernel_max_rate_cpp`, ptr, day, x)
+    .Call(`_ScrewDrivE_sg_kernel_max_rate_cpp`, ptr, day, x)
 }
 
 sg_ode_run_cpp <- function(ptr, x0, day_from, day_to, rtol, atol, record, stop_on_stiff, max_steps) {
-    .Call(`_SGDrivE_sg_ode_run_cpp`, ptr, x0, day_from, day_to, rtol, atol, record, stop_on_stiff, max_steps)
+    .Call(`_ScrewDrivE_sg_ode_run_cpp`, ptr, x0, day_from, day_to, rtol, atol, record, stop_on_stiff, max_steps)
 }
 

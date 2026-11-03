@@ -1,4 +1,4 @@
-# SGDrivE v0.1 development plan
+# ScrewDrivE v0.1 development plan
 
 Updated version of `plan_SGDRIVE.rtf` (2026-10-08), revised to match the
 decisions in `DECISIONS.md`. The model itself is specified in

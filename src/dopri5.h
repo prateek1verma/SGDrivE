@@ -19,15 +19,15 @@
 // length n. The integrator allocates its work vectors once and can be reused
 // for many integrations of the same size.
 
-#ifndef SGDRIVE_DOPRI5_H
-#define SGDRIVE_DOPRI5_H
+#ifndef SCREWDRIVE_DOPRI5_H
+#define SCREWDRIVE_DOPRI5_H
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
 #include <vector>
 
-namespace sgdrive {
+namespace screwdrive {
 
 struct Dopri5Options {
   double rtol = 1e-8;
@@ -250,6 +250,6 @@ class Dopri5 {
   }
 };
 
-}  // namespace sgdrive
+}  // namespace screwdrive
 
-#endif  // SGDRIVE_DOPRI5_H
+#endif  // SCREWDRIVE_DOPRI5_H

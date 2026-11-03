@@ -1,4 +1,4 @@
-// C++ rate kernel of the SGDrivE v0.1 model (D-021).
+// C++ rate kernel of the ScrewDrivE v0.1 model (D-021).
 //
 // A block-by-block translation of the R reference rate function
 // .sg_rates_r() (R/reference-rates.R), which implements dev/MODEL_SPEC.md
@@ -10,14 +10,14 @@
 // reuses them (D-010, D-022). Working arrays are allocated once in the
 // constructor; eval() and aggregate() allocate nothing.
 
-#ifndef SGDRIVE_RATES_H
-#define SGDRIVE_RATES_H
+#ifndef SCREWDRIVE_RATES_H
+#define SCREWDRIVE_RATES_H
 
 #include <vector>
 
 #include "model_view.h"
 
-namespace sgdrive {
+namespace screwdrive {
 
 // Quantities that depend only on the day's forcing (S1-S5, S7 without
 // density dependence). Shared by the ODE and chain-binomial solvers.
@@ -97,6 +97,6 @@ class RateKernel {
   double fertile_rate(const DayRates& r) const;
 };
 
-}  // namespace sgdrive
+}  // namespace screwdrive
 
-#endif  // SGDRIVE_RATES_H
+#endif  // SCREWDRIVE_RATES_H

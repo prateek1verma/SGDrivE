@@ -1,4 +1,4 @@
-# Regenerate the reference outputs used for SGDrivE regression tests.
+# Regenerate the reference outputs used for ScrewDrivE regression tests.
 #
 # The legacy Gutierrez & Ponti (2014) R translations are copied UNCHANGED into
 # data-raw/reference_impl/scripts/ (they source each other via the relative

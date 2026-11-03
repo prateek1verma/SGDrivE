@@ -3,7 +3,7 @@
 
 skip_if_not_installed("deSolve")
 
-ns <- asNamespace("SGDrivE")
+ns <- asNamespace("ScrewDrivE")
 wx_all <- sg_example_weather()
 cube3 <- sg_cube(sg_test_cube_mendelian())
 const_weather <- function(temp, days = 40) {

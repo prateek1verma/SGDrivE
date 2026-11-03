@@ -16,7 +16,7 @@ test_that("temperature mortality matches the legacy code (proportion and surviva
 
 test_that("egg viability matches the legacy code where it is non-negative", {
   # The legacy code keeps negative 'viabilities' and clamps them when applied;
-  # SGDrivE clamps at 0 directly. The hazards are identical.
+  # ScrewDrivE clamps at 0 directly. The hazards are identical.
   expect_equal(sg_egg_viability(grid$temp, gp), pmax(0, grid$egg_viability),
     tolerance = sg_tol_exact
   )

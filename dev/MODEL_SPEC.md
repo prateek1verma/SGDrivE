@@ -1,4 +1,4 @@
-# SGDrivE v0.1 model specification
+# ScrewDrivE v0.1 model specification
 
 This document is the agreed specification that milestones M1–M3 implement.
 Equation labels (S1, S2, …) are cited in code comments. Changes to the model
@@ -6,7 +6,7 @@ require a change here and, where relevant, a new entry in `DECISIONS.md`.
 
 Source tags: **[GP2014]** Gutierrez & Ponti (2014) paper or Pascal code;
 **[G2019]** Gutierrez, Ponti & Arias (2019); **[MGDrivE]** MGDrivE v1 cubes;
-**[MGDrivE2]** MGDrivE2 lifecycle model; **[adapted]** new for SGDrivE.
+**[MGDrivE2]** MGDrivE2 lifecycle model; **[adapted]** new for ScrewDrivE.
 
 ---
 

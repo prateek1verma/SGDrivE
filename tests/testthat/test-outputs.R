@@ -1,7 +1,7 @@
 # Output tables (D-026): totals, long tables, allele frequencies, female
 # classes and the case proxy, for ODE and chain-binomial simulations.
 
-ns <- asNamespace("SGDrivE")
+ns <- asNamespace("ScrewDrivE")
 p <- sg_params()
 wx <- sg_forcing(sg_example_weather(), p, "1971-05-01", "1971-05-31")
 cube3 <- sg_cube(sg_test_cube_mendelian())
@@ -149,7 +149,7 @@ test_that("females mated to sterile males lay eggs but cause no cases", {
   }
   # stochastic: sterile-mated females' batches are never cases
   set.seed(4)
-  r <- asNamespace("SGDrivE")$.sg_cb_run_cpp(sg_model(p, sg_cube(raw), wx, area = 100), x * 100)
+  r <- asNamespace("ScrewDrivE")$.sg_cb_run_cpp(sg_model(p, sg_cube(raw), wx, area = 100), x * 100)
   expect_gt(sum(r$counters[1:3, "egg_batches"]), 0)
   expect_identical(sum(r$counters[1:3, "fertile_batches"]), 0)
 })

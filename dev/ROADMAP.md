@@ -1,4 +1,4 @@
-# SGDrivE roadmap to v0.1.0
+# ScrewDrivE roadmap to v0.1.0
 
 | Milestone | Deliverables | Done when |
 |---|---|---|

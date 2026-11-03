@@ -5,7 +5,7 @@
 
 #include <limits>
 
-namespace sgdrive {
+namespace screwdrive {
 
 CbStepper::CbStepper(const ModelView& mv, double dt)
     : mv_(mv),
@@ -103,7 +103,7 @@ void CbStepper::prepare_day(int day) {
   }
 }
 
-}  // namespace sgdrive
+}  // namespace screwdrive
 
 namespace {
 
@@ -129,19 +129,19 @@ bool is_whole(const Rcpp::NumericVector& x) {
 // [[Rcpp::export]]
 Rcpp::List sg_cb_step_cpp(const Rcpp::List& view, int day, double dt,
                           const Rcpp::NumericVector& x, bool stochastic) {
-  const sgdrive::ModelView mv(view);
+  const screwdrive::ModelView mv(view);
   if (x.size() != mv.n_states) Rcpp::stop("state has the wrong length");
   if (day < 1 || day > mv.n_days) Rcpp::stop("day %d is outside the forcing", day);
   steps_per_day(dt);
   if (stochastic && !is_whole(x)) Rcpp::stop("stochastic steps need whole, non-negative counts");
-  sgdrive::CbStepper stepper(mv, dt);
+  screwdrive::CbStepper stepper(mv, dt);
   stepper.prepare_day(day);
   Rcpp::NumericVector y = Rcpp::clone(x), flows(mv.n_counters);
   if (stochastic) {
-    sgdrive::RandomDraws draws;
+    screwdrive::RandomDraws draws;
     stepper.step(y.begin(), flows.begin(), draws);
   } else {
-    sgdrive::ExpectedDraws draws;
+    screwdrive::ExpectedDraws draws;
     stepper.step(y.begin(), flows.begin(), draws);
   }
   return Rcpp::List::create(Rcpp::Named("x") = y, Rcpp::Named("flows") = flows);
@@ -165,7 +165,7 @@ Rcpp::List sg_cb_step_cpp(const Rcpp::List& view, int day, double dt,
 Rcpp::List sg_cb_run_cpp(const Rcpp::List& view, const Rcpp::NumericVector& x0,
                          const Rcpp::NumericVector& rel_count, double dt, bool stochastic,
                          int n_days, const Rcpp::LogicalVector& record) {
-  const sgdrive::ModelView mv(view);
+  const screwdrive::ModelView mv(view);
   const int n = mv.n_states, nc = mv.n_counters;
   if (x0.size() != n) Rcpp::stop("initial state has the wrong length");
   if (n_days < 1 || n_days > mv.n_days) {
@@ -196,9 +196,9 @@ Rcpp::List sg_cb_run_cpp(const Rcpp::List& view, const Rcpp::NumericVector& x0,
   Rcpp::IntegerVector state_days(n_record);
   Rcpp::NumericMatrix counters(n_days, nc);
   std::vector<double> x(x0.begin(), x0.end()), flows(nc);
-  sgdrive::CbStepper stepper(mv, dt);
-  sgdrive::RandomDraws random_draws;
-  sgdrive::ExpectedDraws expected_draws;
+  screwdrive::CbStepper stepper(mv, dt);
+  screwdrive::RandomDraws random_draws;
+  screwdrive::ExpectedDraws expected_draws;
   int row = 0, extinct_day = 0, wild_extinct_day = 0, days_run = 0;
   // individuals of the wild-type genotype(s): blocks E..U by genotype, F by
   // the female's genotype
@@ -215,7 +215,7 @@ Rcpp::List sg_cb_run_cpp(const Rcpp::List& view, const Rcpp::NumericVector& x0,
     }
     for (int g = 0; g < ng; ++g) {
       if (!mv.wild[g]) continue;
-      const double* p = y.data() + mv.offsets[sgdrive::kF] + g * ng * mv.n_A;
+      const double* p = y.data() + mv.offsets[screwdrive::kF] + g * ng * mv.n_A;
       for (int s = 0; s < ng * mv.n_A; ++s) tot += p[s];
     }
     return tot;
@@ -271,15 +271,15 @@ Rcpp::List sg_cb_run_cpp(const Rcpp::List& view, const Rcpp::NumericVector& x0,
 // [[Rcpp::export]]
 Rcpp::NumericMatrix sg_cb_step_rep_cpp(const Rcpp::List& view, int day, double dt,
                                        const Rcpp::NumericVector& x, int n_rep) {
-  const sgdrive::ModelView mv(view);
+  const screwdrive::ModelView mv(view);
   if (x.size() != mv.n_states) Rcpp::stop("state has the wrong length");
   if (day < 1 || day > mv.n_days) Rcpp::stop("day %d is outside the forcing", day);
   if (n_rep < 1) Rcpp::stop("n_rep must be >= 1");
   steps_per_day(dt);
   if (!is_whole(x)) Rcpp::stop("stochastic steps need whole, non-negative counts");
-  sgdrive::CbStepper stepper(mv, dt);
+  screwdrive::CbStepper stepper(mv, dt);
   stepper.prepare_day(day);
-  sgdrive::RandomDraws draws;
+  screwdrive::RandomDraws draws;
   const int n = mv.n_states, nc = mv.n_counters;
   Rcpp::NumericMatrix out(n_rep, n + nc);
   std::vector<double> y(n), flows(nc);

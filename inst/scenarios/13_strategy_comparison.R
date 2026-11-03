@@ -22,7 +22,7 @@
 #
 # Run time: about a minute for 100 replicates per strategy on a laptop.
 
-library(SGDrivE)
+library(ScrewDrivE)
 library(ggplot2) # plots
 
 # 1. Settings -----------------------------------------------------------------

@@ -10,7 +10,7 @@
 # * the package's McAllen weather (NOAA, gap-filled) and the default start of
 #   their code (sg_init(model)).
 #
-# With these settings SGDrivE matches the R translation of their Pascal code
+# With these settings ScrewDrivE matches the R translation of their Pascal code
 # to a relative error of 1e-6 in every daily total over the 24 years
 # (tests/testthat/test-regression-gp2014.R). The script checks the published
 # result that can be compared numerically, the annual cold-stress index
@@ -20,7 +20,7 @@
 #
 # Run time: a few seconds.
 
-library(SGDrivE)
+library(ScrewDrivE)
 library(ggplot2) # plots
 
 # 1. Parameters, cube and weather ---------------------------------------------
@@ -66,7 +66,7 @@ ggplot(cold, aes(year, mu_cold)) +
     x = NULL, y = expression(mu[cold]),
     title = "Cold-stress index at McAllen, Texas",
     subtitle = paste(
-      "bars: SGDrivE; points: published values (Gutierrez & Ponti 2014;",
+      "bars: ScrewDrivE; points: published values (Gutierrez & Ponti 2014;",
       "Gutierrez et al. 2019); dashed: about the limit for overwintering"
     )
   ) +

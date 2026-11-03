@@ -17,7 +17,7 @@ test_that("default start reproduces the Gutierrez & Ponti initial state (one gen
 
 test_that("default weights put everything in the wild type", {
   x <- sg_init(m3)
-  tot <- SGDrivE:::.sg_state_block_totals(unclass(x))
+  tot <- ScrewDrivE:::.sg_state_block_totals(unclass(x))
   expect_identical(unname(tot[, "Aa"]), rep(0, 6))
   expect_identical(unname(tot[, "aa"]), rep(0, 6))
   expect_equal(unname(tot["E", "AA"]), 0.25 * 3)

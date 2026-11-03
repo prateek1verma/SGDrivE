@@ -2,11 +2,11 @@
 #
 # Observation model taken from the case-inversion exercise
 # (MGDrivE1-screwworm/inference/case_inversion/nws_cases.stan), kept here in the
-# script; the SGDrivE package is not changed:
+# script; the ScrewDrivE package is not changed:
 #
 #   cases_w ~ NegBin(mu_w, phi),  mu_w = rho * sum over week w of (g * batches)
 #
-# where `batches` are the daily egg-laying events simulated by SGDrivE
+# where `batches` are the daily egg-laying events simulated by ScrewDrivE
 # (counter "egg_batches"), g is a discretised gamma delay from egg laying to
 # report (mean 6 d, sd 3 d, up to 20 d), and rho is reported cases per egg batch
 # (under-reporting, reportable hosts, egg masses per wound).
@@ -55,7 +55,7 @@ nb_loglik <- function(cases, mu, phi) {
   sum(dnbinom(cases, mu = mu + 1e-9, size = phi, log = TRUE))
 }
 
-# 2. Process model (SGDrivE, unchanged) ---------------------------------------
+# 2. Process model (ScrewDrivE, unchanged) ---------------------------------------
 wx_all <- read.csv(file.path(data_dir, "weather_1961_1962", "station_daily_1961_1962_filled.csv"),
   stringsAsFactors = FALSE)
 station_weather <- function(station) {

@@ -156,9 +156,9 @@ test_that("the C++ backend needs deSolve only for a fallback day or a deSolve me
 })
 
 test_that("the C++ day loop can stop and resume without changing the result", {
-  v <- SGDrivE:::.sg_model_view(m_rel)
-  ptr <- SGDrivE:::sg_kernel_new_cpp(v)
-  run <- SGDrivE:::sg_ode_run_cpp
+  v <- ScrewDrivE:::.sg_model_view(m_rel)
+  ptr <- ScrewDrivE:::sg_kernel_new_cpp(v)
+  run <- ScrewDrivE:::sg_ode_run_cpp
   x0 <- as.numeric(sg_init(m_rel))
   rec <- rep(TRUE, 60)
   full <- run(ptr, x0, 1L, 60L, 1e-8, 1e-10, rec, TRUE, 1e5)
@@ -179,18 +179,18 @@ test_that("the C++ day loop can stop and resume without changing the result", {
   expect_equal(stop5$x[m_idx] - full$states[4, m_idx], 40)
   # single rate evaluations for deSolve
   y <- c(x0, numeric(length(attr(v, "counter_names"))))
-  r_cpp <- SGDrivE:::sg_kernel_rates_cpp(ptr, 3L, y)
-  r_ref <- SGDrivE:::sg_rates_cpp(v, 3L, x0)
+  r_cpp <- ScrewDrivE:::sg_kernel_rates_cpp(ptr, 3L, y)
+  r_ref <- ScrewDrivE:::sg_rates_cpp(v, 3L, x0)
   expect_identical(r_cpp, c(r_ref$deriv, r_ref$counters))
   expect_identical(
-    SGDrivE:::sg_kernel_max_rate_cpp(ptr, 3L, x0), SGDrivE:::sg_max_rate_cpp(v, 3L, x0)
+    ScrewDrivE:::sg_kernel_max_rate_cpp(ptr, 3L, x0), ScrewDrivE:::sg_max_rate_cpp(v, 3L, x0)
   )
 })
 
 test_that("the C++ entry points check their input", {
-  v <- SGDrivE:::.sg_model_view(m_rel)
-  ptr <- SGDrivE:::sg_kernel_new_cpp(v)
-  run <- SGDrivE:::sg_ode_run_cpp
+  v <- ScrewDrivE:::.sg_model_view(m_rel)
+  ptr <- ScrewDrivE:::sg_kernel_new_cpp(v)
+  run <- ScrewDrivE:::sg_ode_run_cpp
   x0 <- as.numeric(sg_init(m_rel))
   rec <- rep(TRUE, 60)
   expect_error(run(ptr, x0[-1], 1L, 60L, 1e-8, 1e-10, rec, TRUE, 1e5), "wrong length")
@@ -198,7 +198,7 @@ test_that("the C++ entry points check their input", {
   expect_error(run(ptr, x0, 0L, 60L, 1e-8, 1e-10, rec, TRUE, 1e5), "outside the forcing")
   expect_error(run(ptr, x0, 1L, 61L, 1e-8, 1e-10, rec, TRUE, 1e5), "outside the forcing")
   expect_error(run(ptr, x0, 30L, 20L, 1e-8, 1e-10, rec, TRUE, 1e5), "before day_from")
-  expect_error(SGDrivE:::sg_kernel_rates_cpp(ptr, 1L, numeric(2)), "wrong length")
-  expect_error(SGDrivE:::sg_kernel_rates_cpp(ptr, 61L, x0), "outside the forcing")
-  expect_error(SGDrivE:::sg_kernel_max_rate_cpp(ptr, 1L, numeric(2)), "wrong length")
+  expect_error(ScrewDrivE:::sg_kernel_rates_cpp(ptr, 1L, numeric(2)), "wrong length")
+  expect_error(ScrewDrivE:::sg_kernel_rates_cpp(ptr, 61L, x0), "outside the forcing")
+  expect_error(ScrewDrivE:::sg_kernel_max_rate_cpp(ptr, 1L, numeric(2)), "wrong length")
 })

@@ -1,6 +1,6 @@
 # data-raw
 
-Scripts and inputs that produce data shipped with, or used to test, SGDrivE.
+Scripts and inputs that produce data shipped with, or used to test, ScrewDrivE.
 This folder is excluded from the built package (`.Rbuildignore`).
 
 ## Contents

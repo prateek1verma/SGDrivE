@@ -20,7 +20,7 @@ Rcpp::NumericMatrix sg_chain_advance_cpp(const Rcpp::NumericVector& q, int last,
   for (int i = 0; i < n; ++i) {
     if (!(q[i] >= 0.0) || !std::isfinite(q[i])) Rcpp::stop("rates must be finite and >= 0");
   }
-  sgdrive::ChainAdvance chain(n);
+  screwdrive::ChainAdvance chain(n);
   std::vector<double> p(static_cast<std::size_t>(n) * (n + 1)), pbar(p.size());
   chain.advance_average(q.begin(), last, mu, dt, p.data(), pbar.data());
   if (average) p.swap(pbar);

@@ -23,7 +23,7 @@ test_that("simulate_ode() returns daily states, counters, releases and diagnosti
   expect_identical(dim(sim$state), c(61L, m3$n_states))
   expect_identical(colnames(sim$state), sg_state_names(m3))
   expect_identical(unname(sim$state[1, ]), as.numeric(sg_init(m3)))
-  expect_identical(dim(sim$counters), c(60L, length(SGDrivE:::.sg_counter_names(cube3$genotypes))))
+  expect_identical(dim(sim$counters), c(60L, length(ScrewDrivE:::.sg_counter_names(cube3$genotypes))))
   expect_named(sim$diagnostics, c(
     "day", "steps", "rejected", "evaluations", "stiff", "fallback", "max_rate", "min_state"
   ))

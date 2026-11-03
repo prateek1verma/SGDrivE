@@ -7,6 +7,6 @@
 # * https://testthat.r-lib.org/articles/special-files.html
 
 library(testthat)
-library(SGDrivE)
+library(ScrewDrivE)
 
-test_check("SGDrivE")
+test_check("ScrewDrivE")

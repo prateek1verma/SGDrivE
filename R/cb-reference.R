@@ -1,4 +1,4 @@
-# Reference chain-binomial solver (pure R) of the SGDrivE v0.1 model.
+# Reference chain-binomial solver (pure R) of the ScrewDrivE v0.1 model.
 #
 # A direct translation of dev/MODEL_SPEC.md S15-S19 (D-022), the "truth"
 # against which the C++ stepper (milestone M4) is tested. In stochastic mode

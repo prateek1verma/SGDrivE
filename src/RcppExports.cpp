@@ -12,7 +12,7 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 
 // sg_backend_info_cpp
 Rcpp::List sg_backend_info_cpp();
-RcppExport SEXP _SGDrivE_sg_backend_info_cpp() {
+RcppExport SEXP _ScrewDrivE_sg_backend_info_cpp() {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -22,7 +22,7 @@ END_RCPP
 }
 // sg_cb_step_cpp
 Rcpp::List sg_cb_step_cpp(const Rcpp::List& view, int day, double dt, const Rcpp::NumericVector& x, bool stochastic);
-RcppExport SEXP _SGDrivE_sg_cb_step_cpp(SEXP viewSEXP, SEXP daySEXP, SEXP dtSEXP, SEXP xSEXP, SEXP stochasticSEXP) {
+RcppExport SEXP _ScrewDrivE_sg_cb_step_cpp(SEXP viewSEXP, SEXP daySEXP, SEXP dtSEXP, SEXP xSEXP, SEXP stochasticSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -37,7 +37,7 @@ END_RCPP
 }
 // sg_cb_run_cpp
 Rcpp::List sg_cb_run_cpp(const Rcpp::List& view, const Rcpp::NumericVector& x0, const Rcpp::NumericVector& rel_count, double dt, bool stochastic, int n_days, const Rcpp::LogicalVector& record);
-RcppExport SEXP _SGDrivE_sg_cb_run_cpp(SEXP viewSEXP, SEXP x0SEXP, SEXP rel_countSEXP, SEXP dtSEXP, SEXP stochasticSEXP, SEXP n_daysSEXP, SEXP recordSEXP) {
+RcppExport SEXP _ScrewDrivE_sg_cb_run_cpp(SEXP viewSEXP, SEXP x0SEXP, SEXP rel_countSEXP, SEXP dtSEXP, SEXP stochasticSEXP, SEXP n_daysSEXP, SEXP recordSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -54,7 +54,7 @@ END_RCPP
 }
 // sg_cb_step_rep_cpp
 Rcpp::NumericMatrix sg_cb_step_rep_cpp(const Rcpp::List& view, int day, double dt, const Rcpp::NumericVector& x, int n_rep);
-RcppExport SEXP _SGDrivE_sg_cb_step_rep_cpp(SEXP viewSEXP, SEXP daySEXP, SEXP dtSEXP, SEXP xSEXP, SEXP n_repSEXP) {
+RcppExport SEXP _ScrewDrivE_sg_cb_step_rep_cpp(SEXP viewSEXP, SEXP daySEXP, SEXP dtSEXP, SEXP xSEXP, SEXP n_repSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -69,7 +69,7 @@ END_RCPP
 }
 // sg_chain_advance_cpp
 Rcpp::NumericMatrix sg_chain_advance_cpp(const Rcpp::NumericVector& q, int last, double dt, bool average, double mu);
-RcppExport SEXP _SGDrivE_sg_chain_advance_cpp(SEXP qSEXP, SEXP lastSEXP, SEXP dtSEXP, SEXP averageSEXP, SEXP muSEXP) {
+RcppExport SEXP _ScrewDrivE_sg_chain_advance_cpp(SEXP qSEXP, SEXP lastSEXP, SEXP dtSEXP, SEXP averageSEXP, SEXP muSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -84,7 +84,7 @@ END_RCPP
 }
 // sg_dopri5_test_cpp
 Rcpp::List sg_dopri5_test_cpp(std::string problem, Rcpp::NumericVector y0, double t0, double t1, double rtol, double atol, double fixed_h, double max_steps, double par);
-RcppExport SEXP _SGDrivE_sg_dopri5_test_cpp(SEXP problemSEXP, SEXP y0SEXP, SEXP t0SEXP, SEXP t1SEXP, SEXP rtolSEXP, SEXP atolSEXP, SEXP fixed_hSEXP, SEXP max_stepsSEXP, SEXP parSEXP) {
+RcppExport SEXP _ScrewDrivE_sg_dopri5_test_cpp(SEXP problemSEXP, SEXP y0SEXP, SEXP t0SEXP, SEXP t1SEXP, SEXP rtolSEXP, SEXP atolSEXP, SEXP fixed_hSEXP, SEXP max_stepsSEXP, SEXP parSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -103,7 +103,7 @@ END_RCPP
 }
 // sg_model_view_info_cpp
 Rcpp::List sg_model_view_info_cpp(const Rcpp::List& view);
-RcppExport SEXP _SGDrivE_sg_model_view_info_cpp(SEXP viewSEXP) {
+RcppExport SEXP _ScrewDrivE_sg_model_view_info_cpp(SEXP viewSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -114,7 +114,7 @@ END_RCPP
 }
 // sg_rates_cpp
 Rcpp::List sg_rates_cpp(const Rcpp::List& view, int day, const Rcpp::NumericVector& state);
-RcppExport SEXP _SGDrivE_sg_rates_cpp(SEXP viewSEXP, SEXP daySEXP, SEXP stateSEXP) {
+RcppExport SEXP _ScrewDrivE_sg_rates_cpp(SEXP viewSEXP, SEXP daySEXP, SEXP stateSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -127,7 +127,7 @@ END_RCPP
 }
 // sg_max_rate_cpp
 double sg_max_rate_cpp(const Rcpp::List& view, int day, const Rcpp::NumericVector& state);
-RcppExport SEXP _SGDrivE_sg_max_rate_cpp(SEXP viewSEXP, SEXP daySEXP, SEXP stateSEXP) {
+RcppExport SEXP _ScrewDrivE_sg_max_rate_cpp(SEXP viewSEXP, SEXP daySEXP, SEXP stateSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -140,7 +140,7 @@ END_RCPP
 }
 // sg_aggregates_cpp
 Rcpp::List sg_aggregates_cpp(const Rcpp::List& view, int day, const Rcpp::NumericVector& state);
-RcppExport SEXP _SGDrivE_sg_aggregates_cpp(SEXP viewSEXP, SEXP daySEXP, SEXP stateSEXP) {
+RcppExport SEXP _ScrewDrivE_sg_aggregates_cpp(SEXP viewSEXP, SEXP daySEXP, SEXP stateSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -153,7 +153,7 @@ END_RCPP
 }
 // sg_kernel_new_cpp
 SEXP sg_kernel_new_cpp(const Rcpp::List& view);
-RcppExport SEXP _SGDrivE_sg_kernel_new_cpp(SEXP viewSEXP) {
+RcppExport SEXP _ScrewDrivE_sg_kernel_new_cpp(SEXP viewSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -164,7 +164,7 @@ END_RCPP
 }
 // sg_kernel_rates_cpp
 Rcpp::NumericVector sg_kernel_rates_cpp(SEXP ptr, int day, const Rcpp::NumericVector& y);
-RcppExport SEXP _SGDrivE_sg_kernel_rates_cpp(SEXP ptrSEXP, SEXP daySEXP, SEXP ySEXP) {
+RcppExport SEXP _ScrewDrivE_sg_kernel_rates_cpp(SEXP ptrSEXP, SEXP daySEXP, SEXP ySEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -177,7 +177,7 @@ END_RCPP
 }
 // sg_kernel_max_rate_cpp
 double sg_kernel_max_rate_cpp(SEXP ptr, int day, const Rcpp::NumericVector& x);
-RcppExport SEXP _SGDrivE_sg_kernel_max_rate_cpp(SEXP ptrSEXP, SEXP daySEXP, SEXP xSEXP) {
+RcppExport SEXP _ScrewDrivE_sg_kernel_max_rate_cpp(SEXP ptrSEXP, SEXP daySEXP, SEXP xSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -190,7 +190,7 @@ END_RCPP
 }
 // sg_ode_run_cpp
 Rcpp::List sg_ode_run_cpp(SEXP ptr, const Rcpp::NumericVector& x0, int day_from, int day_to, double rtol, double atol, const Rcpp::LogicalVector& record, bool stop_on_stiff, double max_steps);
-RcppExport SEXP _SGDrivE_sg_ode_run_cpp(SEXP ptrSEXP, SEXP x0SEXP, SEXP day_fromSEXP, SEXP day_toSEXP, SEXP rtolSEXP, SEXP atolSEXP, SEXP recordSEXP, SEXP stop_on_stiffSEXP, SEXP max_stepsSEXP) {
+RcppExport SEXP _ScrewDrivE_sg_ode_run_cpp(SEXP ptrSEXP, SEXP x0SEXP, SEXP day_fromSEXP, SEXP day_toSEXP, SEXP rtolSEXP, SEXP atolSEXP, SEXP recordSEXP, SEXP stop_on_stiffSEXP, SEXP max_stepsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -209,24 +209,24 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_SGDrivE_sg_backend_info_cpp", (DL_FUNC) &_SGDrivE_sg_backend_info_cpp, 0},
-    {"_SGDrivE_sg_cb_step_cpp", (DL_FUNC) &_SGDrivE_sg_cb_step_cpp, 5},
-    {"_SGDrivE_sg_cb_run_cpp", (DL_FUNC) &_SGDrivE_sg_cb_run_cpp, 7},
-    {"_SGDrivE_sg_cb_step_rep_cpp", (DL_FUNC) &_SGDrivE_sg_cb_step_rep_cpp, 5},
-    {"_SGDrivE_sg_chain_advance_cpp", (DL_FUNC) &_SGDrivE_sg_chain_advance_cpp, 5},
-    {"_SGDrivE_sg_dopri5_test_cpp", (DL_FUNC) &_SGDrivE_sg_dopri5_test_cpp, 9},
-    {"_SGDrivE_sg_model_view_info_cpp", (DL_FUNC) &_SGDrivE_sg_model_view_info_cpp, 1},
-    {"_SGDrivE_sg_rates_cpp", (DL_FUNC) &_SGDrivE_sg_rates_cpp, 3},
-    {"_SGDrivE_sg_max_rate_cpp", (DL_FUNC) &_SGDrivE_sg_max_rate_cpp, 3},
-    {"_SGDrivE_sg_aggregates_cpp", (DL_FUNC) &_SGDrivE_sg_aggregates_cpp, 3},
-    {"_SGDrivE_sg_kernel_new_cpp", (DL_FUNC) &_SGDrivE_sg_kernel_new_cpp, 1},
-    {"_SGDrivE_sg_kernel_rates_cpp", (DL_FUNC) &_SGDrivE_sg_kernel_rates_cpp, 3},
-    {"_SGDrivE_sg_kernel_max_rate_cpp", (DL_FUNC) &_SGDrivE_sg_kernel_max_rate_cpp, 3},
-    {"_SGDrivE_sg_ode_run_cpp", (DL_FUNC) &_SGDrivE_sg_ode_run_cpp, 9},
+    {"_ScrewDrivE_sg_backend_info_cpp", (DL_FUNC) &_ScrewDrivE_sg_backend_info_cpp, 0},
+    {"_ScrewDrivE_sg_cb_step_cpp", (DL_FUNC) &_ScrewDrivE_sg_cb_step_cpp, 5},
+    {"_ScrewDrivE_sg_cb_run_cpp", (DL_FUNC) &_ScrewDrivE_sg_cb_run_cpp, 7},
+    {"_ScrewDrivE_sg_cb_step_rep_cpp", (DL_FUNC) &_ScrewDrivE_sg_cb_step_rep_cpp, 5},
+    {"_ScrewDrivE_sg_chain_advance_cpp", (DL_FUNC) &_ScrewDrivE_sg_chain_advance_cpp, 5},
+    {"_ScrewDrivE_sg_dopri5_test_cpp", (DL_FUNC) &_ScrewDrivE_sg_dopri5_test_cpp, 9},
+    {"_ScrewDrivE_sg_model_view_info_cpp", (DL_FUNC) &_ScrewDrivE_sg_model_view_info_cpp, 1},
+    {"_ScrewDrivE_sg_rates_cpp", (DL_FUNC) &_ScrewDrivE_sg_rates_cpp, 3},
+    {"_ScrewDrivE_sg_max_rate_cpp", (DL_FUNC) &_ScrewDrivE_sg_max_rate_cpp, 3},
+    {"_ScrewDrivE_sg_aggregates_cpp", (DL_FUNC) &_ScrewDrivE_sg_aggregates_cpp, 3},
+    {"_ScrewDrivE_sg_kernel_new_cpp", (DL_FUNC) &_ScrewDrivE_sg_kernel_new_cpp, 1},
+    {"_ScrewDrivE_sg_kernel_rates_cpp", (DL_FUNC) &_ScrewDrivE_sg_kernel_rates_cpp, 3},
+    {"_ScrewDrivE_sg_kernel_max_rate_cpp", (DL_FUNC) &_ScrewDrivE_sg_kernel_max_rate_cpp, 3},
+    {"_ScrewDrivE_sg_ode_run_cpp", (DL_FUNC) &_ScrewDrivE_sg_ode_run_cpp, 9},
     {NULL, NULL, 0}
 };
 
-RcppExport void R_init_SGDrivE(DllInfo *dll) {
+RcppExport void R_init_ScrewDrivE(DllInfo *dll) {
     R_registerRoutines(dll, NULL, CallEntries, NULL, NULL);
     R_useDynamicSymbols(dll, FALSE);
 }

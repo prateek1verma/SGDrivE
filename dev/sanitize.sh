@@ -19,15 +19,15 @@ LDFLAGS = -fsanitize=address,undefined
 MK
 # build from a tarball so that no sanitizer objects are left in src/
 R CMD build --no-build-vignettes --no-manual . >"$tmp/build.log" 2>&1 || { cat "$tmp/build.log"; exit 1; }
-mv SGDrivE_*.tar.gz "$tmp/"
-R_MAKEVARS_USER="$tmp/Makevars" R CMD INSTALL --no-test-load -l "$tmp/lib" "$tmp"/SGDrivE_*.tar.gz \
+mv ScrewDrivE_*.tar.gz "$tmp/"
+R_MAKEVARS_USER="$tmp/Makevars" R CMD INSTALL --no-test-load -l "$tmp/lib" "$tmp"/ScrewDrivE_*.tar.gz \
   >"$tmp/install.log" 2>&1 || { cat "$tmp/install.log"; exit 1; }
 
 asan="$(clang++ -print-file-name=libclang_rt.asan_osx_dynamic.dylib)"
 r_home="$(R RHOME)"
 cat > "$tmp/run.R" <<RS
 .libPaths(c("$tmp/lib", .libPaths()))
-res <- testthat::test_dir("tests/testthat", package = "SGDrivE", load_package = "installed",
+res <- testthat::test_dir("tests/testthat", package = "ScrewDrivE", load_package = "installed",
   filter = "rates-cpp|dopri5|model-view|simulate|backend-equivalence|regression|stress|cb-",
   reporter = "summary", stop_on_failure = TRUE)
 RS

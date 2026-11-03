@@ -1,6 +1,6 @@
 # ggplot2 plots of simulations (D-026) and the data behind them.
 
-ns <- asNamespace("SGDrivE")
+ns <- asNamespace("ScrewDrivE")
 p <- sg_params()
 wx <- sg_forcing(sg_example_weather(), p, "1971-05-01", "1971-06-29")
 mod <- sg_model(p, sg_cube(sg_test_cube_mendelian()), wx,

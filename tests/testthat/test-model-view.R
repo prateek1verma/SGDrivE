@@ -1,5 +1,5 @@
-view <- SGDrivE:::.sg_model_view
-info <- SGDrivE:::sg_model_view_info_cpp
+view <- ScrewDrivE:::.sg_model_view
+info <- ScrewDrivE:::sg_model_view_info_cpp
 
 p <- sg_params()
 wx <- sg_forcing(sg_example_weather(), p, start = "1971-05-01", end = "1971-06-29")
@@ -51,7 +51,7 @@ test_that("view fields follow the C++ conventions", {
   )
   v <- view(m)
   expect_s3_class(v, "sg_model_view")
-  expect_identical(attr(v, "counter_names"), SGDrivE:::.sg_counter_names(cb$genotypes))
+  expect_identical(attr(v, "counter_names"), ScrewDrivE:::.sg_counter_names(cb$genotypes))
   expect_identical(v$offsets[1], 0L) # 0-based
   expect_identical(v$rel_index, as.integer(m$releases$index - 1L))
   expect_identical(v$rel_day, m$releases$day)

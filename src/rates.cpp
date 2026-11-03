@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace sgdrive {
+namespace screwdrive {
 
 RateKernel::RateKernel(const ModelView& mv)
     : mv_(mv),
@@ -395,15 +395,15 @@ double RateKernel::max_rate(int day, const double* y) {
   return best;
 }
 
-}  // namespace sgdrive
+}  // namespace screwdrive
 
 // Internal test entry points: evaluate the kernel for one state.
 // [[Rcpp::export]]
 Rcpp::List sg_rates_cpp(const Rcpp::List& view, int day, const Rcpp::NumericVector& state) {
-  const sgdrive::ModelView mv(view);
+  const screwdrive::ModelView mv(view);
   if (state.size() != mv.n_states) Rcpp::stop("state has the wrong length");
   if (day < 1 || day > mv.n_days) Rcpp::stop("day %d is outside the forcing", day);
-  sgdrive::RateKernel kernel(mv);
+  screwdrive::RateKernel kernel(mv);
   Rcpp::NumericVector deriv(mv.n_states), counters(mv.n_counters);
   kernel.eval(day, state.begin(), deriv.begin(), counters.begin());
   return Rcpp::List::create(Rcpp::Named("deriv") = deriv, Rcpp::Named("counters") = counters);
@@ -411,10 +411,10 @@ Rcpp::List sg_rates_cpp(const Rcpp::List& view, int day, const Rcpp::NumericVect
 
 // [[Rcpp::export]]
 double sg_max_rate_cpp(const Rcpp::List& view, int day, const Rcpp::NumericVector& state) {
-  const sgdrive::ModelView mv(view);
+  const screwdrive::ModelView mv(view);
   if (state.size() != mv.n_states) Rcpp::stop("state has the wrong length");
   if (day < 1 || day > mv.n_days) Rcpp::stop("day %d is outside the forcing", day);
-  sgdrive::RateKernel kernel(mv);
+  screwdrive::RateKernel kernel(mv);
   return kernel.max_rate(day, state.begin());
 }
 
@@ -422,13 +422,13 @@ double sg_max_rate_cpp(const Rcpp::List& view, int day, const Rcpp::NumericVecto
 // used by both solvers).
 // [[Rcpp::export]]
 Rcpp::List sg_aggregates_cpp(const Rcpp::List& view, int day, const Rcpp::NumericVector& state) {
-  const sgdrive::ModelView mv(view);
+  const screwdrive::ModelView mv(view);
   if (state.size() != mv.n_states) Rcpp::stop("state has the wrong length");
   if (day < 1 || day > mv.n_days) Rcpp::stop("day %d is outside the forcing", day);
-  sgdrive::RateKernel kernel(mv);
-  const sgdrive::DayRates r = kernel.day_rates(day);
+  screwdrive::RateKernel kernel(mv);
+  const screwdrive::DayRates r = kernel.day_rates(day);
   kernel.aggregate(r, state.begin());
-  const sgdrive::Aggregates& a = kernel.agg();
+  const screwdrive::Aggregates& a = kernel.agg();
   return Rcpp::List::create(
       Rcpp::Named("q") = Rcpp::NumericVector::create(r.q_e, r.q_l, r.q_p),
       Rcpp::Named("mu") = Rcpp::NumericVector::create(r.mu_e, a.mu_l, r.mu_p, r.mu_f, r.mu_m),

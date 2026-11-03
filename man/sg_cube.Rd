@@ -63,7 +63,7 @@ precomputes the quantities the solvers need. The cube itself is used
 unchanged.
 }
 \details{
-\strong{Lifespan fractions.} SGDrivE represents a genotype's effect on adult
+\strong{Lifespan fractions.} ScrewDrivE represents a genotype's effect on adult
 lifespan as a fraction l_g of the wild-type physiological lifespan \code{adult_lifespan_dd}
 (D-002; model specification S5). Temperature mortality is the same for all
 genotypes. MGDrivE v1 cubes instead store omega, a multiplier of daily

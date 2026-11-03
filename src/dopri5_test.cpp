@@ -15,17 +15,17 @@ Rcpp::List sg_dopri5_test_cpp(std::string problem, Rcpp::NumericVector y0, doubl
                               double max_steps, double par) {
   const int n = y0.size();
   std::vector<double> y(y0.begin(), y0.end());
-  sgdrive::Dopri5Options opt;
+  screwdrive::Dopri5Options opt;
   opt.rtol = rtol;
   opt.atol = atol;
   opt.fixed_h = fixed_h;
   opt.max_steps = static_cast<long>(max_steps);
 
   auto run = [&](auto f) {
-    sgdrive::Dopri5 solver(n);
+    screwdrive::Dopri5 solver(n);
     return solver.integrate(f, t0, t1, y.data(), opt);
   };
-  sgdrive::Dopri5Stats st;
+  screwdrive::Dopri5Stats st;
   if (problem == "decay") {  // y' = -par y
     st = run([&](double, const double* x, double* dx) {
       for (int i = 0; i < n; ++i) dx[i] = -par * x[i];

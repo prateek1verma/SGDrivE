@@ -7,7 +7,7 @@
 #'
 #' @return A named list with elements:
 #'   \describe{
-#'     \item{`package_version`}{Installed version of SGDrivE (character).}
+#'     \item{`package_version`}{Installed version of ScrewDrivE (character).}
 #'     \item{`cplusplus`}{Value of the `__cplusplus` macro the backend was
 #'       compiled with (numeric; e.g. `201703` for C++17).}
 #'     \item{`compiler`}{Compiler identification string (character).}
@@ -17,5 +17,5 @@
 #' sg_backend_info()
 sg_backend_info <- function() {
   info <- sg_backend_info_cpp()
-  c(list(package_version = as.character(utils::packageVersion("SGDrivE"))), info)
+  c(list(package_version = as.character(utils::packageVersion("ScrewDrivE"))), info)
 }

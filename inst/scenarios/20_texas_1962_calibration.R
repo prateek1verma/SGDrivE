@@ -18,7 +18,7 @@
 #
 # Run time: about a minute per fit.
 
-library(SGDrivE)
+library(ScrewDrivE)
 
 # 0. Paths ---------------------------------------------------------------------
 # Run from the repository root, or change `data_dir`.

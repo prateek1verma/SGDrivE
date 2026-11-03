@@ -2,9 +2,9 @@
 # uniformization (src/chains.h) and the R matrix exponential
 # (.sg_chain_advance_r) against closed forms and each other.
 
-adv_cpp <- SGDrivE:::sg_chain_advance_cpp
-adv_r <- SGDrivE:::.sg_chain_advance_r
-avg_r <- SGDrivE:::.sg_chain_average_r
+adv_cpp <- ScrewDrivE:::sg_chain_advance_cpp
+adv_r <- ScrewDrivE:::.sg_chain_advance_r
+avg_r <- ScrewDrivE:::.sg_chain_average_r
 
 test_that("equal rates give Poisson advancement (Erlang chain)", {
   for (dt in c(0.05, 0.4, 3)) {
@@ -137,7 +137,7 @@ test_that("chains of a real model: adult chains of a short-lived genotype", {
   # S lives 0.25 x 202.8 = 50.7 dd, ending in the pre-oviposition segment
   cube <- sg_cube(sg_test_cube_sit(), lifespan_fraction = c(W = 1, S = 0.25))
   m <- sg_model(p, cube, sg_forcing(sg_example_weather(), p, "1971-06-01", "1971-06-30"))
-  v <- SGDrivE:::.sg_model_view(m)
+  v <- ScrewDrivE:::.sg_model_view(m)
   dx <- v$dx[1]
   for (g in 1:2) {
     iw <- v$inv_w_f[(g - 1) * v$n_A + seq_len(v$n_A)]

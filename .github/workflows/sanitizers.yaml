@@ -35,15 +35,15 @@ jobs:
         run: |
           set -o pipefail
           RDsan CMD build --no-build-vignettes --no-manual .
-          RDsan CMD check --no-manual --ignore-vignettes SGDrivE_*.tar.gz 2>&1 | tee check.log
+          RDsan CMD check --no-manual --ignore-vignettes ScrewDrivE_*.tar.gz 2>&1 | tee check.log
 
-      - name: Fail on sanitizer reports in SGDrivE's code
+      - name: Fail on sanitizer reports in ScrewDrivE's code
         if: always()
         shell: bash
         run: |
-          grep -rn "runtime error\|ERROR: AddressSanitizer" SGDrivE.Rcheck check.log || true
-          if grep -rqE "ERROR: AddressSanitizer|(backend_info|dopri5|dopri5_test|model_view|rates|simulate|RcppExports)\.(cpp|h):[0-9]+:[0-9]+: runtime error" SGDrivE.Rcheck check.log; then
-            echo "Sanitizer errors found in SGDrivE's C++ code"
+          grep -rn "runtime error\|ERROR: AddressSanitizer" ScrewDrivE.Rcheck check.log || true
+          if grep -rqE "ERROR: AddressSanitizer|(backend_info|dopri5|dopri5_test|model_view|rates|simulate|RcppExports)\.(cpp|h):[0-9]+:[0-9]+: runtime error" ScrewDrivE.Rcheck check.log; then
+            echo "Sanitizer errors found in ScrewDrivE's C++ code"
             exit 1
           fi
 
@@ -54,4 +54,4 @@ jobs:
           name: sanitizers-check
           path: |
             check.log
-            SGDrivE.Rcheck/
+            ScrewDrivE.Rcheck/

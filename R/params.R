@@ -1,6 +1,6 @@
 #' Model parameters
 #'
-#' Creates a validated set of SGDrivE model parameters. Every parameter has a
+#' Creates a validated set of ScrewDrivE model parameters. Every parameter has a
 #' default (see [sg_param_table()] for the full list with units, ranges and
 #' sources); arguments given in `...` override the defaults.
 #'
@@ -10,7 +10,7 @@
 #'   list `x` of values, use `do.call(sg_params, x)`.
 #' @param preset Which set of defaults to start from:
 #'   \describe{
-#'     \item{`"default"`}{SGDrivE defaults: Gutierrez & Ponti (2014) biology
+#'     \item{`"default"`}{ScrewDrivE defaults: Gutierrez & Ponti (2014) biology
 #'       with speed-tuned sub-stage numbers (at most 10 per stage), mating at
 #'       rate `nu`, and searching mated females as competitors for wounds.}
 #'     \item{`"gp2014"`}{The configuration of the Gutierrez & Ponti (2014)

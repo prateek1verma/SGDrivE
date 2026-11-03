@@ -10,7 +10,7 @@ test_that("sg_model() assembles a model with the documented components", {
     "counts", "hosts", "releases", "meta"
   ))
   expect_identical(m$dims$n_genotypes, 3L)
-  expect_identical(m$meta$package_version, as.character(utils::packageVersion("SGDrivE")))
+  expect_identical(m$meta$package_version, as.character(utils::packageVersion("ScrewDrivE")))
   expect_match(m$meta$hash, "^[0-9a-f]{32}$")
   expect_identical(nrow(m$releases), 0L)
 })
@@ -62,7 +62,7 @@ test_that("adult chains follow D-018 and genotype lifespans", {
   expect_identical(m$adult$female$last_class[["S"]], 3L)
   expect_identical(m$adult$male$last_class[["S"]], 10L) # no male threshold
   expect_equal(sum(m$adult$male$width["S", ]), 0.25 * 202.8, tolerance = sg_tol_exact)
-  expect_match(SGDrivE:::.sg_never_reached(m), "S: first oviposition")
+  expect_match(ScrewDrivE:::.sg_never_reached(m), "S: first oviposition")
 })
 
 test_that("instant mating drops the receptivity boundary", {

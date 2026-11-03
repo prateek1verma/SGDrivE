@@ -25,14 +25,14 @@ automatically", or for the host parameters "not set").}
 \item{\code{units}}{Units: \code{degC} degrees Celsius, \code{dd} degree-days, \code{d}
 days, \code{d^-1} per day, \code{km^-2} per square kilometre.}
 \item{\code{source}}{\code{GP2014} (Gutierrez & Ponti 2014), \code{G2019}
-(Gutierrez et al. 2019), \code{MGDrivE2}, or \code{adapted} (new in SGDrivE).}
+(Gutierrez et al. 2019), \code{MGDrivE2}, or \code{adapted} (new in ScrewDrivE).}
 \item{\code{spec}}{Equation(s) of the model specification using the
 parameter.}
 \item{\code{description}}{What the parameter does.}
 }
 }
 \description{
-Returns the table that defines every SGDrivE model parameter: its name,
+Returns the table that defines every ScrewDrivE model parameter: its name,
 symbol, default value, allowed range, units, source and the equation of the
 model specification that uses it. This table is the single source for the
 defaults and checks in \code{\link[=sg_params]{sg_params()}}.

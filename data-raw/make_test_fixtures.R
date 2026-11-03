@@ -9,7 +9,7 @@
 # * data-raw/reference/gp2014_mcallen_discrete.rds (legacy McAllen run);
 # * the raw NOAA GHCN-Daily station files USC00415701.csv and
 #   USW00012959.csv, from the directory in the environment variable
-#   SGDRIVE_RAW_WEATHER (default: the screwworm project folder on Box). They
+#   SCREWDRIVE_RAW_WEATHER (default: the screwworm project folder on Box). They
 #   are not stored in this repository (13 MB); download them from
 #   https://www.ncei.noaa.gov/data/global-historical-climatology-network-daily/access/
 
@@ -39,7 +39,7 @@ saveRDS(forcing, file.path(fix_dir, "gp2014_mcallen_forcing.rds"), compress = "x
 
 # ---- 3. raw NOAA extracts around filled periods -------------------------------
 raw_dir <- Sys.getenv(
-  "SGDRIVE_RAW_WEATHER",
+  "SCREWDRIVE_RAW_WEATHER",
   file.path(
     "/Users/prateekverma/Library/CloudStorage/Box-Box/Research Projects/Screwworm",
     "Simulations/MGDrivE1-screwworm/data/weather"

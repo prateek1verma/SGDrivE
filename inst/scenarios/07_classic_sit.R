@@ -16,12 +16,12 @@
 # have no viable eggs and eggs sired by sterile males never hatch, no
 # heterozygote can ever be born, so two genotypes are enough here: W (wild)
 # and S (sterile, released). Everything else (life cycle, temperature, wound
-# search, mating) is SGDrivE's model, so the population responds differently
+# search, mating) is ScrewDrivE's model, so the population responds differently
 # from the MGDrivE version (see the notes at the end).
 #
 # Run time: a few seconds.
 
-library(SGDrivE)
+library(ScrewDrivE)
 library(ggplot2) # plots
 
 # 1. Settings -----------------------------------------------------------------

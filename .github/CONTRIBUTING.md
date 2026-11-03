@@ -1,6 +1,6 @@
-# Contributing to SGDrivE
+# Contributing to ScrewDrivE
 
-SGDrivE is in early development. These notes keep the code base consistent.
+ScrewDrivE is in early development. These notes keep the code base consistent.
 
 ## Workflow
 
@@ -31,9 +31,9 @@ RStudio. Run the full local check with `Rscript dev/check.R`.
 ## Slow tests
 
 Some tests (e.g. the 24-year legacy regression) are skipped unless
-`SGDRIVE_SLOW_TESTS=true`. Run them locally from the package root with
+`SCREWDRIVE_SLOW_TESTS=true`. Run them locally from the package root with
 ```r
-Sys.setenv(SGDRIVE_SLOW_TESTS = "true"); devtools::test()
+Sys.setenv(SCREWDRIVE_SLOW_TESTS = "true"); devtools::test()
 ```
 or trigger the `slow-tests` workflow on GitHub.
 

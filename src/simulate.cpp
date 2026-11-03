@@ -23,7 +23,7 @@
 #include "model_view.h"
 #include "rates.h"
 
-namespace sgdrive {
+namespace screwdrive {
 
 struct KernelHandle {
   ModelView mv;
@@ -37,17 +37,17 @@ struct KernelHandle {
   }
 };
 
-}  // namespace sgdrive
+}  // namespace screwdrive
 
 namespace {
 
-sgdrive::KernelHandle* handle(SEXP ptr) {
-  Rcpp::XPtr<sgdrive::KernelHandle> h(ptr);
+screwdrive::KernelHandle* handle(SEXP ptr) {
+  Rcpp::XPtr<screwdrive::KernelHandle> h(ptr);
   if (h.get() == nullptr) Rcpp::stop("invalid kernel handle (create it with sg_kernel_new_cpp)");
   return h.get();
 }
 
-void check_day(const sgdrive::ModelView& mv, int day) {
+void check_day(const screwdrive::ModelView& mv, int day) {
   if (day < 1 || day > mv.n_days) Rcpp::stop("day %d is outside the forcing", day);
 }
 
@@ -56,7 +56,7 @@ void check_day(const sgdrive::ModelView& mv, int day) {
 // Create the kernel handle for a model view.
 // [[Rcpp::export]]
 SEXP sg_kernel_new_cpp(const Rcpp::List& view) {
-  Rcpp::XPtr<sgdrive::KernelHandle> ptr(new sgdrive::KernelHandle(view), true);
+  Rcpp::XPtr<screwdrive::KernelHandle> ptr(new screwdrive::KernelHandle(view), true);
   return ptr;
 }
 
@@ -64,8 +64,8 @@ SEXP sg_kernel_new_cpp(const Rcpp::List& view) {
 // length n_states + n_counters (the counter part of y is not used).
 // [[Rcpp::export]]
 Rcpp::NumericVector sg_kernel_rates_cpp(SEXP ptr, int day, const Rcpp::NumericVector& y) {
-  sgdrive::KernelHandle* h = handle(ptr);
-  const sgdrive::ModelView& mv = h->mv;
+  screwdrive::KernelHandle* h = handle(ptr);
+  const screwdrive::ModelView& mv = h->mv;
   check_day(mv, day);
   if (y.size() < mv.n_states) Rcpp::stop("state has the wrong length");
   Rcpp::NumericVector out(mv.n_states + mv.n_counters);
@@ -75,7 +75,7 @@ Rcpp::NumericVector sg_kernel_rates_cpp(SEXP ptr, int day, const Rcpp::NumericVe
 
 // [[Rcpp::export]]
 double sg_kernel_max_rate_cpp(SEXP ptr, int day, const Rcpp::NumericVector& x) {
-  sgdrive::KernelHandle* h = handle(ptr);
+  screwdrive::KernelHandle* h = handle(ptr);
   check_day(h->mv, day);
   if (x.size() < h->mv.n_states) Rcpp::stop("state has the wrong length");
   return h->kernel.max_rate(day, x.begin());
@@ -94,8 +94,8 @@ double sg_kernel_max_rate_cpp(SEXP ptr, int day, const Rcpp::NumericVector& x) {
 Rcpp::List sg_ode_run_cpp(SEXP ptr, const Rcpp::NumericVector& x0, int day_from, int day_to,
                           double rtol, double atol, const Rcpp::LogicalVector& record,
                           bool stop_on_stiff, double max_steps) {
-  sgdrive::KernelHandle* h = handle(ptr);
-  const sgdrive::ModelView& mv = h->mv;
+  screwdrive::KernelHandle* h = handle(ptr);
+  const screwdrive::ModelView& mv = h->mv;
   const int n = mv.n_states, nc = mv.n_counters;
   if (x0.size() != n) Rcpp::stop("initial state has the wrong length");
   if (record.size() != mv.n_days) Rcpp::stop("`record` must have one value per day");
@@ -103,7 +103,7 @@ Rcpp::List sg_ode_run_cpp(SEXP ptr, const Rcpp::NumericVector& x0, int day_from,
   check_day(mv, day_to);
   if (day_to < day_from) Rcpp::stop("day_to is before day_from");
 
-  sgdrive::Dopri5Options opt;
+  screwdrive::Dopri5Options opt;
   opt.rtol = rtol;
   opt.atol = atol;
   opt.max_steps = static_cast<long>(max_steps);
@@ -117,7 +117,7 @@ Rcpp::List sg_ode_run_cpp(SEXP ptr, const Rcpp::NumericVector& x0, int day_from,
 
   std::vector<double> x(x0.begin(), x0.end());
   std::vector<double> y(static_cast<std::size_t>(n) + nc);
-  sgdrive::Dopri5 solver(n + nc);
+  screwdrive::Dopri5 solver(n + nc);
   int stopped_day = 0, stop_status = 0, completed = 0;
 
   for (int d = day_from; d <= day_to; ++d) {
@@ -132,7 +132,7 @@ Rcpp::List sg_ode_run_cpp(SEXP ptr, const Rcpp::NumericVector& x0, int day_from,
     auto rhs = [&](double, const double* yy, double* dy) {
       h->kernel.eval(d, yy, dy, dy + n);
     };
-    const sgdrive::Dopri5Stats st = solver.integrate(rhs, d - 1.0, static_cast<double>(d),
+    const screwdrive::Dopri5Stats st = solver.integrate(rhs, d - 1.0, static_cast<double>(d),
                                                      y.data(), opt);
     // a solution that is not finite stops the run (status 4; defensive: the
     // error control rejects such steps)

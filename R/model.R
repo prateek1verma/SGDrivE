@@ -171,7 +171,7 @@ sg_model <- function(params, cube, forcing, releases = NULL, area = 1,
     ),
     hosts = if (hosts) .sg_host_setup(p, area) else NULL,
     releases = NULL,
-    meta = list(package_version = as.character(utils::packageVersion("SGDrivE")), hash = NA)
+    meta = list(package_version = as.character(utils::packageVersion("ScrewDrivE")), hash = NA)
   )
   class(model) <- "sg_model"
   model$releases <- .sg_release_events(model, releases)

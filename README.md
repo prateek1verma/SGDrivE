@@ -1,7 +1,7 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file. -->
 
-# SGDrivE <small>Screwworm Genetic-Control Dynamics Explorer</small>
+# ScrewDrivE <small>Screwworm Genetic-Control Dynamics Explorer</small>
 
 <!-- badges: start -->
 
@@ -10,7 +10,7 @@ experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](h
 [![R-CMD-check](https://github.com/prateek1verma/SGDrivE/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/prateek1verma/SGDrivE/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
-SGDrivE will simulate genotype-resolved population dynamics of the New
+ScrewDrivE will simulate genotype-resolved population dynamics of the New
 World screwworm (*Cochliomyia hominivorax*) under genetic control: the
 sterile insect technique (SIT), precision-guided SIT (pgSIT),
 female-specific RIDL (fsRIDL) and gene drives.
@@ -30,7 +30,7 @@ female-specific RIDL (fsRIDL) and gene drives.
 | Life history: degree-day development, temperature-dependent mortality, adult ageing chains, pre-oviposition period, wound-limited oviposition | Gutierrez & Ponti (2014) |
 | Genotype inheritance, read from unmodified inheritance cubes | MGDrivE (Sanchez et al. 2020) |
 | Mating: unmated → mated females, male availability | MGDrivE2 (Wu et al. 2021), adapted to NWS |
-| Solvers: deterministic ODE and stochastic chain-binomial, one shared C++ rate kernel | SGDrivE |
+| Solvers: deterministic ODE and stochastic chain-binomial, one shared C++ rate kernel | ScrewDrivE |
 
 Populations are tracked as counts per node. The full specification is in
 [`dev/MODEL_SPEC.md`](dev/MODEL_SPEC.md) and the design decisions in
@@ -51,7 +51,7 @@ on Windows).
 ## Check the installation
 
 ``` r
-library(SGDrivE)
+library(ScrewDrivE)
 sg_backend_info()
 #> $package_version
 #> [1] "0.0.0.9000"

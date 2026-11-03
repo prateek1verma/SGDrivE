@@ -7,7 +7,7 @@
 
 skip_if_not_installed("deSolve")
 
-ns <- asNamespace("SGDrivE")
+ns <- asNamespace("ScrewDrivE")
 wx_all <- sg_example_weather()
 p <- sg_params()
 step_rep <- function(m, x, n, day = 10L) {

@@ -1,7 +1,7 @@
 # simulate_cb(): replicates, random-number streams (D-022), outputs and
 # checks. The step itself is tested in test-cb-reference.R and test-cb-cpp.R.
 
-ns <- asNamespace("SGDrivE")
+ns <- asNamespace("ScrewDrivE")
 p <- sg_params()
 wx_all <- sg_example_weather()
 cube3 <- sg_cube(sg_test_cube_mendelian())

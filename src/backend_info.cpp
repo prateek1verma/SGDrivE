@@ -1,4 +1,4 @@
-// Toolchain check for the SGDrivE C++ backend (milestone M0).
+// Toolchain check for the ScrewDrivE C++ backend (milestone M0).
 //
 // Contains no model code. It only reports how the shared library was
 // compiled, so tests and continuous integration can confirm that the C++

@@ -3,7 +3,7 @@ test_that("sg_params() returns validated defaults in table order", {
   expect_s3_class(p, "sg_params")
   expect_identical(attr(p, "preset"), "default")
   expect_identical(names(p), sg_param_table()$name)
-  expect_identical(unclass(p)[names(p)], SGDrivE:::.sg_param_defaults())
+  expect_identical(unclass(p)[names(p)], ScrewDrivE:::.sg_param_defaults())
 })
 
 test_that("integer parameters are stored as integers", {

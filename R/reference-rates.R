@@ -1,4 +1,4 @@
-# Reference rate function (pure R) of the SGDrivE v0.1 model.
+# Reference rate function (pure R) of the ScrewDrivE v0.1 model.
 #
 # A direct, readable translation of dev/MODEL_SPEC.md S7-S14, used as the
 # "truth" against which the C++ kernel (milestone M3) is tested. Speed is not

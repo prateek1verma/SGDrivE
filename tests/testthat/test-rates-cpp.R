@@ -2,12 +2,12 @@
 # (.sg_rates_r, itself checked against hand calculations and the legacy model)
 # to floating-point round-off, for every option, cube type and preset.
 
-rates_r <- SGDrivE:::.sg_rates_r
-setup <- SGDrivE:::.sg_reference_setup
-view <- SGDrivE:::.sg_model_view
-rates_cpp <- SGDrivE:::sg_rates_cpp
-max_rate_r <- SGDrivE:::.sg_max_rate
-max_rate_cpp <- SGDrivE:::sg_max_rate_cpp
+rates_r <- ScrewDrivE:::.sg_rates_r
+setup <- ScrewDrivE:::.sg_reference_setup
+view <- ScrewDrivE:::.sg_model_view
+rates_cpp <- ScrewDrivE:::sg_rates_cpp
+max_rate_r <- ScrewDrivE:::.sg_max_rate
+max_rate_cpp <- ScrewDrivE:::sg_max_rate_cpp
 
 wx_all <- sg_example_weather()
 days <- c(1, 45, 120, 200, 300) # winter, spring, summer, autumn (1971)
@@ -128,7 +128,7 @@ test_that("the C++ test entry points check their input", {
 })
 
 test_that("C++ day rates and state aggregates equal the R reference", {
-  agg_cpp <- SGDrivE:::sg_aggregates_cpp
+  agg_cpp <- ScrewDrivE:::sg_aggregates_cpp
   for (pn in c("default", "instant", "all_adults", "crowding", "allee", "gp2014")) {
     for (cn in c("sit", "mendelian")) {
       m <- mk(param_sets[[pn]], cubes[[cn]], area = 3)

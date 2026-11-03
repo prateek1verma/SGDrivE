@@ -14,7 +14,7 @@ list \code{x} of values, use \code{do.call(sg_params, x)}.}
 
 \item{preset}{Which set of defaults to start from:
 \describe{
-\item{\code{"default"}}{SGDrivE defaults: Gutierrez & Ponti (2014) biology
+\item{\code{"default"}}{ScrewDrivE defaults: Gutierrez & Ponti (2014) biology
 with speed-tuned sub-stage numbers (at most 10 per stage), mating at
 rate \code{nu}, and searching mated females as competitors for wounds.}
 \item{\code{"gp2014"}}{The configuration of the Gutierrez & Ponti (2014)
@@ -32,7 +32,7 @@ An object of class \code{sg_params}: a named list of parameter values in
 the order of \code{\link[=sg_param_table]{sg_param_table()}}, with attribute \code{preset}.
 }
 \description{
-Creates a validated set of SGDrivE model parameters. Every parameter has a
+Creates a validated set of ScrewDrivE model parameters. Every parameter has a
 default (see \code{\link[=sg_param_table]{sg_param_table()}} for the full list with units, ranges and
 sources); arguments given in \code{...} override the defaults.
 }

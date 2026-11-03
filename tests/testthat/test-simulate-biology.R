@@ -49,8 +49,8 @@ sg_test_each_backend("rate mating approaches instant mating as nu grows (S14)", 
   mi <- sg_model(pi, cube, sg_forcing(sg_example_weather(), pi, period[1], period[2]))
   sr <- sim_ode(mr, sg_init(mr))
   si <- sim_ode(mi, sg_init(mi))
-  tot_r <- SGDrivE:::.sg_sim_block_totals(sr)
-  tot_i <- SGDrivE:::.sg_sim_block_totals(si)
+  tot_r <- ScrewDrivE:::.sg_sim_block_totals(sr)
+  tot_i <- ScrewDrivE:::.sg_sim_block_totals(si)
   # unmated females are a vanishing fraction; all other blocks agree closely
   expect_lt(max(tot_r[, "U"]) / max(tot_r[, "F"]), 0.01)
   for (b in c("E", "L", "P", "M")) {

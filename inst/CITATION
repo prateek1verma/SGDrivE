@@ -1,13 +1,13 @@
 bibentry(
   bibtype = "Manual",
-  title = "{SGDrivE}: Screwworm Genetic-Control Dynamics Explorer",
+  title = "{ScrewDrivE}: Screwworm Genetic-Control Dynamics Explorer",
   author = person("Prateek", "Verma"),
   year = "2026",
-  note = paste("R package version", utils::packageVersion("SGDrivE")),
+  note = paste("R package version", utils::packageVersion("ScrewDrivE")),
   url = "https://github.com/prateek1verma/SGDrivE",
   textVersion = paste0(
-    "Verma, P. (2026). SGDrivE: Screwworm Genetic-Control Dynamics Explorer. ",
-    "R package version ", utils::packageVersion("SGDrivE"), ". ",
+    "Verma, P. (2026). ScrewDrivE: Screwworm Genetic-Control Dynamics Explorer. ",
+    "R package version ", utils::packageVersion("ScrewDrivE"), ". ",
     "https://github.com/prateek1verma/SGDrivE"
   )
 )

@@ -19,12 +19,12 @@
 #
 # As in scenario 07, two genotypes are enough: W (wild) and S (sterile,
 # released). Everything else (life cycle, temperature, wound search, mating)
-# is SGDrivE's model, so the population responds differently from the
+# is ScrewDrivE's model, so the population responds differently from the
 # MGDrivE version (see the notes at the end).
 #
 # Run time: a few seconds.
 
-library(SGDrivE)
+library(ScrewDrivE)
 library(ggplot2) # plots
 
 # 1. Settings -----------------------------------------------------------------

@@ -57,7 +57,7 @@ sg_constant_weather <- function(temperature, days = 365L, start = "2001-01-01") 
 #' head(wx)
 #' table(wx$source)
 sg_example_weather <- function() {
-  file <- system.file("extdata", "mcallen_tx_1960_1983.csv", package = "SGDrivE")
+  file <- system.file("extdata", "mcallen_tx_1960_1983.csv", package = "ScrewDrivE")
   w <- utils::read.csv(file, stringsAsFactors = FALSE)
   w$date <- as.Date(w$date)
   w[, c("date", "tmax", "tmin", "tmean", "rain", "source")]

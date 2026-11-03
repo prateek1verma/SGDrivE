@@ -9,7 +9,7 @@ sg_backend_info()
 \value{
 A named list with elements:
 \describe{
-\item{\code{package_version}}{Installed version of SGDrivE (character).}
+\item{\code{package_version}}{Installed version of ScrewDrivE (character).}
 \item{\code{cplusplus}}{Value of the \verb{__cplusplus} macro the backend was
 compiled with (numeric; e.g. \code{201703} for C++17).}
 \item{\code{compiler}}{Compiler identification string (character).}

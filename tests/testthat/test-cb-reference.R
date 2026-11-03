@@ -4,7 +4,7 @@
 
 skip_if_not_installed("deSolve")
 
-ns <- asNamespace("SGDrivE")
+ns <- asNamespace("ScrewDrivE")
 setup <- ns$.sg_reference_setup
 step <- ns$.sg_cb_step_r
 day_info <- ns$.sg_cb_day_r

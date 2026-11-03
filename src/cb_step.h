@@ -1,4 +1,4 @@
-// Chain-binomial step of the SGDrivE v0.1 model (D-022, D-024; model
+// Chain-binomial step of the ScrewDrivE v0.1 model (D-022, D-024; model
 // specification S15-S19).
 //
 // A block-by-block translation of the R reference step .sg_cb_step_r()
@@ -14,8 +14,8 @@
 // a state by one step of length dt. Working arrays are allocated in the
 // constructor; neither function allocates.
 
-#ifndef SGDRIVE_CB_STEP_H
-#define SGDRIVE_CB_STEP_H
+#ifndef SCREWDRIVE_CB_STEP_H
+#define SCREWDRIVE_CB_STEP_H
 
 #include <Rcpp.h>
 
@@ -27,7 +27,7 @@
 #include "model_view.h"
 #include "rates.h"
 
-namespace sgdrive {
+namespace screwdrive {
 
 // Random draws from R's generator (call within an Rcpp::RNGScope).
 struct RandomDraws {
@@ -398,6 +398,6 @@ void CbStepper::step(double* x, double* flows, D& draws) {
   std::copy(nx_.begin(), nx_.end(), x);
 }
 
-}  // namespace sgdrive
+}  // namespace screwdrive
 
-#endif  // SGDRIVE_CB_STEP_H
+#endif  // SCREWDRIVE_CB_STEP_H

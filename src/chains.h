@@ -32,14 +32,14 @@
 // Work arrays are kept between calls; repeated calls with the same chain
 // length allocate nothing.
 
-#ifndef SGDRIVE_CHAINS_H
-#define SGDRIVE_CHAINS_H
+#ifndef SCREWDRIVE_CHAINS_H
+#define SCREWDRIVE_CHAINS_H
 
 #include <algorithm>
 #include <cmath>
 #include <vector>
 
-namespace sgdrive {
+namespace screwdrive {
 
 class ChainAdvance {
  public:
@@ -186,6 +186,6 @@ class ChainAdvance {
   }
 };
 
-}  // namespace sgdrive
+}  // namespace screwdrive
 
-#endif  // SGDRIVE_CHAINS_H
+#endif  // SCREWDRIVE_CHAINS_H

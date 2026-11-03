@@ -2,7 +2,7 @@
 #
 # Runs the unchanged legacy ODE translation of Gutierrez & Ponti (2014)
 # (data-raw/reference_impl/scripts/gp2014_ode.R) WITHOUT population floors and
-# with tight solver tolerances, so that the comparison with SGDrivE's
+# with tight solver tolerances, so that the comparison with ScrewDrivE's
 # reference solver at 1e-6 is not limited by solver error. The existing
 # reference files (make_reference.R) are not modified.
 #

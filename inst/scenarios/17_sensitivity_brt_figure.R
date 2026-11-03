@@ -22,7 +22,7 @@
 #
 # Run time: a minute or two, most of it fitting the trees.
 
-library(SGDrivE)
+library(ScrewDrivE)
 library(ggplot2) # plots
 
 # 1. Settings and data --------------------------------------------------------

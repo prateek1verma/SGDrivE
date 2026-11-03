@@ -1,4 +1,4 @@
-# SGDrivE design decisions
+# ScrewDrivE design decisions
 
 Each entry records a decision, its date, the reasoning, and its effect on the
 model. Decisions are changed only by adding a new entry that supersedes an
@@ -8,7 +8,7 @@ Status: **Accepted**, **Superseded** or **Open**.
 
 ---
 
-## D-001 Package name: `SGDrivE` (Accepted, 2026-10-06)
+## D-001 Package name: `ScrewDrivE` (Accepted, 2026-10-06)
 
 "Screwworm Genetic-control Dynamics Explorer". Echoes MGDrivE ("Mosquito Gene
 Drive Explorer") because the package reads MGDrivE cubes and uses MGDrivE2's
@@ -86,7 +86,7 @@ Compatible with MGDrivE and MGDrivE2.
 
 ## D-008 Repository and tooling (Accepted, 2026-10-08)
 
-* Location `~/Documents/GitHub/SGDrivE`, outside Box (cloud sync can corrupt
+* Location `~/Documents/GitHub/ScrewDrivE`, outside Box (cloud sync can corrupt
   git folders and compiled objects).
 * Private GitHub repository `prateek1verma/SGDrivE`.
 * Author and maintainer: Prateek Verma <prateekverma@berkeley.edu>.
@@ -204,7 +204,7 @@ oviposition would match the observed 61 ± 12.2 dd.
   no floors) are added to `data-raw/reference/` as `*_tight.rds`; the existing
   reference files are kept.
 * The 24-year legacy regression is a slow test, run only when the environment
-  variable `SGDRIVE_SLOW_TESTS` is `"true"` (and in a manually triggered CI
+  variable `SCREWDRIVE_SLOW_TESTS` is `"true"` (and in a manually triggered CI
   job); routine tests use the first 3 years.
 
 ## D-020 Initial conditions (Accepted, 2026-10-09)

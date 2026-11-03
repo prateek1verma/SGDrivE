@@ -34,7 +34,7 @@
 #
 # Run time: about three minutes with the defaults below.
 
-library(SGDrivE)
+library(ScrewDrivE)
 
 # 1. Settings -----------------------------------------------------------------
 temperature <- 25 # constant temperature (degC)

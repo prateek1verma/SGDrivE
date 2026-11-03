@@ -8,7 +8,7 @@ accepted, the model goes into MODEL_SPEC (new section) and DECISIONS
 
 ## 1. Why
 
-SGDrivE v0.1 has one node (MODEL_SPEC section 1). The questions that matter
+ScrewDrivE v0.1 has one node (MODEL_SPEC section 1). The questions that matter
 for New World screwworm (NWS) control are spatial: how far and how fast an
 infestation spreads north each season, how wide a sterile-fly barrier must
 be, whether a node far from the release area is reinvaded, and how county

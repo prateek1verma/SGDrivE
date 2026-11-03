@@ -180,7 +180,7 @@ simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
         stiff_fallback = method == "dopri5" && stiff_fallback,
         fallback_days = sum(res$diag$fallback), run_time = run_time,
         model_hash = model$meta$hash, info = .sg_output_info(model),
-        package_version = as.character(utils::packageVersion("SGDrivE")),
+        package_version = as.character(utils::packageVersion("ScrewDrivE")),
         desolve_version = if (.sg_has_desolve()) {
           as.character(utils::packageVersion("deSolve"))
         } else {

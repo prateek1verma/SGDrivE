@@ -1,4 +1,4 @@
-# SGDrivE coding conventions
+# ScrewDrivE coding conventions
 
 These conventions apply to all code in the package. `dev/` and `data-raw/`
 are excluded from the built package.
@@ -79,7 +79,7 @@ boundary.
   `simulate.cpp` (day loop and R entry points), `backend_info.cpp`.
   Test-only entry points live in `*_test.cpp`.
 * Plain C++17, Rcpp and `std::vector`; no other dependencies. Code lives in
-  `namespace sgdrive`; only `sg_..._cpp` functions are exported to R (run
+  `namespace screwdrive`; only `sg_..._cpp` functions are exported to R (run
   `Rcpp::compileAttributes()` after changing them) and they are called only
   from internal R wrappers.
 * C++ reads the model only through the model view built in R
