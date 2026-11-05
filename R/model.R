@@ -8,12 +8,14 @@
 #' @param params An `sg_params` object ([sg_params()]).
 #' @param cube An `sg_cube` object ([sg_cube()]).
 #' @param forcing An `sg_forcing` object ([sg_forcing()]) built with the same
-#'   temperature, development and mortality parameters as `params`.
+#'   temperature, development and mortality parameters as `params`. Leave it
+#'   `NULL` when a `landscape` is given (each node's forcing comes from it).
 #' @param releases Optional `sg_releases` object ([sg_releases()]).
 #' @param area Node area in km^2 (> 0; default 1, so counts equal densities
 #'   numerically; D-009). Wound density `wound_density` and the mate-finding
 #'   half-saturation `male_density_half_mating` (per km^2) and releases given per km^2 are
-#'   converted to counts per node with it.
+#'   converted to counts per node with it. Not used with a `landscape`, which
+#'   gives each node's area.
 #' @param adult_segment_substages Optional list with elements `female` and/or `male`:
 #'   the number of sub-stages in each segment of that sex's adult chain,
 #'   overriding the proportional allocation (D-018). Each must sum to `adult_substages`.
@@ -27,7 +29,13 @@
 #'   adult females (see Details). Give `area` or `adult_females`, not both.
 #'   Needs a forcing with one constant temperature, e.g. from
 #'   [sg_constant_weather()], and a cube with a single wild type that breeds
-#'   true.
+#'   true. Not available with a `landscape`.
+#' @param landscape Optional `sg_landscape` object ([sg_landscape()]): several
+#'   nodes, each with its own area, forcing, wound or host density and role
+#'   (MODEL_SPEC section 8a, D-032). Without it the model has one node.
+#' @param movement Optional `sg_movement_layer` object ([sg_movement_layer()])
+#'   or a list with one such layer: how adults move between the landscape's
+#'   nodes. Needs a `landscape`. (Several layers follow in a later version.)
 #'
 #' @details
 #' **Adult chains** (model specification S6, D-018). Each adult chain is split
@@ -45,6 +53,13 @@
 #' from slowest to fastest is node, host class, genotype, mate genotype
 #' (F only), sub-stage. Use [sg_state_index()] and [sg_state_names()] rather
 #' than computing positions by hand.
+#'
+#' **Several nodes** (D-032). With a landscape of N nodes the state vector is
+#' the concatenation of N per-node vectors, each with the layout above (node
+#' slowest), and state names end in `"@"` and the node id, e.g.
+#' `"M[AA,1]@north"`. Each node's wound count (or host count), mate-finding
+#' half-saturation and per-km^2 releases use that node's area and densities.
+#' Releases need a `node` ([sg_releases()]).
 #'
 #' **Releases** enter the first sub-stage of their stage: eggs E, pupae P,
 #' adult males M and adult females U (unmated).
@@ -67,16 +82,22 @@
 #' with the same hash give the same simulation.
 #'
 #' @return An object of class `sg_model`: a list with `params`, `cube`,
-#'   `forcing`, `area`, `dims` (numbers of genotypes, sub-stages, nodes and
-#'   host classes), `adult` (female and male chains), `layout` (one row per
-#'   state block: name, first index, length), `n_states`, `counts` (wound
-#'   number `H`, half-saturation `h_M`, extinction threshold, per node; internal names;
+#'   `forcing` (with a landscape: the forcing of the first node; all nodes
+#'   share its dates), `area` (one value per node), `dims` (numbers of
+#'   genotypes, sub-stages, nodes and host classes), `adult` (female and male
+#'   chains), `layout` (one row per state block of a node: name, first index
+#'   within the node, length), `n_states` (all nodes), `counts` (wound
+#'   number `H`, half-saturation `h_M`, one value per node, and the extinction
+#'   threshold; internal names;
 #'   `H` is `NA` with the host-wound model), `hosts` (`NULL` with
-#'   `wound_model = "static"`; otherwise the host class, host count per node
-#'   `n`, infestation sub-stages `n_I` and per-host rates per day `wounding`,
+#'   `wound_model = "static"`; otherwise the host class, host count `n` of
+#'   each node, infestation sub-stages `n_I` and per-host rates per day `wounding`,
 #'   `healing`, `advance`, `treatment` and `attractiveness`, D-030),
-#'   `releases` (events with day, state index and count) and `meta`
-#'   (package version and hash).
+#'   `releases` (events with day, state index and count; with several nodes
+#'   also the node) and `meta` (package version and hash). With a landscape
+#'   also `n_states_node` (states per node), `landscape` and `movement` (the
+#'   merged movement groups, `dx_ref`, `t_ref` and `kappa_max`; `NULL`
+#'   without movement).
 #' @seealso [sg_state_index()], [sg_state_names()]
 #' @export
 #' @examples
@@ -92,13 +113,34 @@
 #'   mod
 #'   head(sg_state_names(mod))
 #' }
-sg_model <- function(params, cube, forcing, releases = NULL, area = 1,
-                     adult_segment_substages = NULL, adult_females = NULL) {
+sg_model <- function(params, cube, forcing = NULL, releases = NULL, area = 1,
+                     adult_segment_substages = NULL, adult_females = NULL,
+                     landscape = NULL, movement = NULL) {
   if (!inherits(params, "sg_params")) {
     .sg_stop("`params` must be an sg_params object; create one with sg_params().")
   }
   if (!inherits(cube, "sg_cube")) {
     .sg_stop("`cube` must be an sg_cube object; create one with sg_cube().")
+  }
+  if (!is.null(landscape)) {
+    if (!inherits(landscape, "sg_landscape")) {
+      .sg_stop("`landscape` must be an sg_landscape object; create one with sg_landscape().")
+    }
+    if (!is.null(forcing)) {
+      .sg_stop("Give `forcing` or `landscape`, not both: a landscape holds each node's forcing.")
+    }
+    if (!missing(area)) {
+      .sg_stop("Give `area` or `landscape`, not both: a landscape holds each node's area.")
+    }
+    if (!is.null(adult_females)) {
+      .sg_stop("`adult_females` is available only for one-node models without a landscape.")
+    }
+    forcing <- landscape$forcing[[landscape$nodes$forcing_series[1L]]]
+    area <- landscape$nodes$area
+  } else if (!is.null(movement)) {
+    .sg_stop(
+      "`movement` needs a `landscape` (sg_landscape()) whose nodes the flies move between."
+    )
   }
   if (!inherits(forcing, "sg_forcing")) {
     .sg_stop("`forcing` must be an sg_forcing object; create one with sg_forcing().")
@@ -121,10 +163,11 @@ sg_model <- function(params, cube, forcing, releases = NULL, area = 1,
     return(model)
   }
   area_ok <- is.numeric(area) && length(area) == 1L && is.finite(area) && area > 0
-  if (!area_ok) {
+  if (is.null(landscape) && !area_ok) {
     .sg_stop("`area` must be a single positive number (node area in km^2).")
   }
   .sg_check_forcing_params(forcing, params)
+  movement <- .sg_model_movement(movement, landscape, params)
   adult_segment_substages <- .sg_check_adult_substages_arg(adult_segment_substages)
 
   p <- params
@@ -145,15 +188,19 @@ sg_model <- function(params, cube, forcing, releases = NULL, area = 1,
   )
 
   hosts <- p$wound_model == "hosts"
+  n_node <- if (is.null(landscape)) 1L else landscape$n_nodes
   dims <- list(
     n_genotypes = n_g,
     n_E = p$egg_substages, n_L = p$larva_substages, n_P = p$pupa_substages,
     n_A = p$adult_substages,
     n_I = if (hosts) p$infestation_substages else 0L,
-    n_node = 1L, n_host = 1L
+    n_node = n_node, n_host = 1L
   )
-  layout <- .sg_layout(dims, hosts)
-  n_states <- sum(layout$length)
+  # blocks of one node; the state vector holds n_node such vectors (node slowest)
+  layout <- .sg_layout(utils::modifyList(dims, list(n_node = 1L)), hosts)
+  if (n_node > 1L) layout$dims <- sub("^node 1 x ", "per node: ", layout$dims)
+  n_states <- n_node * sum(layout$length)
+  dens <- .sg_node_densities(landscape, p)
 
   model <- list(
     params = params,
@@ -165,14 +212,21 @@ sg_model <- function(params, cube, forcing, releases = NULL, area = 1,
     layout = layout,
     n_states = n_states,
     counts = list(
-      H = if (hosts) NA_real_ else p$wound_density * area,
+      H = if (hosts) rep(NA_real_, n_node) else dens$wound * area,
       h_M = p$male_density_half_mating * area,
       ext_threshold = p$extinction_threshold
     ),
-    hosts = if (hosts) .sg_host_setup(p, area) else NULL,
+    hosts = if (hosts) .sg_host_setup(p, area, dens$host) else NULL,
     releases = NULL,
     meta = list(package_version = as.character(utils::packageVersion("ScrewDrivE")), hash = NA)
   )
+  # fields that one-node models without a landscape do not carry, so their
+  # structure and hash stay as before (D-032)
+  if (!is.null(landscape)) {
+    model$n_states_node <- sum(layout$length)
+    model$landscape <- landscape
+    model$movement <- movement
+  }
   class(model) <- "sg_model"
   model$releases <- .sg_release_events(model, releases)
   model$meta$hash <- .sg_model_hash(model)
@@ -195,9 +249,12 @@ sg_model <- function(params, cube, forcing, releases = NULL, area = 1,
 #' @param genotype,mate,substage Optional genotype names, mate genotype names
 #'   (block `"F"` only) and sub-stage numbers. `NULL` selects all. Host blocks
 #'   have no genotype.
+#' @param node Optional node ids or numbers (models with a landscape,
+#'   [sg_landscape()]). `NULL` selects all nodes.
 #' @return `sg_state_index()`: integer positions (1-based), ordered with the
-#'   sub-stage varying fastest. `sg_state_names()`: character vector of length
-#'   `model$n_states`.
+#'   sub-stage varying fastest and the node slowest. `sg_state_names()`:
+#'   character vector of length `model$n_states`; with more than one node each
+#'   name ends in `"@"` and the node id, e.g. `"M[AA,1]@north"`.
 #' @seealso [sg_model()]
 #' @export
 #' @examples
@@ -211,13 +268,16 @@ sg_model <- function(params, cube, forcing, releases = NULL, area = 1,
 #'   sg_state_names(mod)[sg_state_index(mod, "M", genotype = "Aa")]
 #' }
 sg_state_index <- function(model, block = c("E", "L", "P", "M", "U", "F", "HS", "HW", "HI"),
-                           genotype = NULL, mate = NULL, substage = NULL) {
+                           genotype = NULL, mate = NULL, substage = NULL, node = NULL) {
   if (!inherits(model, "sg_model")) {
     .sg_stop("`model` must be an sg_model object.")
   }
   block <- .sg_match_choice(block, c("E", "L", "P", "M", "U", "F", "HS", "HW", "HI"), "block")
   geno <- model$cube$genotypes
   n_sub <- .sg_block_substages(model$dims, block)
+  # first position of each selected node, minus 1 (node slowest, D-032)
+  base <- (.sg_node_numbers(model, node) - 1L) * .sg_n_states_node(model)
+  with_nodes <- function(within) as.integer(rep(base, each = length(within)) + within)
   if (block %in% .sg_host_blocks) {
     if (is.null(model$hosts)) {
       .sg_stop("Block ", block, " exists only with wound_model = \"hosts\".")
@@ -229,7 +289,7 @@ sg_state_index <- function(model, block = c("E", "L", "P", "M", "U", "F", "HS", 
     if (!is.numeric(si) || any(si < 1) || any(si > n_sub) || any(si != round(si))) {
       .sg_stop("`substage` must be whole numbers between 1 and ", n_sub, " for block ", block, ".")
     }
-    return(as.integer(model$layout$start[model$layout$block == block] + si - 1L))
+    return(with_nodes(model$layout$start[model$layout$block == block] + si - 1L))
   }
   pick_geno <- function(x, what) {
     if (is.null(x)) {
@@ -253,7 +313,7 @@ sg_state_index <- function(model, block = c("E", "L", "P", "M", "U", "F", "HS", 
   start <- model$layout$start[model$layout$block == block]
   n_m <- if (block == "F") length(geno) else 1L
   grid <- expand.grid(s = si, m = mi, g = gi)
-  as.integer(start + ((grid$g - 1L) * n_m + (grid$m - 1L)) * n_sub + (grid$s - 1L))
+  with_nodes(start + ((grid$g - 1L) * n_m + (grid$m - 1L)) * n_sub + (grid$s - 1L))
 }
 
 #' @rdname sg_state_index
@@ -263,10 +323,10 @@ sg_state_names <- function(model) {
     .sg_stop("`model` must be an sg_model object.")
   }
   geno <- model$cube$genotypes
-  out <- character(model$n_states)
+  out <- character(.sg_n_states_node(model)) # names of one node's states
   for (b in model$layout$block) {
     n_sub <- .sg_block_substages(model$dims, b)
-    idx <- sg_state_index(model, b)
+    idx <- sg_state_index(model, b, node = 1L)
     if (b %in% .sg_host_blocks) {
       cls <- model$hosts$classes
       out[idx] <- if (b == "HI") {
@@ -282,7 +342,11 @@ sg_state_names <- function(model) {
       out[idx] <- paste0(b, "[", grid$g, ",", grid$s, "]")
     }
   }
-  out
+  ids <- .sg_node_ids(model)
+  if (length(ids) == 1L) {
+    return(out)
+  }
+  paste0(rep(out, times = length(ids)), "@", rep(ids, each = length(out)))
 }
 
 #' @export
@@ -316,15 +380,21 @@ print.sg_model <- function(x, ...) {
   }
   p <- x$params
   h <- x$hosts
-  wounds <- if (is.null(h)) {
-    sprintf("wounds H = %s per node", format(x$counts$H))
+  if (d$n_node == 1L) {
+    wounds <- if (is.null(h)) {
+      sprintf("wounds H = %s per node", format(x$counts$H))
+    } else {
+      sprintf("hosts N_H = %s per node", format(h$n))
+    }
+    cat(sprintf(
+      "  node area %s km^2; %s; mating \"%s\"; search competitors \"%s\"\n",
+      format(x$area), wounds, p$mating_mode, p$wound_competitors
+    ))
   } else {
-    sprintf("hosts N_H = %s per node", format(h$n))
+    .sg_print_nodes(x)
+    cat(sprintf("  mating \"%s\"; search competitors \"%s\"\n", p$mating_mode, p$wound_competitors))
   }
-  cat(sprintf(
-    "  node area %s km^2; %s; mating \"%s\"; search competitors \"%s\"\n",
-    format(x$area), wounds, p$mating_mode, p$wound_competitors
-  ))
+  .sg_print_movement(x)
   if (!is.null(h)) {
     cat(sprintf(
       paste0(
@@ -358,6 +428,59 @@ print.sg_model <- function(x, ...) {
 }
 
 # ---- internal ------------------------------------------------------------------
+
+# print() lines for a model with several nodes.
+.sg_print_nodes <- function(x) {
+  nd <- x$landscape$nodes
+  rng <- function(v) {
+    r <- range(v)
+    if (r[1L] == r[2L]) format(r[1L]) else paste0(format(r[1L]), "-", format(r[2L]))
+  }
+  n_src <- sum(nd$role == "source")
+  cat(sprintf(
+    "  %d nodes (%d study, %d source), total area %s km^2; %d forcing series\n",
+    nrow(nd), nrow(nd) - n_src, n_src, format(sum(nd$area), big.mark = ","),
+    length(x$landscape$forcing)
+  ))
+  cat(if (is.null(x$hosts)) {
+    sprintf("  wounds H per node: %s\n", rng(x$counts$H))
+  } else {
+    sprintf("  hosts N_H per node: %s\n", rng(x$hosts$n))
+  })
+}
+
+# print() lines for the movement groups of a model (MODEL_SPEC 8a).
+.sg_print_movement <- function(x) {
+  mv <- x$movement
+  if (is.null(mv)) {
+    return(invisible(NULL))
+  }
+  for (g in mv$groups) {
+    lost <- vapply(seq_len(ncol(g$loss)), function(i) any(g$loss[, i] > 0), TRUE)
+    cat(sprintf(
+      paste0(
+        "  movement (%s clock): %d edges, %d node%s with open edges; ",
+        "leave rates per day at %g degC: %s\n"
+      ),
+      g$clock, length(g$col), sum(lost), if (sum(lost) != 1L) "s" else "", mv$t_ref,
+      paste0(rownames(g$rate), " ", vapply(seq_len(3L), function(s) {
+        r <- range(g$rate[s, ])
+        if (r[1L] == r[2L]) {
+          format(r[1L], digits = 4L)
+        } else {
+          paste0(format(r[1L], digits = 4L), "-", format(r[2L], digits = 4L))
+        }
+      }, ""), collapse = ", ")
+    ))
+  }
+  if (any(vapply(mv$groups, function(g) g$clock == "physiological", TRUE))) {
+    cat(sprintf(
+      "  physiological clock: kappa = min(%s, dx / %.4g)\n",
+      format(mv$kappa_max), mv$dx_ref
+    ))
+  }
+  invisible(NULL)
+}
 
 .sg_check_forcing_params <- function(forcing, params) {
   nms <- names(forcing$param_values)
@@ -438,15 +561,15 @@ print.sg_model <- function(x, ...) {
   )
 }
 
-# Host-wound model (D-030, design note section 3.2): host count per node and
-# per-host rates per day. Wounding is set so that, without flies, a fraction
-# wounded_fraction of hosts carries an attractive wound: omega = gamma_W p0 /
-# (1 - p0).
-.sg_host_setup <- function(p, area) {
+# Host-wound model (D-030, design note section 3.2): host count of each node
+# (host density per km^2 times area) and per-host rates per day. Wounding is
+# set so that, without flies, a fraction wounded_fraction of hosts carries an
+# attractive wound: omega = gamma_W p0 / (1 - p0).
+.sg_host_setup <- function(p, area, host_density = p$host_density) {
   healing <- 1 / p$wound_healing_days
   list(
     classes = "hosts",
-    n = p$host_density * area,
+    n = host_density * area,
     n_I = p$infestation_substages,
     wounding = healing * p$wounded_fraction / (1 - p$wounded_fraction),
     healing = healing,
@@ -456,23 +579,127 @@ print.sg_model <- function(x, ...) {
   )
 }
 
+# Wound and host densities per km^2 of each node: the landscape's values where
+# given, otherwise those of the parameters (D-032).
+.sg_node_densities <- function(landscape, p) {
+  if (is.null(landscape)) {
+    return(list(wound = p$wound_density, host = p$host_density))
+  }
+  nd <- landscape$nodes
+  hosts <- p$wound_model == "hosts"
+  if (hosts && any(!is.na(nd$wound_density))) {
+    .sg_warn(
+      "The landscape's wound_density has no effect with wound_model = \"hosts\"; ",
+      "wounds come from host_density and wounded_fraction."
+    )
+  }
+  if (!hosts && any(!is.na(nd$host_density))) {
+    .sg_warn("The landscape's host_density has no effect unless wound_model = \"hosts\".")
+  }
+  list(
+    wound = ifelse(is.na(nd$wound_density), p$wound_density, nd$wound_density),
+    host = ifelse(is.na(nd$host_density), p$host_density, nd$host_density)
+  )
+}
+
+# Movement of a model (MODEL_SPEC 8a, N1-N3): the layers merged into groups,
+# the reference temperature, dx at that temperature (S1, with its floor) and
+# the cap of the physiological clock. NULL without movement.
+.sg_model_movement <- function(movement, landscape, p) {
+  if (is.null(movement)) {
+    return(NULL)
+  }
+  layers <- if (inherits(movement, "sg_movement_layer")) list(movement) else movement
+  ok <- is.list(layers) && length(layers) >= 1L &&
+    all(vapply(layers, inherits, TRUE, "sg_movement_layer"))
+  if (!ok) {
+    .sg_stop(
+      "`movement` must be an sg_movement_layer object (or a list of them); ",
+      "create one with sg_movement_layer()."
+    )
+  }
+  if (length(layers) > 1L) {
+    .sg_stop(
+      "This version accepts one movement layer per model; several layers (e.g. local ",
+      "and long-distance movement) follow in a later version (design note phase 4)."
+    )
+  }
+  list(
+    groups = .sg_movement_groups(layers, landscape$nodes$id),
+    t_ref = p$movement_t_ref,
+    dx_ref = sg_degree_days(p$movement_t_ref, p),
+    kappa_max = p$movement_kappa_max
+  )
+}
+
+# Stop for functions that do not (yet) handle several nodes or movement.
+.sg_one_node_only <- function(model, what, when = "in a later version") {
+  if (model$dims$n_node > 1L || !is.null(model$movement)) {
+    .sg_stop(
+      what, " is not available for models with several nodes or movement yet (", when, ")."
+    )
+  }
+  invisible(TRUE)
+}
+
+# Node ids ("1" for a model without a landscape) and states per node.
+.sg_node_ids <- function(model) {
+  if (is.null(model$landscape)) "1" else model$landscape$nodes$id
+}
+.sg_n_states_node <- function(model) {
+  if (is.null(model$n_states_node)) model$n_states else model$n_states_node
+}
+
+# Node numbers (1-based) from ids or numbers; NULL means all nodes.
+.sg_node_numbers <- function(model, node) {
+  ids <- .sg_node_ids(model)
+  if (is.null(node)) {
+    return(seq_along(ids))
+  }
+  if (is.numeric(node)) {
+    bad <- node < 1 | node > length(ids) | node != round(node) | is.na(node)
+    if (any(bad)) {
+      .sg_stop("`node` numbers must be whole numbers between 1 and ", length(ids), ".")
+    }
+    return(as.integer(node))
+  }
+  idx <- match(as.character(node), ids)
+  if (anyNA(idx)) {
+    bad <- as.character(node)[is.na(idx)][1L]
+    .sg_stop(
+      "Unknown node \"", bad, "\".", .sg_suggest(bad, ids),
+      " Nodes: ", .sg_wrap_names(ids), "."
+    )
+  }
+  idx
+}
+
 # Release events with the state position they are added to (first sub-stage).
+# With several nodes the table also has the node id (D-032).
 .sg_release_events <- function(model, releases) {
-  ev <- .sg_resolve_releases(releases, model$forcing$dates, model$area, model$cube$genotypes)
+  ids <- .sg_node_ids(model)
+  multi <- length(ids) > 1L
+  ev <- .sg_resolve_releases(
+    releases, model$forcing$dates, model$area, model$cube$genotypes, ids
+  )
+  cols <- c("day", "index", "count", "genotype", "stage", "sex", if (multi) "node")
   if (nrow(ev) == 0L) {
     ev$index <- integer(0)
-    return(ev[, c("day", "index", "count", "genotype", "stage", "sex")])
+    if (multi) ev$node <- character(0)
+    return(ev[, cols])
   }
   block <- ifelse(ev$stage == "egg", "E", ifelse(ev$stage == "pupa", "P",
     ifelse(ev$sex == "male", "M", "U")
   ))
+  node <- if (multi) ev$node else rep(1L, nrow(ev))
   ev$index <- vapply(seq_len(nrow(ev)), function(i) {
-    sg_state_index(model, block[i], genotype = ev$genotype[i], substage = 1L)
+    sg_state_index(model, block[i], genotype = ev$genotype[i], substage = 1L, node = node[i])
   }, 1L)
+  if (multi) ev$node <- ids[ev$node]
   key <- paste(ev$day, ev$index)
-  agg <- ev[!duplicated(key), c("day", "index", "genotype", "stage", "sex")]
+  agg <- ev[!duplicated(key), setdiff(cols, "count")]
   agg$count <- as.numeric(tapply(ev$count, factor(key, levels = unique(key)), sum))
-  agg <- agg[order(agg$day, agg$index), c("day", "index", "count", "genotype", "stage", "sex")]
+  agg <- agg[order(agg$day, agg$index), cols]
   rownames(agg) <- NULL
   agg
 }
@@ -523,6 +750,20 @@ print.sg_model <- function(x, ...) {
     adult = lapply(model$adult, function(ch) ch[c("segment_counts", "width", "last_class")]),
     releases = model$releases
   )
+  # landscape and movement enter only when present, so one-node hashes are
+  # unchanged (D-032)
+  if (!is.null(model$landscape)) {
+    inputs$landscape <- list(
+      nodes = model$landscape$nodes,
+      forcing = lapply(model$landscape$forcing, function(f) {
+        list(
+          dx = f$dx, dx_egg = f$dx_egg, mu_T = f$mu_T, mu_E = f$mu_E,
+          phi_ov = f$phi_ov, moisture = f$moisture
+        )
+      })
+    )
+  }
+  if (!is.null(model$movement)) inputs$movement <- model$movement
   txt <- paste(deparse(inputs, control = c("keepNA", "keepInteger", "digits17")),
     collapse = "\n"
   )

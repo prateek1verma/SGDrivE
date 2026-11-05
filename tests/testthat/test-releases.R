@@ -125,3 +125,27 @@ test_that("resolution checks genotypes and the simulation period", {
   expect_identical(nrow(ScrewDrivE:::.sg_resolve_releases(NULL, dates, 1, "W")), 0L)
   expect_error(ScrewDrivE:::.sg_resolve_releases(list(), dates, 1, "W"), "sg_releases object")
 })
+
+test_that("releases can name nodes; each node gets the full number (D-032)", {
+  rel <- sg_releases("S",
+    stage = "adult", sex = "male", times = c(5, 12), number = c(10, 20),
+    node = c("b", "a")
+  )
+  ev <- as.data.frame(rel)
+  expect_true("node" %in% names(ev))
+  expect_identical(nrow(ev), 4L)
+  expect_identical(ev$node, c("a", "b", "a", "b"))
+  expect_identical(ev$number, c(10, 10, 20, 20))
+  # without node the column is NA
+  plain <- sg_releases("S", stage = "pupa", times = 1, number = 1)
+  expect_true(all(is.na(as.data.frame(plain)$node)))
+  # combined schedules keep their nodes
+  both <- c(rel, sg_releases("S", stage = "pupa", times = 3, number = 5))
+  expect_identical(sum(is.na(as.data.frame(both)$node)), 1L)
+  pupa_at <- function(node) sg_releases("S", stage = "pupa", times = 1, number = 1, node = node)
+  expect_error(pupa_at(NA), "distinct node ids")
+  expect_error(pupa_at(c("a", "a")), "distinct")
+  expect_error(pupa_at(""), "distinct")
+  out <- capture.output(print(rel))
+  expect_true(any(grepl("S adult \\(male\\) @a", out)))
+})

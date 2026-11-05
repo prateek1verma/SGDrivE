@@ -13,6 +13,7 @@
 
 # Static, model-dependent quantities, computed once per simulation.
 .sg_reference_setup <- function(model) {
+  .sg_one_node_only(model, "Simulating this model", "this development step")
   d <- model$dims
   p <- model$params
   cb <- model$cube

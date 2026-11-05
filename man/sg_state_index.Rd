@@ -10,7 +10,8 @@ sg_state_index(
   block = c("E", "L", "P", "M", "U", "F", "HS", "HW", "HI"),
   genotype = NULL,
   mate = NULL,
-  substage = NULL
+  substage = NULL,
+  node = NULL
 )
 
 sg_state_names(model)
@@ -27,11 +28,15 @@ sub-stage). Host states are named e.g. \code{"HW[hosts]"}, \code{"HI[hosts,2]"}.
 \item{genotype, mate, substage}{Optional genotype names, mate genotype names
 (block \code{"F"} only) and sub-stage numbers. \code{NULL} selects all. Host blocks
 have no genotype.}
+
+\item{node}{Optional node ids or numbers (models with a landscape,
+\code{\link[=sg_landscape]{sg_landscape()}}). \code{NULL} selects all nodes.}
 }
 \value{
 \code{sg_state_index()}: integer positions (1-based), ordered with the
-sub-stage varying fastest. \code{sg_state_names()}: character vector of length
-\code{model$n_states}.
+sub-stage varying fastest and the node slowest. \code{sg_state_names()}:
+character vector of length \code{model$n_states}; with more than one node each
+name ends in \code{"@"} and the node id, e.g. \code{"M[AA,1]@north"}.
 }
 \description{
 \code{sg_state_index()} returns the positions in the state vector of the states

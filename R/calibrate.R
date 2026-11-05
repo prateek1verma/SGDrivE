@@ -58,6 +58,7 @@ calibrate_population <- function(model, target, parameter = NULL,
   if (!inherits(model, "sg_model")) {
     .sg_stop("`model` must be an sg_model object; create one with sg_model().")
   }
+  .sg_one_node_only(model, "calibrate_population()")
   hosts <- !is.null(model$hosts)
   allowed <- if (hosts) c("wounded_fraction", "host_density") else "wound_density"
   if (is.null(parameter)) parameter <- allowed[1L]

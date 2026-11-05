@@ -11,7 +11,8 @@ sg_releases(
   times,
   number,
   per = c("node", "km2"),
-  split = 0.5
+  split = 0.5,
+  node = NULL
 )
 }
 \arguments{
@@ -39,12 +40,17 @@ model is assembled; D-009).}
 
 \item{split}{For \code{sex = "both"}: fraction of each release that is female
 (default 0.5, D-013).}
+
+\item{node}{Node id(s) where the release takes place, for models with a
+landscape of several nodes (\code{\link[=sg_landscape]{sg_landscape()}}); each node given receives
+\code{number} per event. Required when the model has more than one node;
+ignored for one-node models. Releases per km^2 use each node's area.}
 }
 \value{
 An object of class \code{sg_releases} holding a data frame of events
-(one row per event, stage and sex) with columns \code{time}, \code{time_type}
+(one row per event, stage, sex and node) with columns \code{time}, \code{time_type}
 (\code{"day"} or \code{"date"}), \code{genotype}, \code{stage}, \code{sex} (\code{NA} for eggs and
-pupae), \code{number} and \code{per}.
+pupae), \code{number}, \code{per} and \code{node} (\code{NA} when not given).
 }
 \description{
 Defines releases of a genotype at a life stage on a set of days (D-005).
@@ -72,6 +78,12 @@ rel2
 # Combine schedules given in the same way (day numbers here)
 pupae <- sg_releases("S", stage = "pupa", times = 100, number = 50)
 c(rel, pupae)
+
+# In a landscape: the same weekly release in two named nodes
+sg_releases("S",
+  stage = "adult", sex = "male", times = seq(30, by = 7, length.out = 4),
+  number = 500, per = "km2", node = c("south", "middle")
+)
 }
 \seealso{
 \code{c()} to combine schedules; \code{as.data.frame()} to inspect them.

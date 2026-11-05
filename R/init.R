@@ -116,6 +116,9 @@ sg_init <- function(model,
     "method"
   )
   per <- .sg_match_choice(per, c("node", "km2"), "per")
+  if (method != "state") {
+    .sg_one_node_only(model, paste0("sg_init(method = \"", method, "\")"), "use method = \"state\"")
+  }
 
   if (method %in% c("burn_in", "equilibrium", "threshold")) {
     res <- if (method == "burn_in") {
@@ -366,12 +369,20 @@ print.sg_state <- function(x, ...) {
   }
   h <- model$hosts
   if (!is.null(h)) {
-    total <- sum(state[.sg_host_index(model)])
-    if (abs(total - h$n) > 1e-8 * max(1, h$n)) {
-      .sg_warn(sprintf(
-        "The host states sum to %s, not host_density * area = %s; the number of hosts stays %s.",
-        format(total), format(h$n), format(total)
-      ))
+    ids <- .sg_node_ids(model)
+    for (i in seq_along(ids)) {
+      idx <- unlist(lapply(.sg_host_blocks, function(b) sg_state_index(model, b, node = i)))
+      total <- sum(state[idx])
+      if (abs(total - h$n[i]) > 1e-8 * max(1, h$n[i])) {
+        .sg_warn(sprintf(
+          paste(
+            "The host states%s sum to %s, not host_density * area = %s;",
+            "the number of hosts stays %s."
+          ),
+          if (length(ids) > 1L) paste0(" of node ", ids[i]) else "",
+          format(total), format(h$n[i]), format(total)
+        ))
+      }
     }
   }
   as.numeric(state)

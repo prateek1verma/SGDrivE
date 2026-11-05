@@ -344,6 +344,7 @@ sg_equilibria <- function(model, temperature = NULL) {
   if (!inherits(model, "sg_model")) {
     .sg_stop("`model` must be an sg_model object; create one with sg_model().")
   }
+  .sg_one_node_only(model, "sg_equilibria()")
   if (is.null(temperature)) {
     temperature <- .sg_forcing_constant_temp(model$forcing, model$params)
     if (is.null(temperature)) {

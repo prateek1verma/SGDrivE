@@ -98,6 +98,7 @@ simulate_cb <- function(model, init = NULL, n_rep = 1L, dt = 0.1, output_every =
   if (!whole(n_rep, 1)) .sg_stop("`n_rep` must be a whole number >= 1.")
   if (!whole(output_every, 1)) .sg_stop("`output_every` must be a whole number >= 1 (days).")
   keep <- .sg_match_choice(keep, c("state", "totals"), "keep")
+  .sg_one_node_only(model, "simulate_cb()", "planned for the next version step; use simulate_ode()")
   if (!is.null(seed) && !whole(seed, -.Machine$integer.max)) {
     .sg_stop("`seed` must be NULL or a single whole number.")
   }

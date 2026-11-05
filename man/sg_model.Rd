@@ -7,11 +7,13 @@
 sg_model(
   params,
   cube,
-  forcing,
+  forcing = NULL,
   releases = NULL,
   area = 1,
   adult_segment_substages = NULL,
-  adult_females = NULL
+  adult_females = NULL,
+  landscape = NULL,
+  movement = NULL
 )
 }
 \arguments{
@@ -20,14 +22,16 @@ sg_model(
 \item{cube}{An \code{sg_cube} object (\code{\link[=sg_cube]{sg_cube()}}).}
 
 \item{forcing}{An \code{sg_forcing} object (\code{\link[=sg_forcing]{sg_forcing()}}) built with the same
-temperature, development and mortality parameters as \code{params}.}
+temperature, development and mortality parameters as \code{params}. Leave it
+\code{NULL} when a \code{landscape} is given (each node's forcing comes from it).}
 
 \item{releases}{Optional \code{sg_releases} object (\code{\link[=sg_releases]{sg_releases()}}).}
 
 \item{area}{Node area in km^2 (> 0; default 1, so counts equal densities
 numerically; D-009). Wound density \code{wound_density} and the mate-finding
 half-saturation \code{male_density_half_mating} (per km^2) and releases given per km^2 are
-converted to counts per node with it.}
+converted to counts per node with it. Not used with a \code{landscape}, which
+gives each node's area.}
 
 \item{adult_segment_substages}{Optional list with elements \code{female} and/or \code{male}:
 the number of sub-stages in each segment of that sex's adult chain,
@@ -43,20 +47,34 @@ wild-type equilibrium at the forcing's constant temperature has this many
 adult females (see Details). Give \code{area} or \code{adult_females}, not both.
 Needs a forcing with one constant temperature, e.g. from
 \code{\link[=sg_constant_weather]{sg_constant_weather()}}, and a cube with a single wild type that breeds
-true.}
+true. Not available with a \code{landscape}.}
+
+\item{landscape}{Optional \code{sg_landscape} object (\code{\link[=sg_landscape]{sg_landscape()}}): several
+nodes, each with its own area, forcing, wound or host density and role
+(MODEL_SPEC section 8a, D-032). Without it the model has one node.}
+
+\item{movement}{Optional \code{sg_movement_layer} object (\code{\link[=sg_movement_layer]{sg_movement_layer()}})
+or a list with one such layer: how adults move between the landscape's
+nodes. Needs a \code{landscape}. (Several layers follow in a later version.)}
 }
 \value{
 An object of class \code{sg_model}: a list with \code{params}, \code{cube},
-\code{forcing}, \code{area}, \code{dims} (numbers of genotypes, sub-stages, nodes and
-host classes), \code{adult} (female and male chains), \code{layout} (one row per
-state block: name, first index, length), \code{n_states}, \code{counts} (wound
-number \code{H}, half-saturation \code{h_M}, extinction threshold, per node; internal names;
+\code{forcing} (with a landscape: the forcing of the first node; all nodes
+share its dates), \code{area} (one value per node), \code{dims} (numbers of
+genotypes, sub-stages, nodes and host classes), \code{adult} (female and male
+chains), \code{layout} (one row per state block of a node: name, first index
+within the node, length), \code{n_states} (all nodes), \code{counts} (wound
+number \code{H}, half-saturation \code{h_M}, one value per node, and the extinction
+threshold; internal names;
 \code{H} is \code{NA} with the host-wound model), \code{hosts} (\code{NULL} with
-\code{wound_model = "static"}; otherwise the host class, host count per node
-\code{n}, infestation sub-stages \code{n_I} and per-host rates per day \code{wounding},
+\code{wound_model = "static"}; otherwise the host class, host count \code{n} of
+each node, infestation sub-stages \code{n_I} and per-host rates per day \code{wounding},
 \code{healing}, \code{advance}, \code{treatment} and \code{attractiveness}, D-030),
-\code{releases} (events with day, state index and count) and \code{meta}
-(package version and hash).
+\code{releases} (events with day, state index and count; with several nodes
+also the node) and \code{meta} (package version and hash). With a landscape
+also \code{n_states_node} (states per node), \code{landscape} and \code{movement} (the
+merged movement groups, \code{dx_ref}, \code{t_ref} and \code{kappa_max}; \code{NULL}
+without movement).
 }
 \description{
 Combines parameters, an inheritance cube, weather forcing and releases into
@@ -80,6 +98,13 @@ blocks E, L, P, M, U, F (in this order). Within each block the index order
 from slowest to fastest is node, host class, genotype, mate genotype
 (F only), sub-stage. Use \code{\link[=sg_state_index]{sg_state_index()}} and \code{\link[=sg_state_names]{sg_state_names()}} rather
 than computing positions by hand.
+
+\strong{Several nodes} (D-032). With a landscape of N nodes the state vector is
+the concatenation of N per-node vectors, each with the layout above (node
+slowest), and state names end in \code{"@"} and the node id, e.g.
+\code{"M[AA,1]@north"}. Each node's wound count (or host count), mate-finding
+half-saturation and per-km^2 releases use that node's area and densities.
+Releases need a \code{node} (\code{\link[=sg_releases]{sg_releases()}}).
 
 \strong{Releases} enter the first sub-stage of their stage: eggs E, pupae P,
 adult males M and adult females U (unmated).
