@@ -637,6 +637,69 @@ both cubes, the chain-binomial draw-for-draw test with s = 0.4 and s = 0,
 and ODE runs in which releases of infertile females alone leave the wild
 population unchanged.
 
+## D-032 Several nodes and adult movement, v0.2 (Accepted, 2026-11-04)
+
+v0.1 has one node, but the questions that matter for NWS control are
+spatial: how fast an infestation spreads north each season, how wide a
+sterile-fly barrier must be, whether distant nodes are reinvaded, and how
+the Texas 1962 county series is reproduced. Equations: MODEL_SPEC section
+8a (N1–N5); biology, interface, outputs, tests and work packages:
+dev/MOVEMENT_DESIGN.md. Decisions (user, 2026-11-02, revised and completed
+2026-11-04; numbers as in the design note, section 10):
+
+1. Adults move (M, U and F; unmated females too), keeping genotype, mate
+   genotype and sub-stage. Eggs, larvae, pupae and hosts do not move
+   (host transport is v0.4).
+2. Movement clock: κ = min(κ_max, Δx(T)/Δx(T_ref)), rates given per day at
+   T_ref = `movement_t_ref` = 27 °C; `movement_kappa_max` = 1 by default
+   (capped), `Inf` for uncapped degree-day scaling; a calendar clock
+   (κ = 1) per layer for wind-borne movement and the MGDrivE2 cross-check.
+   No study relates NWS movement to temperature or supports 27 °C or the
+   cap (27 °C is a reference point near T_opt where field rates were
+   measured), so the clock is a sensitivity dimension: the first transect
+   runs calendar, capped and uncapped.
+3. The only model input is leave rates and destination probabilities (the
+   generator of a continuous-time Markov chain over nodes, as in
+   MGDrivE2); no built-in kernel. Constructors that take a user-supplied
+   kernel, exact conversion helpers and `check_movement()` remove the
+   scale dependence of raw rates.
+4. Long-distance movement uses the same framework as additional layers; the
+   interface takes a list of layers from the start (one in phases 1–3,
+   several in phase 4). Batch events deferred.
+5. First landscape: a south Texas transect built with the general diffusion
+   constructor; Texas counties as the documented general network (phase 4).
+6. Open or closed landscape edges through destination rows ≤ 1; the
+   remainder leaves the landscape and is counted.
+7. Inflow from outside: source nodes with their own weather.
+8. Time variation kept minimal: the clock in phases 1–3, one daily
+   multiplier per layer in phase 4; richer forms deferred.
+9. Outputs: a recorder stores only requested quantities (weighted sums of
+   states and counters computed in C++), with full states on request.
+10. The recorder is built in phases 1–2 (ODE, then chain-binomial).
+11. Simplifications: optional ODE node extinction rule; layers merged
+    inside the model by (clock, schedule), one emigration draw per
+    compartment in the chain-binomial step; one destination matrix per
+    layer and one T_ref per model; stiff fallback off for several nodes;
+    fixed habitat differences through per-node rates; MGDrivE2fast
+    cross-check optional.
+12. The node extinction rule (N5) stays optional and off by default, also
+    for several nodes.
+13. Whether the recorder's `"totals"` replaces the full `sim$state` as the
+    default output is decided once the recorder is fully integrated; until
+    then full states stay the default.
+
+Choices made in writing the specification (phase 0), within these
+decisions: in the chain-binomial step movement comes after the chain moves
+and before emergence and arrivals, immigrants are added after all
+emigration draws (no fly moves twice in a step); the node extinction rule
+returns a node's infested hosts to S and counts them in
+infestations_ended, and counts removed flies per node and stage;
+`"equilibrium"`, `"threshold"` and R0 are computed per node without
+movement (exact for zero net movement, otherwise a start for a burn-in).
+Parameters `movement_t_ref` and `movement_kappa_max` enter the parameter
+table with the code (phase 1). Effects: with one node and no movement every
+result is unchanged (bitwise for the ODE).
+
 ---
 
 ## Open questions
