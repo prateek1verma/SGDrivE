@@ -3,7 +3,7 @@
     Code
       print(sg_params(adult_substages = 8))
     Output
-      <sg_params> preset "default": 52 parameters, 1 differ from the defaults (*)
+      <sg_params> preset "default": 54 parameters, 1 differ from the defaults (*)
       
       temperature
           dev_temp_min                  14.5                 degC                  GP2014
@@ -71,6 +71,10 @@
           infestation_substages         6                    -                     adapted
           infested_wound_attractiveness 1                    -                     adapted
           treatment_rate                0                    d^-1                  adapted
+      
+      movement
+          movement_t_ref                27                   degC                  adapted
+          movement_kappa_max            1                    -                     adapted
       
       numerical
           extinction_threshold          1                    individuals           adapted

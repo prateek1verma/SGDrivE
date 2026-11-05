@@ -3,7 +3,7 @@ test_that("parameter table has the documented columns and unique names", {
   expect_s3_class(tab, "data.frame")
   expect_named(tab, c(
     "name", "symbol", "group", "type", "default", "lower", "upper",
-    "bounds", "choices", "allow_na", "units", "source", "spec", "description"
+    "bounds", "choices", "allow_na", "allow_inf", "units", "source", "spec", "description"
   ))
   expect_false(anyDuplicated(tab$name) > 0)
   expect_true(all(tab$group %in% ScrewDrivE:::.sg_param_groups))
@@ -15,7 +15,7 @@ test_that("parameter table has the documented columns and unique names", {
 test_that("every parameter has units, a spec equation and a description", {
   tab <- sg_param_table()
   expect_true(all(nzchar(tab$units)))
-  expect_true(all(grepl("^[SH][0-9]+(, [SH][0-9]+)*$", tab$spec)))
+  expect_true(all(grepl("^[SHN][0-9]+(, [SHN][0-9]+)*$", tab$spec)))
   expect_true(all(nchar(tab$description) > 10))
 })
 
@@ -69,4 +69,15 @@ test_that("host-wound parameters are in the table (D-030)", {
   expect_true(is.na(d$host_density) && is.na(d$wounded_fraction))
   expect_identical(d$infestation_substages, 6L)
   expect_match(tab$choices[tab$name == "larval_crowding_mode"], "per_infested_host")
+})
+
+test_that("movement parameters are in the table (D-032)", {
+  tab <- sg_param_table()
+  mv <- tab[tab$group == "movement", ]
+  expect_identical(mv$name, c("movement_t_ref", "movement_kappa_max"))
+  expect_identical(mv$symbol, c("T_ref", "kappa_max"))
+  expect_identical(mv$default, c("27", "1"))
+  expect_true(all(mv$spec == "N3"))
+  # only movement_kappa_max may be Inf
+  expect_identical(tab$name[tab$allow_inf], "movement_kappa_max")
 })

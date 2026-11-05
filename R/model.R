@@ -498,12 +498,19 @@ print.sg_model <- function(x, ...) {
   out
 }
 
+# Parameters that act only through movement (MODEL_SPEC N3, D-032).
+.sg_movement_param_names <- c("movement_t_ref", "movement_kappa_max")
+
 # MD5 hash of the model inputs, computed from a canonical text representation
-# (independent of the R version, unlike serialize()).
+# (independent of the R version, unlike serialize()). Movement parameters
+# enter only when the model has movement, so models without movement keep the
+# hashes they had before movement existed (D-032).
 .sg_model_hash <- function(model) {
   f <- model$forcing
+  params <- unclass(model$params)
+  if (is.null(model$movement)) params[.sg_movement_param_names] <- NULL # keeps attribute preset
   inputs <- list(
-    params = unclass(model$params),
+    params = params,
     cube = model$cube[c(
       "genotypes", "wild_type", "release_type", "eta", "phi", "xiF", "xiM", "s",
       "ell", "egg_tensor"
