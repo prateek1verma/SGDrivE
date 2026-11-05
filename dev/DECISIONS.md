@@ -689,13 +689,17 @@ dev/MOVEMENT_DESIGN.md. Decisions (user, 2026-11-02, revised and completed
     then full states stay the default.
 
 Choices made in writing the specification (phase 0), within these
-decisions: in the chain-binomial step movement comes after the chain moves
+decisions, confirmed by the user on 2026-11-04: in the chain-binomial step movement comes after the chain moves
 and before emergence and arrivals, immigrants are added after all
 emigration draws (no fly moves twice in a step); the node extinction rule
 returns a node's infested hosts to S and counts them in
 infestations_ended, and counts removed flies per node and stage;
 `"equilibrium"`, `"threshold"` and R0 are computed per node without
-movement (exact for zero net movement, otherwise a start for a burn-in).
+movement (exact for zero net movement, otherwise a start for a burn-in);
+the `lsoda` stiff fallback is off by default for several nodes. The
+movement step order is first-order operator splitting: any order differs
+from the ODE only at order dt, and holding immigrants until all emigration
+draws are done keeps the result independent of node numbering.
 Parameters `movement_t_ref` and `movement_kappa_max` enter the parameter
 table with the code (phase 1). Effects: with one node and no movement every
 result is unchanged (bitwise for the ODE).
