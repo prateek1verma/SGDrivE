@@ -29,6 +29,8 @@
 #'   (ColorBrewer Dark2, up to 8 series) or `"viridis"` (any number). With 9
 #'   to 12 series both `"okabe_ito"` and `"brewer"` use ColorBrewer Paired,
 #'   with more than 12 viridis.
+#' @param nodes For models with a landscape: the nodes to sum over (default
+#'   the study nodes); see [sg_totals()].
 #' @param ... Not used.
 #' @return A ggplot object (add layers, scales or themes with `+`). The
 #'   plotted data are returned by [sg_plot_data()].
@@ -51,8 +53,8 @@
 plot.sg_sim <- function(x, what = c("stages", "genotypes", "alleles", "females", "cases", "hosts"),
                         stages = NULL, per = c("km2", "node"), period = "week",
                         host_density = NULL, replicates = NULL,
-                        palette = c("okabe_ito", "brewer", "viridis"), ...) {
-  .sg_plot(x, what, stages, per, period, host_density, replicates, palette)
+                        palette = c("okabe_ito", "brewer", "viridis"), nodes = NULL, ...) {
+  .sg_plot(x, what, stages, per, period, host_density, replicates, palette, nodes)
 }
 
 #' @rdname plot.sg_sim
@@ -61,8 +63,8 @@ plot.sg_sim_cb <- function(x,
                            what = c("stages", "genotypes", "alleles", "females", "cases", "hosts"),
                            stages = NULL, per = c("km2", "node"), period = "week",
                            host_density = NULL, replicates = NULL,
-                           palette = c("okabe_ito", "brewer", "viridis"), ...) {
-  .sg_plot(x, what, stages, per, period, host_density, replicates, palette)
+                           palette = c("okabe_ito", "brewer", "viridis"), nodes = NULL, ...) {
+  .sg_plot(x, what, stages, per, period, host_density, replicates, palette, nodes)
 }
 
 #' Data behind a simulation plot
@@ -86,7 +88,7 @@ plot.sg_sim_cb <- function(x,
 sg_plot_data <- function(sim,
                          what = c("stages", "genotypes", "alleles", "females", "cases", "hosts"),
                          stages = NULL, per = c("km2", "node"), period = "week",
-                         host_density = NULL, replicates = NULL) {
+                         host_density = NULL, replicates = NULL, nodes = NULL) {
   what <- .sg_match_choice(
     what, c("stages", "genotypes", "alleles", "females", "cases", "hosts"), "what"
   )
@@ -96,28 +98,28 @@ sg_plot_data <- function(sim,
   if (is.null(stages)) stages <- if (what == "stages") "all" else "adults"
   d <- switch(EXPR = what,
     stages = {
-      t <- sg_totals(sim, by = "stage", stages = stages, per = per)
+      t <- sg_totals(sim, by = "stage", stages = stages, per = per, nodes = nodes)
       out <- .sg_series(t, "stage", "value")
       lev <- intersect(.sg_stage_names, unique(out$series))
       out$series <- factor(gsub("_", " ", out$series), levels = gsub("_", " ", lev))
       structure(out, ylab = paste("individuals", unit), title = "Totals by stage")
     },
     genotypes = {
-      t <- sg_totals(sim, by = "genotype", stages = stages, per = per)
+      t <- sg_totals(sim, by = "genotype", stages = stages, per = per, nodes = nodes)
       structure(.sg_series(t, "genotype", "value"),
         ylab = paste("individuals", unit),
         title = paste("Totals by genotype:", paste(stages, collapse = ", "))
       )
     },
     alleles = {
-      t <- sg_allele_freq(sim, stages = stages)
+      t <- sg_allele_freq(sim, stages = stages, nodes = nodes)
       structure(.sg_series(t, "allele", "freq"),
         ylab = "allele frequency",
         title = paste("Allele frequencies:", paste(stages, collapse = ", "))
       )
     },
     females = {
-      f <- sg_females(sim, per = per)
+      f <- sg_females(sim, per = per, nodes = nodes)
       classes <- c("females", "unmated", "mated", "wild_type", "egg_laying", "fertile_equivalent")
       classes <- classes[vapply(classes, function(cl) !all(is.na(f[[cl]])), TRUE)]
       ids <- intersect(c("date", "replicate"), names(f))
@@ -128,7 +130,7 @@ sg_plot_data <- function(sim,
       structure(out, ylab = paste("females", unit), title = "Female classes")
     },
     cases = {
-      cs <- sg_cases(sim, period = period, per = per, host_density = host_density)
+      cs <- sg_cases(sim, period = period, per = per, host_density = host_density, nodes = nodes)
       col <- if (is.null(host_density)) "cases" else "cases_per_host"
       ids <- intersect(c("period", "replicate"), names(cs))
       out <- cbind(cs[ids], series = gsub("_", " ", col), value = cs[[col]])
@@ -147,7 +149,7 @@ sg_plot_data <- function(sim,
       )
     },
     hosts = {
-      hs <- sg_hosts(sim, per = per)
+      hs <- sg_hosts(sim, per = per, nodes = nodes)
       classes <- c("unwounded", "wounded", "infested")
       ids <- intersect(c("date", "replicate"), names(hs))
       out <- do.call(rbind, lapply(classes, function(cl) {
@@ -171,12 +173,12 @@ sg_plot_data <- function(sim,
 .sg_has_ggplot2 <- function() requireNamespace("ggplot2", quietly = TRUE)
 
 .sg_plot <- function(sim, what, stages, per, period, host_density, replicates,
-                     palette = "okabe_ito") {
+                     palette = "okabe_ito", nodes = NULL) {
   palette <- .sg_match_choice(palette, c("okabe_ito", "brewer", "viridis"), "palette")
   if (!.sg_has_ggplot2()) {
     .sg_stop("Plots need the 'ggplot2' package: install.packages(\"ggplot2\").")
   }
-  d <- sg_plot_data(sim, what, stages, per, period, host_density, replicates)
+  d <- sg_plot_data(sim, what, stages, per, period, host_density, replicates, nodes)
   stochastic <- "replicate" %in% names(d)
   if (stochastic) d$line <- interaction(d$series, d$replicate, drop = TRUE)
   aes_of <- function(...) do.call(ggplot2::aes, lapply(list(...), as.name))

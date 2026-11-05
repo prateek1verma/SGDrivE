@@ -4,18 +4,25 @@
 \alias{sg_hosts}
 \title{Hosts of the host-wound model}
 \usage{
-sg_hosts(sim, per = c("node", "km2"))
+sg_hosts(sim, per = c("node", "km2"), nodes = NULL)
 }
 \arguments{
 \item{sim}{A simulation from \code{\link[=simulate_ode]{simulate_ode()}} or \code{\link[=simulate_cb]{simulate_cb()}}.}
 
-\item{per}{\code{"node"} (counts per node) or \code{"km2"} (divided by the node area).}
+\item{per}{\code{"node"} (counts per node) or \code{"km2"} (divided by the node area).
+With several nodes: counts summed over the chosen nodes, or divided by
+their summed area (by each node's area when grouping by \code{"node"}).}
+
+\item{nodes}{For models with a landscape (\code{\link[=sg_landscape]{sg_landscape()}}): ids or numbers
+of the nodes to include. Default: the study nodes (source nodes are left
+out).}
 }
 \value{
 A data frame with columns \code{day}, \code{date}, \code{replicate} (stochastic
 runs only), \code{unwounded}, \code{wounded}, \code{infested} (summed over infestation
 sub-stages), \code{hosts} (all three) and \code{prevalence} (infested / hosts).
-Counts are per node, or per km^2 with \code{per = "km2"}.
+Counts are per node, or per km^2 with \code{per = "km2"}; with several nodes
+summed over \code{nodes} (default the study nodes).
 }
 \description{
 Numbers of hosts without an attractive wound, wounded and infested, for a

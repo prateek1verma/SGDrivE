@@ -43,6 +43,16 @@ never mature as mates (their lifespan ends first, D-018); released
 genotypes whose crosses with wild-type females give no viable eggs are
 listed as sterile (expected for sterile insect releases); populations
 below about ten wild-type individuals per node at their seasonal low.
+
+\strong{Several nodes} (D-032). Every node is checked as a one-node model (its
+forcing, area, wounds or hosts), giving a table by node (\code{nodes}) with the
+fastest rate, the R0 range and days with R0 > 1 and, with \code{scale}, the
+smallest wild population in the node from a burn-in and run of the whole
+landscape with movement. \code{movement} summarises the movement groups
+(largest leave rate by class at the reference temperature, nodes with open
+edges). Warnings are those of the nodes and of the model; with more than
+one node a note recalls that ODE runs without \code{node_extinction} can show
+recolonisation by fractions of a fly.
 }
 \examples{
 if (requireNamespace("MGDrivE", quietly = TRUE)) {

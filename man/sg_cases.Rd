@@ -8,7 +8,8 @@ sg_cases(
   sim,
   period = c("day", "week", "month", "year"),
   per = c("km2", "node"),
-  host_density = NULL
+  host_density = NULL,
+  nodes = NULL
 )
 }
 \arguments{
@@ -22,6 +23,10 @@ sg_cases(
 \item{host_density}{Optional density of hosts (animals per km^2); adds
 cases per host. Not used with the host-wound model, whose own host
 density gives \code{cases_per_host}.}
+
+\item{nodes}{For models with a landscape: ids or numbers of the nodes
+whose cases are summed (default the study nodes); per km^2, wound
+fractions and cases per host then refer to these nodes together.}
 }
 \value{
 A data frame with columns \code{period} (first day), \code{days},

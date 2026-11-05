@@ -278,7 +278,7 @@ print.sg_sim <- function(x, ...) {
   tot <- .sg_sim_block_totals(x)
   last <- tot[nrow(tot), ]
   cat(
-    "  final totals: ",
+    "  final totals", if (.sg_sim_nodes(x)$multi) " (study nodes)", ": ",
     paste0(names(last), " ", format(last, digits = 4L), collapse = ", "), "\n",
     sep = ""
   )
@@ -287,7 +287,7 @@ print.sg_sim <- function(x, ...) {
     cat(sprintf(
       "  hosts: %s infested of %s at the end (prevalence %.3g); %s infestations\n",
       format(hs$infested[nrow(hs)], digits = 4L), format(hs$hosts[nrow(hs)], digits = 6L),
-      hs$prevalence[nrow(hs)], format(.sg_counter_total(x, "infestations"), digits = 5L)
+      hs$prevalence[nrow(hs)], format(sum(sg_cases(x, "year", per = "node")$cases), digits = 5L)
     ))
   }
   cat(sprintf(
@@ -532,14 +532,23 @@ print.sg_sim <- function(x, ...) {
   res
 }
 
-# Individuals released per day (rows) and block (columns E, P, M, U).
+# Individuals released per day (rows) and block (columns E, P, M, U); with
+# several nodes per block and node ("M@north", D-032).
 .sg_release_matrix <- function(model) {
   rel <- model$releases
   blocks <- c("E", "P", "M", "U")
-  out <- matrix(0, model$forcing$n_days, length(blocks), dimnames = list(NULL, blocks))
-  rel_block <- substr(sg_state_names(model)[rel$index], 1L, 1L)
+  ids <- .sg_node_ids(model)
+  cols <- if (length(ids) == 1L) {
+    blocks
+  } else {
+    paste0(rep(blocks, length(ids)), "@", rep(ids, each = length(blocks)))
+  }
+  out <- matrix(0, model$forcing$n_days, length(cols), dimnames = list(NULL, cols))
+  nm <- sg_state_names(model)[rel$index]
+  rel_col <- substr(nm, 1L, 1L)
+  if (length(ids) > 1L) rel_col <- paste0(rel_col, "@", .sg_name_node(nm))
   for (j in seq_along(rel$day)) {
-    out[rel$day[j], rel_block[j]] <- out[rel$day[j], rel_block[j]] + rel$count[j]
+    out[rel$day[j], rel_col[j]] <- out[rel$day[j], rel_col[j]] + rel$count[j]
   }
   out
 }
@@ -603,12 +612,18 @@ print.sg_sim <- function(x, ...) {
   )
 }
 
-# Totals by block at each output day (rows) from the state matrix.
+# Totals by block at each output day (rows) from the state matrix; with
+# several nodes over the study nodes (D-032).
 .sg_sim_block_totals <- function(sim) {
-  block <- substr(colnames(sim$state), 1L, 1L)
+  st <- sim$state
+  if (inherits(sim, "sg_sim") && .sg_sim_nodes(sim)$multi) {
+    a <- .sg_sim_array(sim)
+    st <- matrix(a$array[, , 1L], dim(a$array)[1L], dimnames = list(NULL, dimnames(a$array)[[2L]]))
+  }
+  block <- substr(colnames(st), 1L, 1L)
   tot <- vapply(c("E", "L", "P", "M", "U", "F"), function(b) {
-    rowSums(sim$state[, block == b, drop = FALSE])
-  }, numeric(nrow(sim$state)))
+    rowSums(st[, block == b, drop = FALSE])
+  }, numeric(nrow(st)))
   if (!is.matrix(tot)) tot <- matrix(tot, nrow = 1L, dimnames = list(NULL, names(tot)))
   tot
 }

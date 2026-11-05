@@ -215,10 +215,9 @@ test_that("functions without multi-node support yet stop clearly", {
   m <- sg_model(p, cube, landscape = nodes_landscape(p), movement = chain_layer())
   x0 <- numeric(m$n_states)
   expect_error(simulate_cb(m, init = x0), "simulate_cb\\(\\) is not available")
-  expect_error(check_model(m), "check_model\\(\\) is not available")
   expect_error(calibrate_population(m, 10), "calibrate_population\\(\\) is not available")
-  # (sg_init() and sg_equilibria() handle several nodes since WP7,
-  # test-init-nodes.R); a full state vector is accepted
+  # (sg_init() and sg_equilibria() handle several nodes since WP7 and
+  # check_model() since WP8); a full state vector is accepted
   x <- sg_init(m, "state", state = x0)
   expect_length(x, m$n_states)
   expect_identical(names(x), sg_state_names(m))

@@ -4,12 +4,18 @@
 \alias{sg_females}
 \title{Female classes}
 \usage{
-sg_females(sim, per = c("node", "km2"))
+sg_females(sim, per = c("node", "km2"), nodes = NULL)
 }
 \arguments{
 \item{sim}{A simulation from \code{\link[=simulate_ode]{simulate_ode()}} or \code{\link[=simulate_cb]{simulate_cb()}}.}
 
-\item{per}{\code{"node"} (counts per node) or \code{"km2"} (divided by the node area).}
+\item{per}{\code{"node"} (counts per node) or \code{"km2"} (divided by the node area).
+With several nodes: counts summed over the chosen nodes, or divided by
+their summed area (by each node's area when grouping by \code{"node"}).}
+
+\item{nodes}{For models with a landscape (\code{\link[=sg_landscape]{sg_landscape()}}): ids or numbers
+of the nodes to include. Default: the study nodes (source nodes are left
+out).}
 }
 \value{
 A data frame with columns \code{day}, \code{date}, \code{replicate} (stochastic
@@ -25,7 +31,8 @@ a female mated to a sterile male counts 0, one with half the viable
 eggs counts 0.5.}
 }
 \code{egg_laying} and \code{fertile_equivalent} need the full state, so they are
-\code{NA} for stochastic runs with \code{keep = "totals"}.
+\code{NA} for stochastic runs with \code{keep = "totals"}. With several nodes the
+females of \code{nodes} (default the study nodes) are summed.
 }
 \description{
 Adult female numbers by class: the quantities that matter for genetic

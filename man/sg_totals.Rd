@@ -10,24 +10,39 @@ sg_totals(
   sim,
   by = c("stage", "genotype"),
   stages = "all",
-  per = c("node", "km2")
+  per = c("node", "km2"),
+  nodes = NULL
 )
 
-\method{as.data.frame}{sg_sim}(x, row.names = NULL, optional = FALSE, ..., per = "node")
+\method{as.data.frame}{sg_sim}(
+  x,
+  row.names = NULL,
+  optional = FALSE,
+  ...,
+  per = "node",
+  nodes = NULL
+)
 
 \method{as.data.frame}{sg_sim_cb}(x, row.names = NULL, optional = FALSE, ..., per = "node")
 }
 \arguments{
 \item{sim}{A simulation from \code{\link[=simulate_ode]{simulate_ode()}} or \code{\link[=simulate_cb]{simulate_cb()}}.}
 
-\item{by}{Grouping variables, any of \code{"stage"}, \code{"sex"}, \code{"genotype"} and
-\code{"mate"}; \code{character(0)} gives the grand total.}
+\item{by}{Grouping variables, any of \code{"stage"}, \code{"sex"}, \code{"genotype"},
+\code{"mate"} and (models with a landscape) \code{"node"}; \code{character(0)} gives the
+grand total.}
 
 \item{stages}{Stages to include, any of \code{"eggs"}, \code{"larvae"}, \code{"pupae"},
 \code{"males"}, \code{"unmated_females"}, \code{"mated_females"}, or the shortcuts
 \code{"adults"} (the last three), \code{"juveniles"} (the first three) and \code{"all"}.}
 
-\item{per}{\code{"node"} (counts per node) or \code{"km2"} (divided by the node area).}
+\item{per}{\code{"node"} (counts per node) or \code{"km2"} (divided by the node area).
+With several nodes: counts summed over the chosen nodes, or divided by
+their summed area (by each node's area when grouping by \code{"node"}).}
+
+\item{nodes}{For models with a landscape (\code{\link[=sg_landscape]{sg_landscape()}}): ids or numbers
+of the nodes to include. Default: the study nodes (source nodes are left
+out).}
 
 \item{x}{A simulation from \code{\link[=simulate_ode]{simulate_ode()}} or \code{\link[=simulate_cb]{simulate_cb()}}.}
 
@@ -47,7 +62,12 @@ genotype and (for mated females) mate genotype.
 Stages are the model's blocks E, L, P, M, U and F; juveniles have
 sex \code{"unsexed"}. Grouping by \code{"mate"} needs the full state, so it is not
 available for stochastic runs with \code{keep = "totals"}; the mate of
-individuals other than mated females is \code{NA}.
+individuals other than mated females is \code{NA}. With several nodes the
+counts are summed over \code{nodes} unless \code{by} contains \code{"node"}.
+
+\code{as.data.frame()} gives totals by stage, sex, genotype and mate,
+and with several nodes also by node, for all nodes unless \code{nodes} is
+given.
 }
 \examples{
 if (requireNamespace("MGDrivE", quietly = TRUE)) {

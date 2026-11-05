@@ -47,7 +47,11 @@ sg_r0 <- function(model, temperature) {
 #'
 #' Checks that every change in the total number of individuals is explained
 #' by the recorded flows: releases plus eggs laid minus deaths (by hazard, old
-#' age and at emergence), between consecutive output days.
+#' age and at emergence), between consecutive output days. With several
+#' nodes (D-032) the balance is node by node and includes movement
+#' (immigrants minus emigrants, emigrants including those that leave the
+#' landscape); with the node extinction rule ([simulate_ode()]) it includes
+#' the removed flies.
 #'
 #' @param sim A simulation from [simulate_ode()] or [simulate_cb()].
 #' @return A data frame with columns `day` (end of each interval between
@@ -58,7 +62,10 @@ sg_r0 <- function(model, temperature) {
 #'   states are not counted. With the host-wound model (D-030) a column
 #'   `host_residual` gives the largest mismatch between the change of a host
 #'   block (HS, HW, HI) and its host flows (round-off for the ODE, zero for
-#'   stochastic runs).
+#'   stochastic runs). With several nodes a column `node` after `day`, one row
+#'   per node and interval; with movement a column `movement` (net
+#'   immigration); with the node extinction rule a column `removed`; the
+#'   residual includes them.
 #' @export
 #' @examples
 #' if (requireNamespace("MGDrivE", quietly = TRUE)) {
@@ -68,20 +75,43 @@ sg_r0 <- function(model, temperature) {
 #'   max(abs(sg_flow_balance(sim)$residual))
 #' }
 sg_flow_balance <- function(sim) {
-  .sg_sim_info(sim)
-  a <- .sg_sim_array(sim)$array
+  sel <- .sg_sim_nodes(sim, default = "all")
+  if (!sel$multi) {
+    return(.sg_flow_balance_unit(sim, .sg_sim_array(sim)$array, sim$counters, sim$releases))
+  }
+  # several nodes: each node's states, counters and releases (D-032)
+  a_all <- .sg_sim_array(sim, default = "all")
+  k_node <- .sg_name_node(colnames(sim$counters))
+  r_node <- .sg_name_node(colnames(sim$releases))
+  rows <- lapply(sel$ids, function(id) {
+    a <- a_all$array[, a_all$node == id, , drop = FALSE]
+    k <- sim$counters[, k_node == id, drop = FALSE]
+    colnames(k) <- sub("@.*$", "", colnames(k))
+    rel <- sim$releases[, r_node == id, drop = FALSE]
+    d <- .sg_flow_balance_unit(sim, a, k, rel)
+    cbind(d[1L], node = id, d[-1L])
+  })
+  out <- do.call(rbind, rows)
+  rownames(out) <- NULL
+  out
+}
+
+# Flow balance of one node (or of a one-node simulation): states a [time,
+# column, replicate], counters k and releases rel without node suffixes.
+.sg_flow_balance_unit <- function(sim, a, k, rel) {
   stochastic <- inherits(sim, "sg_sim_cb")
-  k <- sim$counters
-  rel <- sim$releases
   if (!stochastic) {
+    cn0 <- colnames(k)
     dim(k) <- c(dim(k), 1L)
-    dimnames(k) <- list(NULL, colnames(sim$counters), NULL)
+    dimnames(k) <- list(NULL, cn0, NULL)
     dim(rel) <- c(dim(rel), 1L)
   }
   cn <- dimnames(k)[[2L]]
   out_days <- sim$day[-1L]
   interval <- findInterval(seq_len(dim(k)[1L]), c(0, out_days) + 1L)
   host <- .sg_is_host_name(dimnames(a)[[2L]])
+  moving <- any(grepl("^emigrants_", cn))
+  removing <- any(grepl("^removed_", cn))
   rows <- lapply(seq_len(dim(a)[3L]), function(r) {
     total <- rowSums(matrix(a[, !host, r], dim(a)[1L]))
     per_day <- function(cols) rowSums(matrix(k[, cols, r], dim(k)[1L]))
@@ -94,6 +124,15 @@ sg_flow_balance <- function(sim) {
       day = out_days, change = change, releases = released, eggs_laid = eggs,
       deaths = deaths, residual = change - released - eggs + deaths
     )
+    if (moving) {
+      d$movement <- sum_by(per_day(grepl("^immigrants_", cn))) -
+        sum_by(per_day(grepl("^emigrants_", cn)))
+      d$residual <- d$residual - d$movement
+    }
+    if (removing) {
+      d$removed <- sum_by(per_day(grepl("^removed_", cn)))
+      d$residual <- d$residual + d$removed
+    }
     if (any(host)) {
       # host conservation (D-030): the change of each host block equals its
       # flows; the largest absolute mismatch of HS, HW and HI
@@ -146,6 +185,16 @@ sg_flow_balance <- function(sim) {
 #' genotypes whose crosses with wild-type females give no viable eggs are
 #' listed as sterile (expected for sterile insect releases); populations
 #' below about ten wild-type individuals per node at their seasonal low.
+#'
+#' **Several nodes** (D-032). Every node is checked as a one-node model (its
+#' forcing, area, wounds or hosts), giving a table by node (`nodes`) with the
+#' fastest rate, the R0 range and days with R0 > 1 and, with `scale`, the
+#' smallest wild population in the node from a burn-in and run of the whole
+#' landscape with movement. `movement` summarises the movement groups
+#' (largest leave rate by class at the reference temperature, nodes with open
+#' edges). Warnings are those of the nodes and of the model; with more than
+#' one node a note recalls that ODE runs without `node_extinction` can show
+#' recolonisation by fractions of a fly.
 #' @seealso [sg_r0()], [sg_flow_balance()]
 #' @export
 #' @examples
@@ -158,7 +207,9 @@ check_model <- function(model, dt = 0.1, scale = TRUE) {
   if (!inherits(model, "sg_model")) {
     .sg_stop("`model` must be an sg_model object; create one with sg_model().")
   }
-  .sg_one_node_only(model, "check_model()")
+  if (!is.null(model$landscape)) {
+    return(.sg_check_landscape(model, dt, scale))
+  }
   .sg_cb_inputs(model, NULL, dt, stochastic = FALSE, n_days = 1L) # checks dt
   s <- .sg_reference_setup(model)
   p <- s$p
@@ -311,8 +362,123 @@ check_model <- function(model, dt = 0.1, scale = TRUE) {
   )
 }
 
+# check_model() of a model with a landscape (D-032): each node as a one-node
+# model (without the population-scale run), the movement groups, and the
+# population scale from a burn-in and run of the whole landscape.
+.sg_check_landscape <- function(model, dt, scale) {
+  ids <- .sg_node_ids(model)
+  per_node <- lapply(seq_along(ids), function(i) {
+    check_model(.sg_node_model(model, i), dt = dt, scale = FALSE)
+  })
+  nd <- model$landscape$nodes
+  r0_end <- function(ck, k) if (isTRUE(ck$r0$available)) ck$r0$range[k] else NA_real_
+  nodes <- data.frame(
+    node = ids, role = nd$role, area = nd$area, forcing_series = nd$forcing_series,
+    wounds = if (is.null(model$hosts)) model$counts$H else NA_real_,
+    hosts = if (is.null(model$hosts)) NA_real_ else model$hosts$n,
+    max_rate = vapply(per_node, function(ck) ck$rates$max_rate, 0),
+    r0_min = vapply(per_node, function(ck) r0_end(ck, 1L), 0),
+    r0_max = vapply(per_node, function(ck) r0_end(ck, 2L), 0),
+    days_r0_above_1 = vapply(per_node, function(ck) {
+      if (isTRUE(ck$r0$available)) as.numeric(ck$r0$days_above_1) else NA_real_
+    }, 0),
+    stringsAsFactors = FALSE
+  )
+  # warnings: those of the model (the same in every node) once, node ones by node
+  node_warn <- unlist(lapply(seq_along(ids), function(i) per_node[[i]]$warnings))
+  warn <- character(0)
+  for (w in unique(node_warn)) {
+    hit <- ids[vapply(per_node, function(ck) w %in% ck$warnings, TRUE)]
+    warn <- c(warn, if (length(hit) == length(ids)) {
+      w
+    } else {
+      paste0("node(s) ", paste(hit, collapse = ", "), ": ", w)
+    })
+  }
+  if (length(ids) > 1L) {
+    warn <- c(warn, paste(
+      "With several nodes, ODE runs without node_extinction = TRUE can show",
+      "recolonisation by fractions of a fly (MODEL_SPEC N5)."
+    ))
+  }
+  mv <- model$movement
+  movement <- if (is.null(mv)) {
+    NULL
+  } else {
+    list(
+      t_ref = mv$t_ref, kappa_max = mv$kappa_max,
+      groups = lapply(mv$groups, function(g) {
+        list(
+          clock = g$clock, edges = length(g$col),
+          max_rate = apply(g$rate, 1L, max),
+          open_nodes = ids[apply(g$loss, 2L, function(v) any(v > 0))]
+        )
+      })
+    )
+  }
+  scale_info <- list(available = FALSE)
+  f <- model$forcing
+  if (scale && f$n_days >= 365L) {
+    init <- suppressWarnings(sg_init(model, "burn_in"))
+    sim <- simulate_ode(model, init = init)
+    nm <- colnames(sim$state)
+    geno <- sub("^.\\[([^],|]+).*$", "\\1", nm)
+    wild <- geno %in% model$cube$wild_type
+    node_of <- .sg_name_node(nm)
+    if (length(ids) == 1L) node_of <- rep(ids, length(nm))
+    min_wild <- vapply(ids, function(id) {
+      min(rowSums(sim$state[, wild & node_of == id, drop = FALSE]))
+    }, 0)
+    nodes$min_wild <- unname(min_wild)
+    scale_info <- list(available = TRUE, min_wild = min(min_wild))
+    small <- ids[min_wild < 10]
+    if (length(small) > 0L) {
+      warn <- c(warn, paste0(
+        "The wild population falls below 10 individuals in node(s) ", paste(small, collapse = ", "),
+        " (ODE with movement after a one-year burn-in); stochastic runs may lose them by chance."
+      ))
+    }
+  } else if (scale) {
+    scale_info$note <- "needs at least 365 days of forcing"
+  }
+  first <- per_node[[1L]]
+  rel <- model$releases
+  size <- first$size
+  size$states <- model$n_states
+  size$area <- sum(nd$area)
+  size$n_nodes <- length(ids)
+  size$release_events <- nrow(rel)
+  size$released <- sum(rel$count)
+  size$released_genotypes <- unique(rel$genotype)
+  wild_f <- intersect(model$cube$wild_type, model$cube$genotypes[model$cube$phi > 0])
+  size$sterile_releases <- size$released_genotypes[vapply(size$released_genotypes, function(g) {
+    all(model$cube$egg_total[paste0(wild_f, "|", g)] == 0)
+  }, TRUE)]
+  n_counters <- length(.sg_model_counter_names(model))
+  memory <- list(
+    state_bytes_per_replicate = 8 * (f$n_days + 1) * model$n_states,
+    totals_bytes_per_replicate = 8 * (f$n_days + 1) * length(ids) *
+      (6 * model$dims$n_genotypes + if (is.null(model$hosts)) 0 else 3),
+    counters_bytes_per_replicate = 8 * f$n_days * n_counters
+  )
+  structure(
+    list(
+      size = size, options = first$options, rates = list(
+        max_rate = max(nodes$max_rate), mating_rate = first$rates$mating_rate,
+        mating_probability_per_step = first$rates$mating_probability_per_step
+      ),
+      r0 = list(available = any(!is.na(nodes$r0_max))), scale = scale_info,
+      memory = memory, warnings = warn, nodes = nodes, movement = movement
+    ),
+    class = "sg_check"
+  )
+}
+
 #' @export
 print.sg_check <- function(x, ...) {
+  if (!is.null(x$nodes)) {
+    return(.sg_print_check_landscape(x))
+  }
   s <- x$size
   cat("<sg_check>\n")
   wounds <- if (is.null(s$hosts)) sprintf("%g wounds", s$wounds) else sprintf("%g hosts", s$hosts$n)
@@ -370,6 +536,52 @@ print.sg_check <- function(x, ...) {
       "  wild population (ODE after a one-year burn-in): %.3g to %.3g individuals per node\n",
       x$scale$min_wild, x$scale$max_wild
     ))
+  }
+  cat(sprintf(
+    "  memory per stochastic replicate: %.3g MB (states) or %.3g MB (totals)\n",
+    (x$memory$state_bytes_per_replicate + x$memory$counters_bytes_per_replicate) / 1e6,
+    (x$memory$totals_bytes_per_replicate + x$memory$counters_bytes_per_replicate) / 1e6
+  ))
+  if (length(x$warnings)) {
+    cat("  warnings:\n")
+    for (w in x$warnings) cat("   - ", w, "\n", sep = "")
+  } else {
+    cat("  no problems found\n")
+  }
+  invisible(x)
+}
+
+.sg_print_check_landscape <- function(x) {
+  s <- x$size
+  cat("<sg_check>\n")
+  cat(sprintf(
+    "  model: %d genotype(s), %d states in %d nodes (%s km^2), %d days (%s to %s)\n",
+    s$genotypes, s$states, s$n_nodes, format(s$area, big.mark = ","), s$days,
+    format(s$period[1L]), format(s$period[2L])
+  ))
+  cat(sprintf(
+    "  releases: %d event(s), %g individuals%s\n", s$release_events, s$released,
+    if (length(s$sterile_releases)) {
+      paste0("; sterile genotype(s): ", paste(s$sterile_releases, collapse = ", "))
+    } else {
+      ""
+    }
+  ))
+  cat("  nodes:\n")
+  print(x$nodes, row.names = FALSE, digits = 4L)
+  if (!is.null(x$movement)) {
+    for (g in x$movement$groups) {
+      cat(sprintf(
+        paste0(
+          "  movement (%s clock): %d edges; largest leave rate at %g degC: male %.3g, ",
+          "virgin %.3g, mated %.3g per day; open edges in %s\n"
+        ),
+        g$clock, g$edges, x$movement$t_ref, g$max_rate[1L], g$max_rate[2L], g$max_rate[3L],
+        if (length(g$open_nodes)) paste(g$open_nodes, collapse = ", ") else "no node"
+      ))
+    }
+  } else {
+    cat("  movement: none\n")
   }
   cat(sprintf(
     "  memory per stochastic replicate: %.3g MB (states) or %.3g MB (totals)\n",

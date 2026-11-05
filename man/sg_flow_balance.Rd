@@ -18,12 +18,19 @@ the population for the ODE and exactly zero for stochastic runs. Host
 states are not counted. With the host-wound model (D-030) a column
 \code{host_residual} gives the largest mismatch between the change of a host
 block (HS, HW, HI) and its host flows (round-off for the ODE, zero for
-stochastic runs).
+stochastic runs). With several nodes a column \code{node} after \code{day}, one row
+per node and interval; with movement a column \code{movement} (net
+immigration); with the node extinction rule a column \code{removed}; the
+residual includes them.
 }
 \description{
 Checks that every change in the total number of individuals is explained
 by the recorded flows: releases plus eggs laid minus deaths (by hazard, old
-age and at emergence), between consecutive output days.
+age and at emergence), between consecutive output days. With several
+nodes (D-032) the balance is node by node and includes movement
+(immigrants minus emigrants, emigrants including those that leave the
+landscape); with the node extinction rule (\code{\link[=simulate_ode]{simulate_ode()}}) it includes
+the removed flies.
 }
 \examples{
 if (requireNamespace("MGDrivE", quietly = TRUE)) {

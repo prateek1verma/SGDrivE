@@ -11,7 +11,8 @@ sg_plot_data(
   per = c("km2", "node"),
   period = "week",
   host_density = NULL,
-  replicates = NULL
+  replicates = NULL,
+  nodes = NULL
 )
 }
 \arguments{
@@ -38,6 +39,9 @@ adults otherwise.}
 
 \item{replicates}{For stochastic runs: which replicates to draw (default
 all).}
+
+\item{nodes}{For models with a landscape: the nodes to sum over (default
+the study nodes); see \code{\link[=sg_totals]{sg_totals()}}.}
 }
 \value{
 A data frame with columns \code{date}, \code{replicate} (stochastic runs

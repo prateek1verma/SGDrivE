@@ -439,6 +439,14 @@ test-outputs.R, test-checks.R.
 * Tests: per-node sums against direct sums of state columns; study vs
   source selection; flow balance closes to `sg_tol_exact` per node with
   movement, open edges and extinction removals.
+* *Implemented (2026-11-05):* `nodes` argument (default study nodes) in
+  `sg_totals()`, `sg_females()`, `sg_allele_freq()`, `sg_cases()`,
+  `sg_hosts()`, the plots and `sg_plot_data()`; `as.data.frame()` gives all
+  nodes by node. For multi-node runs `sim$releases` has one column per stage
+  and node (`"M@north"`), which `sg_flow_balance()` needs for per-node
+  balances. `check_model()` checks each node as a one-node model and runs
+  the population-scale check on the whole landscape with movement. The flow
+  balance closes to about 1e-12 relative.
 
 ### WP9. Recorder for the ODE (L)
 

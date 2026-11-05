@@ -131,7 +131,7 @@ test_that("releases happen in their node", {
   )
   m <- sg_model(p, cube, releases = rel, landscape = mo_land(p, 3, area = c(1, 2, 3)))
   sim <- simulate_ode(m, init = numeric(m$n_states))
-  expect_identical(unname(sim$releases[5L, "M"]), 200)
+  expect_identical(unname(sim$releases[5L, "M@n2"]), 200)
   nm <- colnames(sim$state)
   day5 <- sim$state[sim$day == 5L, ]
   expect_gt(sum(day5[grepl("^M\\[S,.*@n2$", nm)]), 150)

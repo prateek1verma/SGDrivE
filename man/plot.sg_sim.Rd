@@ -14,6 +14,7 @@
   host_density = NULL,
   replicates = NULL,
   palette = c("okabe_ito", "brewer", "viridis"),
+  nodes = NULL,
   ...
 )
 
@@ -26,6 +27,7 @@
   host_density = NULL,
   replicates = NULL,
   palette = c("okabe_ito", "brewer", "viridis"),
+  nodes = NULL,
   ...
 )
 }
@@ -59,6 +61,9 @@ all).}
 (ColorBrewer Dark2, up to 8 series) or \code{"viridis"} (any number). With 9
 to 12 series both \code{"okabe_ito"} and \code{"brewer"} use ColorBrewer Paired,
 with more than 12 viridis.}
+
+\item{nodes}{For models with a landscape: the nodes to sum over (default
+the study nodes); see \code{\link[=sg_totals]{sg_totals()}}.}
 
 \item{...}{Not used.}
 }

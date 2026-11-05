@@ -4,7 +4,7 @@
 \alias{sg_allele_freq}
 \title{Allele frequencies}
 \usage{
-sg_allele_freq(sim, stages = "adults", alleles = NULL)
+sg_allele_freq(sim, stages = "adults", alleles = NULL, nodes = NULL)
 }
 \arguments{
 \item{sim}{A simulation from \code{\link[=simulate_ode]{simulate_ode()}} or \code{\link[=simulate_cb]{simulate_cb()}}.}
@@ -16,6 +16,10 @@ default adults.}
 genotype, columns by allele). By default each genotype name is split
 into single-letter alleles, as in MGDrivE cubes (\code{"Aa"} has one \code{A} and
 one \code{a}; \code{"XY"} one \code{X} and one \code{Y}).}
+
+\item{nodes}{For models with a landscape (\code{\link[=sg_landscape]{sg_landscape()}}): ids or numbers
+of the nodes to include. Default: the study nodes (source nodes are left
+out).}
 }
 \value{
 A data frame with columns \code{day}, \code{date}, \code{replicate} (stochastic
@@ -24,6 +28,10 @@ copies; \code{NA} when no individuals are present).
 }
 \description{
 Frequencies of alleles among the individuals of chosen stages.
+}
+\details{
+With several nodes the individuals of \code{nodes} (default the study
+nodes) are pooled.
 }
 \examples{
 if (requireNamespace("MGDrivE", quietly = TRUE)) {

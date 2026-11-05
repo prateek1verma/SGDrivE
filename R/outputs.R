@@ -8,17 +8,24 @@
 #' genotype and (for mated females) mate genotype.
 #'
 #' @param sim A simulation from [simulate_ode()] or [simulate_cb()].
-#' @param by Grouping variables, any of `"stage"`, `"sex"`, `"genotype"` and
-#'   `"mate"`; `character(0)` gives the grand total.
+#' @param by Grouping variables, any of `"stage"`, `"sex"`, `"genotype"`,
+#'   `"mate"` and (models with a landscape) `"node"`; `character(0)` gives the
+#'   grand total.
 #' @param stages Stages to include, any of `"eggs"`, `"larvae"`, `"pupae"`,
 #'   `"males"`, `"unmated_females"`, `"mated_females"`, or the shortcuts
 #'   `"adults"` (the last three), `"juveniles"` (the first three) and `"all"`.
 #' @param per `"node"` (counts per node) or `"km2"` (divided by the node area).
+#'   With several nodes: counts summed over the chosen nodes, or divided by
+#'   their summed area (by each node's area when grouping by `"node"`).
+#' @param nodes For models with a landscape ([sg_landscape()]): ids or numbers
+#'   of the nodes to include. Default: the study nodes (source nodes are left
+#'   out).
 #'
 #' @details Stages are the model's blocks E, L, P, M, U and F; juveniles have
 #'   sex `"unsexed"`. Grouping by `"mate"` needs the full state, so it is not
 #'   available for stochastic runs with `keep = "totals"`; the mate of
-#'   individuals other than mated females is `NA`.
+#'   individuals other than mated females is `NA`. With several nodes the
+#'   counts are summed over `nodes` unless `by` contains `"node"`.
 #' @return A data frame with columns `day`, `date`, `replicate` (stochastic
 #'   runs only), the `by` variables and `value`.
 #' @seealso [sg_allele_freq()], [sg_females()], [sg_cases()]
@@ -32,10 +39,20 @@
 #'   tail(sg_totals(sim, by = "sex", stages = "adults", per = "km2"))
 #' }
 sg_totals <- function(sim, by = c("stage", "genotype"), stages = "all",
-                      per = c("node", "km2")) {
+                      per = c("node", "km2"), nodes = NULL) {
+  .sg_totals(sim, by, stages, per, nodes, default = "study")
+}
+
+.sg_totals <- function(sim, by, stages, per, nodes, default) {
   per <- .sg_match_choice(per, c("node", "km2"), "per")
   by <- .sg_check_by(by)
-  st <- .sg_stage_array(sim, need_mate = "mate" %in% by)
+  sel <- .sg_sim_nodes(sim, nodes, default)
+  by_node <- "node" %in% by
+  if (by_node && !sel$multi) by <- setdiff(by, "node") # one node: nothing to group
+  st <- .sg_stage_array(sim,
+    need_mate = "mate" %in% by, nodes = nodes, by_node = by_node && sel$multi,
+    default = default
+  )
   keep <- st$cols$stage %in% .sg_expand_stages(stages)
   cols <- st$cols[keep, , drop = FALSE]
   a <- st$array[, keep, , drop = FALSE]
@@ -43,8 +60,15 @@ sg_totals <- function(sim, by = c("stage", "genotype"), stages = "all",
   groups <- unique(key)
   agg <- outer(key, groups, `==`) * 1
   values <- .sg_apply_cols(a, agg)
-  if (per == "km2") values <- values / .sg_sim_info(sim)$area
   levels_df <- cols[match(groups, key), by, drop = FALSE]
+  if (per == "km2") {
+    if (by_node && sel$multi) {
+      node_area <- sel$all$area[match(levels_df$node, sel$all$id)]
+      values <- sweep(values, 2L, node_area, "/")
+    } else {
+      values <- values / sel$area
+    }
+  }
   .sg_long_table(sim, values, levels_df)
 }
 
@@ -52,10 +76,16 @@ sg_totals <- function(sim, by = c("stage", "genotype"), stages = "all",
 #' @param x A simulation from [simulate_ode()] or [simulate_cb()].
 #' @param row.names,optional Not used.
 #' @param ... Not used.
+#' @details `as.data.frame()` gives totals by stage, sex, genotype and mate,
+#'   and with several nodes also by node, for all nodes unless `nodes` is
+#'   given.
 #' @export
 # nolint start: object_name_linter. (row.names is the generic's argument)
-as.data.frame.sg_sim <- function(x, row.names = NULL, optional = FALSE, ..., per = "node") {
-  sg_totals(x, by = c("stage", "sex", "genotype", "mate"), per = per)
+as.data.frame.sg_sim <- function(x, row.names = NULL, optional = FALSE, ..., per = "node",
+                                 nodes = NULL) {
+  .sg_totals(x, c("stage", "sex", "genotype", "mate", "node"), "all", per, nodes,
+    default = "all"
+  )
 }
 
 #' @rdname sg_totals
@@ -78,6 +108,8 @@ as.data.frame.sg_sim_cb <- function(x, row.names = NULL, optional = FALSE, ...,
 #'   genotype, columns by allele). By default each genotype name is split
 #'   into single-letter alleles, as in MGDrivE cubes (`"Aa"` has one `A` and
 #'   one `a`; `"XY"` one `X` and one `Y`).
+#' @details With several nodes the individuals of `nodes` (default the study
+#'   nodes) are pooled.
 #' @return A data frame with columns `day`, `date`, `replicate` (stochastic
 #'   runs only), `allele`, `count` (allele copies) and `freq` (share of all
 #'   copies; `NA` when no individuals are present).
@@ -90,14 +122,14 @@ as.data.frame.sg_sim_cb <- function(x, row.names = NULL, optional = FALSE, ...,
 #'   sim <- simulate_ode(mod, init = sg_init(mod, "hardy_weinberg", alleles = c(A = 0.8, a = 0.2)))
 #'   tail(sg_allele_freq(sim))
 #' }
-sg_allele_freq <- function(sim, stages = "adults", alleles = NULL) {
+sg_allele_freq <- function(sim, stages = "adults", alleles = NULL, nodes = NULL) {
   geno <- .sg_sim_info(sim)$genotypes
   amat <- if (is.null(alleles)) {
     .sg_default_alleles(geno)
   } else {
     .sg_check_allele_matrix(alleles, geno)[geno, , drop = FALSE]
   }
-  st <- .sg_stage_array(sim)
+  st <- .sg_stage_array(sim, nodes = nodes)
   keep <- st$cols$stage %in% .sg_expand_stages(stages)
   # each column (stage, genotype, mate) contributes its genotype's allele copies
   copies <- amat[st$cols$genotype[keep], , drop = FALSE]
@@ -131,7 +163,8 @@ sg_allele_freq <- function(sim, stages = "adults", alleles = NULL) {
 #'       eggs counts 0.5.}
 #'   }
 #'   `egg_laying` and `fertile_equivalent` need the full state, so they are
-#'   `NA` for stochastic runs with `keep = "totals"`.
+#'   `NA` for stochastic runs with `keep = "totals"`. With several nodes the
+#'   females of `nodes` (default the study nodes) are summed.
 #' @export
 #' @examples
 #' if (requireNamespace("MGDrivE", quietly = TRUE)) {
@@ -140,10 +173,11 @@ sg_allele_freq <- function(sim, stages = "adults", alleles = NULL) {
 #'   sim <- simulate_ode(sg_model(p, sg_cube(MGDrivE::cubeMendelian()), wx))
 #'   tail(sg_females(sim))
 #' }
-sg_females <- function(sim, per = c("node", "km2")) {
+sg_females <- function(sim, per = c("node", "km2"), nodes = NULL) {
   per <- .sg_match_choice(per, c("node", "km2"), "per")
   info <- .sg_sim_info(sim)
-  a <- .sg_sim_array(sim)
+  sel <- .sg_sim_nodes(sim, nodes)
+  a <- .sg_sim_array(sim, nodes)
   nm <- dimnames(a$array)[[2L]]
   block <- substr(nm, 1L, 1L)
   geno <- sub("^.\\[([^],|]+).*$", "\\1", nm)
@@ -175,7 +209,7 @@ sg_females <- function(sim, per = c("node", "km2")) {
     out$egg_laying <- NA_real_
     out$fertile_equivalent <- NA_real_
   }
-  if (per == "km2") out[] <- lapply(out, function(v) v / info$area)
+  if (per == "km2") out[] <- lapply(out, function(v) v / sel$area)
   cbind(.sg_time_columns(sim), out)
 }
 
@@ -194,6 +228,9 @@ sg_females <- function(sim, per = c("node", "km2")) {
 #' @param host_density Optional density of hosts (animals per km^2); adds
 #'   cases per host. Not used with the host-wound model, whose own host
 #'   density gives `cases_per_host`.
+#' @param nodes For models with a landscape: ids or numbers of the nodes
+#'   whose cases are summed (default the study nodes); per km^2, wound
+#'   fractions and cases per host then refer to these nodes together.
 #' @details Cases come from the `fertile_batches` counter: a batch of C eggs
 #'   (the clutch size, R phi_ov by default) laid by a female of genotype g
 #'   mated to a male of genotype m holds at least one viable egg with
@@ -224,7 +261,7 @@ sg_females <- function(sim, per = c("node", "km2")) {
 #'   sg_cases(sim, period = "month", host_density = 20)
 #' }
 sg_cases <- function(sim, period = c("day", "week", "month", "year"), per = c("km2", "node"),
-                     host_density = NULL) {
+                     host_density = NULL, nodes = NULL) {
   period <- .sg_match_choice(period, c("day", "week", "month", "year"), "period")
   per <- .sg_match_choice(per, c("km2", "node"), "per")
   if (!is.null(host_density)) {
@@ -241,10 +278,15 @@ sg_cases <- function(sim, period = c("day", "week", "month", "year"), per = c("k
     )
   }
   k <- sim$counters
-  if (!"fertile_batches" %in% dimnames(k)[[2L]]) {
+  sel <- .sg_sim_nodes(sim, nodes)
+  if (!sel$multi && !"fertile_batches" %in% dimnames(k)[[2L]]) {
     .sg_stop("This simulation was made by an older version of ScrewDrivE; run it again.")
   }
   column <- function(name) {
+    if (sel$multi) { # the counter summed over the chosen nodes (D-032)
+      cols <- paste0(name, "@", sel$ids)
+      return(matrix(rowSums(k[, cols, drop = FALSE]), nrow = dim(k)[1L]))
+    }
     v <- if (length(dim(k)) == 3L) k[, name, ] else k[, name]
     matrix(v, nrow = dim(k)[1L])
   }
@@ -261,11 +303,12 @@ sg_cases <- function(sim, period = c("day", "week", "month", "year"), per = c("k
   cases <- t(agg) %*% column(if (is.null(hosts)) "fertile_batches" else "infestations")
   events <- t(agg) %*% column("egg_batches")
   days <- colSums(agg)
-  wounds <- info$H * info$area # wounds per node
+  wounds <- if (sel$multi) sum(sel$all$wounds[sel$pos]) else info$H * info$area # wounds per node
+  n_hosts <- if (is.null(hosts)) NA_real_ else sum(hosts$n[sel$pos])
   if (!is.null(hosts)) {
     superinf <- t(agg) %*% column("superinfestations")
     # wounded hosts on the recorded days of each period, averaged
-    h <- sg_hosts(sim)
+    h <- sg_hosts(sim, nodes = nodes)
     out_key <- key[match(h$date, dates)]
     reps <- if (is.null(h$replicate)) rep(1L, nrow(h)) else h$replicate
     wounded <- vapply(seq_len(ncol(cases)), function(r) {
@@ -276,7 +319,7 @@ sg_cases <- function(sim, period = c("day", "week", "month", "year"), per = c("k
     }, numeric(length(groups)))
     wounded <- matrix(wounded, length(groups))
   }
-  scale <- if (per == "km2") 1 / info$area else 1
+  scale <- if (per == "km2") 1 / sel$area else 1
   out <- lapply(seq_len(ncol(cases)), function(r) {
     wf <- if (!is.null(hosts)) {
       ifelse(wounded[, r] > 0, cases[, r] / (wounded[, r] * days), NA_real_)
@@ -291,9 +334,9 @@ sg_cases <- function(sim, period = c("day", "week", "month", "year"), per = c("k
     )
     if (!is.null(hosts)) {
       d$superinfestations <- superinf[, r] * scale
-      d$cases_per_host <- cases[, r] / hosts$n
+      d$cases_per_host <- cases[, r] / n_hosts
     }
-    if (!is.null(host_density)) d$cases_per_host <- cases[, r] / info$area / host_density
+    if (!is.null(host_density)) d$cases_per_host <- cases[, r] / sel$area / host_density
     if (inherits(sim, "sg_sim_cb")) d <- cbind(d[1:2], replicate = r, d[-(1:2)])
     d
   })
@@ -314,7 +357,8 @@ sg_cases <- function(sim, period = c("day", "week", "month", "year"), per = c("k
 #' @return A data frame with columns `day`, `date`, `replicate` (stochastic
 #'   runs only), `unwounded`, `wounded`, `infested` (summed over infestation
 #'   sub-stages), `hosts` (all three) and `prevalence` (infested / hosts).
-#'   Counts are per node, or per km^2 with `per = "km2"`.
+#'   Counts are per node, or per km^2 with `per = "km2"`; with several nodes
+#'   summed over `nodes` (default the study nodes).
 #' @seealso [sg_cases()], [sg_params()] (host parameters)
 #' @export
 #' @examples
@@ -326,13 +370,14 @@ sg_cases <- function(sim, period = c("day", "week", "month", "year"), per = c("k
 #'   )
 #'   tail(sg_hosts(simulate_ode(mod, init = sg_init(mod, "equilibrium"))))
 #' }
-sg_hosts <- function(sim, per = c("node", "km2")) {
+sg_hosts <- function(sim, per = c("node", "km2"), nodes = NULL) {
   per <- .sg_match_choice(per, c("node", "km2"), "per")
   info <- .sg_sim_info(sim)
   if (is.null(info$hosts)) {
     .sg_stop("sg_hosts() needs a simulation of a model with wound_model = \"hosts\".")
   }
-  a <- .sg_sim_array(sim)
+  sel <- .sg_sim_nodes(sim, nodes)
+  a <- .sg_sim_array(sim, nodes)
   nm <- dimnames(a$array)[[2L]]
   col_sum <- function(prefix) {
     w <- matrix(as.numeric(startsWith(nm, prefix)), ncol = 1L)
@@ -341,7 +386,7 @@ sg_hosts <- function(sim, per = c("node", "km2")) {
   out <- data.frame(unwounded = col_sum("HS["), wounded = col_sum("HW["), infested = col_sum("HI["))
   out$hosts <- out$unwounded + out$wounded + out$infested
   out$prevalence <- ifelse(out$hosts > 0, out$infested / out$hosts, NA_real_)
-  if (per == "km2") out[1:4] <- out[1:4] / info$area
+  if (per == "km2") out[1:4] <- out[1:4] / sel$area
   cbind(.sg_time_columns(sim), out)
 }
 
@@ -350,11 +395,55 @@ sg_hosts <- function(sim, per = c("node", "km2")) {
   laying <- model$adult$female$flags$X_ovi
   if (is.null(laying)) laying <- rep(TRUE, model$dims$n_A)
   h <- model$hosts
+  ids <- .sg_node_ids(model)
   list(
     area = model$area, H = model$params$wound_density, genotypes = cb$genotypes,
     wild_type = cb$wild_type, laying = as.logical(laying), viability = cb$egg_total,
-    hosts = if (is.null(h)) NULL else list(n = h$n, classes = h$classes)
+    hosts = if (is.null(h)) NULL else list(n = h$n, classes = h$classes),
+    # nodes (D-032): id, role, area, wounds per node (static model)
+    nodes = data.frame(
+      id = ids,
+      role = if (is.null(model$landscape)) "study" else model$landscape$nodes$role,
+      area = model$area, wounds = model$counts$H, stringsAsFactors = FALSE
+    )
   )
+}
+
+# Nodes of a simulation chosen for a summary (D-032): ids or numbers, by
+# default the study nodes. Returns their positions, ids and summed area, and
+# whether the simulation has several nodes (names with an "@id" suffix).
+.sg_sim_nodes <- function(sim, nodes = NULL, default = c("study", "all")) {
+  default <- match.arg(default)
+  info <- .sg_sim_info(sim)
+  nd <- info$nodes
+  if (is.null(nd) || nrow(nd) == 1L) {
+    ids <- if (is.null(nd)) "1" else nd$id
+    return(list(pos = 1L, ids = ids, area = sum(info$area), multi = FALSE))
+  }
+  pos <- if (is.null(nodes)) {
+    if (default == "study") which(nd$role == "study") else seq_len(nrow(nd))
+  } else if (is.numeric(nodes)) {
+    if (any(nodes < 1 | nodes > nrow(nd) | nodes != round(nodes))) {
+      .sg_stop("`nodes` numbers must be whole numbers between 1 and ", nrow(nd), ".")
+    }
+    as.integer(nodes)
+  } else {
+    idx <- match(as.character(nodes), nd$id)
+    if (anyNA(idx)) {
+      bad <- as.character(nodes)[is.na(idx)][1L]
+      .sg_stop(
+        "Unknown node \"", bad, "\".", .sg_suggest(bad, nd$id),
+        " Nodes: ", .sg_wrap_names(nd$id), "."
+      )
+    }
+    idx
+  }
+  list(pos = pos, ids = nd$id[pos], area = sum(nd$area[pos]), multi = TRUE, all = nd)
+}
+
+# Node id of each name with an "@id" suffix (NA without one).
+.sg_name_node <- function(nm) {
+  ifelse(grepl("@", nm, fixed = TRUE), sub("^[^@]*@", "", nm), NA_character_)
 }
 
 .sg_sim_info <- function(sim) {
@@ -369,20 +458,33 @@ sg_hosts <- function(sim, per = c("node", "km2")) {
 }
 
 # The simulation's counts as an array [time, column, replicate] and whether
-# the columns are states or block x genotype totals.
-.sg_sim_array <- function(sim) {
+# the columns are states or block x genotype totals. With several nodes only
+# the columns of `nodes` (default the study nodes) are kept, their names lose
+# the "@id" suffix and `node` gives each column's node (D-032).
+.sg_sim_array <- function(sim, nodes = NULL, default = "study") {
   .sg_sim_info(sim)
-  if (inherits(sim, "sg_sim")) {
+  out <- if (inherits(sim, "sg_sim")) {
     a <- sim$state
     dim(a) <- c(dim(a), 1L)
     dimnames(a) <- list(NULL, colnames(sim$state), NULL)
-    return(list(array = a, level = "state"))
-  }
-  if (!is.null(sim$state)) {
+    list(array = a, level = "state")
+  } else if (!is.null(sim$state)) {
     list(array = sim$state, level = "state")
   } else {
     list(array = sim$totals, level = "totals")
   }
+  sel <- .sg_sim_nodes(sim, nodes, default)
+  if (!sel$multi) {
+    out$node <- rep(sel$ids, dim(out$array)[2L])
+    return(out)
+  }
+  nm <- dimnames(out$array)[[2L]]
+  node <- .sg_name_node(nm)
+  keep <- node %in% sel$ids
+  out$array <- out$array[, keep, , drop = FALSE]
+  dimnames(out$array)[[2L]] <- sub("@.*$", "", nm[keep])
+  out$node <- node[keep]
+  out
 }
 
 # Apply a column-aggregation matrix to every time x replicate slice.
@@ -396,11 +498,13 @@ sg_hosts <- function(sim, per = c("node", "km2")) {
 }
 
 # Counts aggregated over sub-stages: array [time, (stage, genotype, mate),
-# replicate] with a descriptor of the columns.
-.sg_stage_array <- function(sim, need_mate = FALSE) {
-  a <- .sg_sim_array(sim)
+# replicate] with a descriptor of the columns; with by_node also by node.
+.sg_stage_array <- function(sim, need_mate = FALSE, nodes = NULL, by_node = FALSE,
+                            default = "study") {
+  a <- .sg_sim_array(sim, nodes, default)
   fly <- !.sg_is_host_name(dimnames(a$array)[[2L]]) # host states are not fly stages
   a$array <- a$array[, fly, , drop = FALSE]
+  node <- a$node[fly]
   nm <- dimnames(a$array)[[2L]]
   if (a$level == "totals" && need_mate) {
     .sg_stop("Mate genotypes need the full state; run simulate_cb() with keep = \"state\".")
@@ -413,6 +517,7 @@ sg_hosts <- function(sim, per = c("node", "km2")) {
     sub("^F\\[[^|]+\\|([^],]+).*$", "\\1", nm), NA_character_
   )
   key <- paste(block, geno, mate)
+  if (by_node) key <- paste(key, node)
   groups <- unique(key)
   agg <- outer(key, groups, `==`) * 1
   first <- match(groups, key)
@@ -425,6 +530,7 @@ sg_hosts <- function(sim, per = c("node", "km2")) {
     stage = unname(stage_of[block[first]]), sex = unname(sex_of[block[first]]),
     genotype = geno[first], mate = mate[first], stringsAsFactors = FALSE
   )
+  if (by_node) cols$node <- node[first]
   list(array = .sg_apply_cols(a$array, agg), cols = cols)
 }
 
@@ -449,7 +555,7 @@ sg_hosts <- function(sim, per = c("node", "km2")) {
 }
 
 .sg_check_by <- function(by) {
-  allowed <- c("stage", "sex", "genotype", "mate")
+  allowed <- c("stage", "sex", "genotype", "mate", "node")
   if (!is.character(by) || any(!by %in% allowed)) {
     .sg_stop("`by` must contain only ", paste0("\"", allowed, "\"", collapse = ", "), ".")
   }
