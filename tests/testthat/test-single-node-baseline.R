@@ -12,9 +12,9 @@ baseline_bitwise <- function() identical(Sys.getenv("SCREWDRIVE_BITWISE_BASELINE
 
 expect_baseline <- function(actual, expected, info, tolerance) {
   if (baseline_bitwise()) {
-    expect_identical(actual, expected, info = info)
+    testthat::expect_identical(actual, expected, info = info)
   } else {
-    expect_equal(actual, expected, tolerance = tolerance, info = info)
+    testthat::expect_equal(actual, expected, tolerance = tolerance, info = info)
   }
 }
 
