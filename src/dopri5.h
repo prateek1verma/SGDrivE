@@ -12,6 +12,10 @@
 // * stiffness test: h * |lambda| estimated from the last two stages; more than
 //   15 steps with an estimate above 3.25 (the stability boundary) flag the
 //   problem as stiff (6 consecutive non-stiff steps reset the count).
+// * optional diagnostic: at each accepted step, the component with the
+//   largest scaled error among the first argmax_limit components is counted
+//   in argmax_counts[index / argmax_group] (e.g. the node that limits the step
+//   size of a multi-node model, D-032). It does not change the integration.
 // A fixed-step mode (fixed_h > 0, no error control) exists for convergence
 // tests.
 //
@@ -38,6 +42,9 @@ struct Dopri5Options {
   bool detect_stiff = true;
   int stiff_steps = 15;     // Hairer's threshold
   bool stop_when_stiff = false;  // return (status 3) as soon as stiffness is detected
+  int* argmax_counts = nullptr;  // optional: counts of the component group with largest error
+  int argmax_group = 1;          // components per group
+  int argmax_limit = 0;          // only components below this index are considered
 };
 
 struct Dopri5Stats {
@@ -115,6 +122,9 @@ class Dopri5 {
       if (err <= 1.0) {
         facold = std::max(err, 1e-4);
         st.accepted++;
+        if (opt.argmax_counts != nullptr && err_argmax_ >= 0) {
+          opt.argmax_counts[err_argmax_ / opt.argmax_group]++;
+        }
         if (opt.detect_stiff) {
           double stnum = 0.0, stden = 0.0;
           for (int i = 0; i < n_; ++i) {
@@ -157,6 +167,7 @@ class Dopri5 {
  private:
   int n_;
   std::vector<double> k1_, k2_, k3_, k4_, k5_, k6_, k7_, ytmp_, ynew_, ysti_;
+  int err_argmax_ = -1;  // component with the largest scaled error in the last error_norm()
 
   // Dormand-Prince coefficients
   static constexpr double c2 = 1.0 / 5.0, c3 = 3.0 / 10.0, c4 = 4.0 / 5.0, c5 = 8.0 / 9.0;
@@ -200,14 +211,19 @@ class Dopri5 {
     st.evaluations += 6;
   }
 
-  double error_norm(double h, const double* y, const Dopri5Options& opt) const {
-    double sum = 0.0;
+  double error_norm(double h, const double* y, const Dopri5Options& opt) {
+    double sum = 0.0, rmax = -1.0;
+    err_argmax_ = -1;
     for (int i = 0; i < n_; ++i) {
       const double e = h * (e1 * k1_[i] + e3 * k3_[i] + e4 * k4_[i] + e5 * k5_[i] +
                             e6 * k6_[i] + e7 * k7_[i]);
       const double sk = opt.atol + opt.rtol * std::max(std::fabs(y[i]), std::fabs(ynew_[i]));
       const double r = e / sk;
       sum += r * r;
+      if (i < opt.argmax_limit && r * r > rmax) {
+        rmax = r * r;
+        err_argmax_ = i;
+      }
     }
     return std::sqrt(sum / n_);
   }

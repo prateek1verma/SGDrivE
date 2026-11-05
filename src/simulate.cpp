@@ -89,7 +89,9 @@ double sg_kernel_max_rate_cpp(SEXP ptr, int day, const Rcpp::NumericVector& x) {
 // the last completed day (or, if the loop stopped on day d, the state at the
 // start of day d after its releases) and stopped_day (0 if all days were
 // completed) with stop_status (1 too many steps, 2 step size too small,
-// 3 stiff, 4 non-finite state).
+// 3 stiff, 4 non-finite state). With more than one node also limiting_node:
+// for each completed day the node (1-based) whose state most often had the
+// largest scaled error in the accepted Dormand-Prince steps (0 if none).
 // [[Rcpp::export]]
 Rcpp::List sg_ode_run_cpp(SEXP ptr, const Rcpp::NumericVector& x0, int day_from, int day_to,
                           double rtol, double atol, const Rcpp::LogicalVector& record,
@@ -113,7 +115,15 @@ Rcpp::List sg_ode_run_cpp(SEXP ptr, const Rcpp::NumericVector& x0, int day_from,
   // results are accumulated in growable vectors and copied once at the end, so
   // a run that stops early (stiff fallback) costs no more than the days it did
   std::vector<double> st_states, st_counters, st_max_rate, st_min_state;
-  std::vector<int> st_days, st_steps, st_rejected, st_evals, st_stiff;
+  std::vector<int> st_days, st_steps, st_rejected, st_evals, st_stiff, st_limiting;
+  // limiting node (D-032): counts per node of the steps it limited
+  const bool track_nodes = mv.n_node > 1;
+  std::vector<int> node_counts(mv.n_node, 0);
+  if (track_nodes) {
+    opt.argmax_counts = node_counts.data();
+    opt.argmax_group = mv.node_stride;
+    opt.argmax_limit = n;  // states only, not the counters integrated alongside
+  }
 
   std::vector<double> x(x0.begin(), x0.end());
   std::vector<double> y(static_cast<std::size_t>(n) + nc);
@@ -128,6 +138,7 @@ Rcpp::List sg_ode_run_cpp(SEXP ptr, const Rcpp::NumericVector& x0, int day_from,
     std::copy(x.begin(), x.end(), y.begin());
     std::fill(y.begin() + n, y.end(), 0.0);
     const double mr = h->kernel.max_rate(d, x.data());
+    std::fill(node_counts.begin(), node_counts.end(), 0);
 
     auto rhs = [&](double, const double* yy, double* dy) {
       h->kernel.eval(d, yy, dy, dy + n);
@@ -150,6 +161,10 @@ Rcpp::List sg_ode_run_cpp(SEXP ptr, const Rcpp::NumericVector& x0, int day_from,
     st_stiff.push_back(st.stiff ? 1 : 0);
     st_max_rate.push_back(mr);
     st_min_state.push_back(*std::min_element(x.begin(), x.end()));
+    if (track_nodes) {
+      const auto top = std::max_element(node_counts.begin(), node_counts.end());
+      st_limiting.push_back(*top > 0 ? static_cast<int>(top - node_counts.begin()) + 1 : 0);
+    }
     if (record[d - 1]) {
       st_states.insert(st_states.end(), x.begin(), x.end());
       st_days.push_back(d);
@@ -179,5 +194,6 @@ Rcpp::List sg_ode_run_cpp(SEXP ptr, const Rcpp::NumericVector& x0, int day_from,
       Rcpp::Named("rejected") = Rcpp::wrap(st_rejected),
       Rcpp::Named("evaluations") = Rcpp::wrap(st_evals), Rcpp::Named("stiff") = stiff,
       Rcpp::Named("max_rate") = Rcpp::wrap(st_max_rate),
-      Rcpp::Named("min_state") = Rcpp::wrap(st_min_state));
+      Rcpp::Named("min_state") = Rcpp::wrap(st_min_state),
+      Rcpp::Named("limiting_node") = Rcpp::wrap(st_limiting));
 }
