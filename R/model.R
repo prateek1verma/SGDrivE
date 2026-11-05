@@ -642,6 +642,41 @@ print.sg_model <- function(x, ...) {
   invisible(TRUE)
 }
 
+# Node i of a model as a one-node model (D-032): the node's forcing series,
+# area, wounds H, mate finding h_M and host count, without landscape,
+# movement or releases. Fields are replaced, not recomputed, so the numbers
+# are exactly those the multi-node model uses. A model without a landscape
+# is returned as it is.
+.sg_node_model <- function(model, i) {
+  land <- model$landscape
+  if (is.null(land)) {
+    return(model)
+  }
+  m <- model
+  m$forcing <- land$forcing[[land$nodes$forcing_series[i]]]
+  m$area <- model$area[i]
+  m$dims$n_node <- 1L
+  m$layout$dims <- sub("^per node: ", "node 1 x ", m$layout$dims)
+  m$n_states <- model$n_states_node
+  m$counts$H <- model$counts$H[i]
+  m$counts$h_M <- model$counts$h_M[i]
+  if (!is.null(m$hosts)) m$hosts$n <- model$hosts$n[i]
+  m$releases <- model$releases[0L, c("day", "index", "count", "genotype", "stage", "sex"),
+    drop = FALSE
+  ]
+  m$n_states_node <- NULL
+  m$landscape <- NULL
+  m$movement <- NULL
+  m$meta$hash <- .sg_model_hash(m)
+  m
+}
+
+# Positions of node i's states in the full state vector.
+.sg_node_positions <- function(model, i) {
+  n_s <- .sg_n_states_node(model)
+  (i - 1L) * n_s + seq_len(n_s)
+}
+
 # Node ids ("1" for a model without a landscape) and states per node.
 .sg_node_ids <- function(model) {
   if (is.null(model$landscape)) "1" else model$landscape$nodes$id

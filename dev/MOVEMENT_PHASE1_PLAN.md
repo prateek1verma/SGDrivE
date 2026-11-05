@@ -348,21 +348,73 @@ Files: src/simulate.cpp, R/simulate.R, tests new test-node-extinction.R.
 
 ### WP7. Initial states per node (M)
 
-Files: R/init.R, R/init-steady.R, tests test-init.R, test-init-steady.R.
+Files: R/model.R (helper), R/init.R, R/init-steady.R, R/checks.R
+(`sg_r0()` help); tests test-init.R, test-init-steady.R, new
+test-init-nodes.R. Only R code.
 
-* `sg_init(nodes = )`, per-node scaling, full-length `"state"` (3.8).
-* `"burn_in"` runs the landscape with movement (it already calls
-  `simulate_ode()`; the burn model keeps landscape and movement).
-* `"equilibrium"` / `"threshold"` per node: loop over nodes with that
-  node's counts and constant temperature; `temperature` scalar or per
-  node; `sg_equilibria()` returns a list per node for N > 1.
-* `print.sg_state()`: totals per node when N > 1.
-* `sg_r0()` needs no change (R0 at low density does not depend on the
-  node's wounds or area); its help states this.
-* Tests: one-node results unchanged; per-node equilibrium equals the
-  equilibrium of a one-node model with that node's area and weather;
-  `nodes` places flies only where asked; burn-in with movement fills an
-  empty connected node.
+Approach: every initial-state method is already correct for one node, so a
+helper gives node i as a one-node model and each method runs per node; the
+results are placed into the full state vector (node slowest).
+
+1. `.sg_node_model(model, i)`: the model reduced to node i (its forcing
+   series, area, H, h_M, host count; no landscape, movement or releases),
+   made by replacing those fields so the numbers are exactly the
+   multi-node model's; `.sg_place_node(x, x_node, i)`. Tested against a
+   one-node `sg_model()` built from scratch for each node.
+2. `"constant"` and `"hardy_weinberg"`: new `nodes` argument (ids or
+   numbers; default all nodes). Selected nodes get the one-node result
+   (`per = "km2"` scales by each node's area); other nodes get no flies;
+   every node gets its hosts at their fly-free steady state.
+3. `"equilibrium"` and `"threshold"`: per node from its one-node model,
+   without movement (D-032). `temperature` one value or one per node;
+   default each node's constant forcing temperature (an error naming the
+   node whose forcing is not constant). Nodes without an equilibrium start
+   empty, with one message listing them. The attribute is a per-node table
+   (node, temperature, R0, eggs per day, adult females).
+4. `sg_equilibria()`: guard removed; with several nodes one data frame with
+   a `node` column (attribute `R0` named by node).
+5. `"burn_in"`: the multi-node ODE with movement from the `"constant"`
+   start (so `nodes` sets where flies start). Without `weather` each node
+   repeats the first year of its own forcing series; `weather` is one data
+   frame for all nodes or a list per node (as in `sg_landscape()`). The
+   start-effect check stays.
+6. `"state"`: a full-length vector, or a named list of per-node vectors.
+7. `print.sg_state()`: with several nodes, stage totals by node, hosts per
+   node and per-node equilibrium information.
+8. Clean-up: guards in `sg_init()` and `sg_equilibria()` removed; help of
+   `sg_r0()` notes that R0 at low density does not depend on a node's area
+   or wounds; `calibrate_population()` stays one-node only.
+9. Tests: one-node results unchanged (existing tests and the baseline);
+   helper against `sg_model()`; constant and Hardy-Weinberg per node, `nodes`
+   and `per = "km2"`, hosts in every node, unknown nodes; equilibrium and
+   threshold per node against one-node models (different temperatures,
+   temperature vector, hosts, a cold node starting empty); `sg_equilibria()`
+   rows per node; burn-in with movement fills an empty connected node, two
+   identical symmetric nodes equal the one-node burn-in, each node repeats
+   its own series; `simulate_ode(m)` runs with the default start; print.
+10. Checks: full suite, bitwise baseline, lint with the package installed,
+    sanitizers.
+
+*Implemented (2026-11-05).* Found on the way: with the host-wound model, an
+equilibrium below the oviposition threshold (e.g. 13 degC) stopped with an
+error in the one-node code too (fertile batches per egg became 0 / 0); it now
+gives an empty state with the usual message (regression test in
+test-init-steady.R). Only R code changed, so the sanitizers were not rerun.
+
+Choices confirmed by the user (2026-11-05):
+
+* `sg_init(node_extinction = FALSE)`, passed only to the burn-in run, so a
+  burn-in with movement can start without fractions of flies in every node.
+* `sg_equilibria()` with several nodes returns one data frame with a `node`
+  column.
+* Burn-in `weather`: one data frame for all nodes or a list per node.
+* `"state"` also accepts a named list of per-node vectors.
+* Default start for landscapes (option A of four discussed): `sg_init(m)`
+  and the default start of `simulate_ode(m)` put the Gutierrez & Ponti
+  starting state (counts per node) into every node, study and source alike,
+  as for one node; `nodes` and `per = "km2"` restrict or scale it. Rejected:
+  per km^2 by default, source nodes only, and an error when
+  `simulate_ode()` has no `init` on a landscape.
 
 ### WP8. Summaries, checks and flow balance per node (M)
 

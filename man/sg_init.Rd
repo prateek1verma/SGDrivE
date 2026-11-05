@@ -15,7 +15,9 @@ sg_init(
   per = c("node", "km2"),
   years = 1L,
   weather = NULL,
-  temperature = NULL
+  temperature = NULL,
+  nodes = NULL,
+  node_extinction = FALSE
 )
 }
 \arguments{
@@ -65,7 +67,9 @@ type(s).}
 \code{"Aa"}, as in single-locus MGDrivE cubes.}
 
 \item{state}{For \code{"state"}: numeric vector of length \code{model$n_states}
-(>= 0), unnamed or named as \code{\link[=sg_state_names]{sg_state_names()}}.}
+(>= 0), unnamed or named as \code{\link[=sg_state_names]{sg_state_names()}}; for a model with a
+landscape also a list with one vector of the states of a node per node,
+named by the node ids.}
 
 \item{per}{Unit of \code{values}: \code{"node"} (counts per node) or \code{"km2"}
 (per km^2, multiplied by the node area).}
@@ -73,12 +77,24 @@ type(s).}
 \item{years}{For \code{"burn_in"}: number of years of burn-in (whole number).}
 
 \item{weather}{For \code{"burn_in"}: optional daily weather (as for
-\code{\link[=sg_forcing]{sg_forcing()}}) covering the \code{years} before the model's start date.}
+\code{\link[=sg_forcing]{sg_forcing()}}) covering the \code{years} before the model's start date. With
+a landscape: one data frame for all nodes or a list with one per node
+(named by node id, or in node order).}
 
 \item{temperature}{For \code{"equilibrium"} and \code{"threshold"}: constant
-temperature (degC).
-Default: the temperature of the model's forcing, when it is constant
-(e.g. from \code{\link[=sg_constant_weather]{sg_constant_weather()}}).}
+temperature (degC); with a landscape one value or one per node.
+Default: the temperature of the model's forcing (of each node's forcing),
+when it is constant (e.g. from \code{\link[=sg_constant_weather]{sg_constant_weather()}}).}
+
+\item{nodes}{For \code{"constant"}, \code{"hardy_weinberg"} and \code{"burn_in"} with a
+landscape (\code{\link[=sg_landscape]{sg_landscape()}}): ids or numbers of the nodes that receive
+the starting population (default all nodes); the other nodes start
+without flies. Ignored for one-node models.}
+
+\item{node_extinction}{For \code{"burn_in"}: apply the node extinction rule
+during the burn-in run (see \code{\link[=simulate_ode]{simulate_ode()}}), so that a burn-in with
+movement does not leave fractions of flies in every node. Default
+\code{FALSE}.}
 }
 \value{
 An object of class \code{sg_state}: a named numeric vector of length
@@ -90,7 +106,8 @@ the same burn-in from a start ten times larger; a warning is given above
 1e-3) or
 \code{equilibrium} or \code{threshold} (temperature, eggs per egg at low density
 \code{R0}, wound search \code{psi}, eggs laid per day, \code{adult_females}: unmated
-plus mated females in the node).
+plus mated females in the node; with a landscape a data frame with one
+row per node).
 }
 \description{
 Builds the state vector (counts per node) at the start of a simulation.
@@ -106,6 +123,17 @@ renormalised among those genotypes. This matters for sex-linked cubes.
 proportion to \code{eta[g, m]} times the initial male weight of m, i.e.
 random mating among the initial adults.
 }
+
+\strong{Several nodes} (D-032). Each node is initialised as a one-node model
+with its own forcing, area, wounds or hosts. \code{"constant"} and
+\code{"hardy_weinberg"} put \code{values} into each node of \code{nodes} (counts per node,
+or per km^2 times the node's area); the default start therefore puts the
+Gutierrez & Ponti starting state into every node, as for one node. Every
+node gets its hosts at their steady state without flies. \code{"equilibrium"}
+and \code{"threshold"} are computed node by node without movement (exact for a
+node whose net movement is zero, otherwise a start for a burn-in); nodes
+without an equilibrium start empty. \code{"burn_in"} runs all nodes with
+movement.
 }
 \examples{
 if (requireNamespace("MGDrivE", quietly = TRUE)) {

@@ -13,7 +13,10 @@ genotype that produces both sexes and breeds true.}
 \item{temperature}{Constant temperature(s) in degC.}
 }
 \value{
-A numeric vector of R0 values, one per temperature.
+A numeric vector of R0 values, one per temperature. R0 at low
+density does not depend on a node's area, wounds or hosts (wound search
+is at its low-density value), so for a model with a landscape it applies
+to every node at that temperature (D-032).
 }
 \description{
 The basic reproduction number of a wild-type population at constant

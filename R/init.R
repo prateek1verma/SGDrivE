@@ -43,16 +43,28 @@
 #'   1). Genotype names must consist of two allele letters, e.g. `"AA"`,
 #'   `"Aa"`, as in single-locus MGDrivE cubes.
 #' @param state For `"state"`: numeric vector of length `model$n_states`
-#'   (>= 0), unnamed or named as [sg_state_names()].
+#'   (>= 0), unnamed or named as [sg_state_names()]; for a model with a
+#'   landscape also a list with one vector of the states of a node per node,
+#'   named by the node ids.
 #' @param per Unit of `values`: `"node"` (counts per node) or `"km2"`
 #'   (per km^2, multiplied by the node area).
 #' @param years For `"burn_in"`: number of years of burn-in (whole number).
 #' @param weather For `"burn_in"`: optional daily weather (as for
-#'   [sg_forcing()]) covering the `years` before the model's start date.
+#'   [sg_forcing()]) covering the `years` before the model's start date. With
+#'   a landscape: one data frame for all nodes or a list with one per node
+#'   (named by node id, or in node order).
 #' @param temperature For `"equilibrium"` and `"threshold"`: constant
-#'   temperature (degC).
-#'   Default: the temperature of the model's forcing, when it is constant
-#'   (e.g. from [sg_constant_weather()]).
+#'   temperature (degC); with a landscape one value or one per node.
+#'   Default: the temperature of the model's forcing (of each node's forcing),
+#'   when it is constant (e.g. from [sg_constant_weather()]).
+#' @param nodes For `"constant"`, `"hardy_weinberg"` and `"burn_in"` with a
+#'   landscape ([sg_landscape()]): ids or numbers of the nodes that receive
+#'   the starting population (default all nodes); the other nodes start
+#'   without flies. Ignored for one-node models.
+#' @param node_extinction For `"burn_in"`: apply the node extinction rule
+#'   during the burn-in run (see [simulate_ode()]), so that a burn-in with
+#'   movement does not leave fractions of flies in every node. Default
+#'   `FALSE`.
 #'
 #' @details
 #' Weights are applied block by block, honouring each genotype's biology:
@@ -64,6 +76,17 @@
 #'   proportion to `eta[g, m]` times the initial male weight of m, i.e.
 #'   random mating among the initial adults.
 #'
+#' **Several nodes** (D-032). Each node is initialised as a one-node model
+#' with its own forcing, area, wounds or hosts. `"constant"` and
+#' `"hardy_weinberg"` put `values` into each node of `nodes` (counts per node,
+#' or per km^2 times the node's area); the default start therefore puts the
+#' Gutierrez & Ponti starting state into every node, as for one node. Every
+#' node gets its hosts at their steady state without flies. `"equilibrium"`
+#' and `"threshold"` are computed node by node without movement (exact for a
+#' node whose net movement is zero, otherwise a start for a burn-in); nodes
+#' without an equilibrium start empty. `"burn_in"` runs all nodes with
+#' movement.
+#'
 #' @return An object of class `sg_state`: a named numeric vector of length
 #'   `model$n_states` (names from [sg_state_names()]) with attribute
 #'   `model_hash`, used by the solvers to check that the state belongs to the
@@ -73,7 +96,8 @@
 #'   1e-3) or
 #'   `equilibrium` or `threshold` (temperature, eggs per egg at low density
 #'   `R0`, wound search `psi`, eggs laid per day, `adult_females`: unmated
-#'   plus mated females in the node).
+#'   plus mated females in the node; with a landscape a data frame with one
+#'   row per node).
 #' @seealso [sg_model()], [sg_state_names()]
 #' @export
 #' @examples
@@ -107,7 +131,8 @@ sg_init <- function(model,
                     ),
                     values = c(E = 0.25, L = 0.25, P = 0.25, M = 0.125, U = 0, F = 0.125),
                     genotypes = NULL, alleles = NULL, state = NULL,
-                    per = c("node", "km2"), years = 1L, weather = NULL, temperature = NULL) {
+                    per = c("node", "km2"), years = 1L, weather = NULL, temperature = NULL,
+                    nodes = NULL, node_extinction = FALSE) {
   if (!inherits(model, "sg_model")) {
     .sg_stop("`model` must be an sg_model object; create one with sg_model().")
   }
@@ -116,9 +141,11 @@ sg_init <- function(model,
     "method"
   )
   per <- .sg_match_choice(per, c("node", "km2"), "per")
-  if (method != "state") {
-    .sg_one_node_only(model, paste0("sg_init(method = \"", method, "\")"), "use method = \"state\"")
+  if (!is.logical(node_extinction) || length(node_extinction) != 1L || is.na(node_extinction)) {
+    .sg_stop("`node_extinction` must be TRUE or FALSE.")
   }
+  start_nodes <- .sg_node_numbers(model, nodes)
+  multi <- !is.null(model$landscape)
 
   if (method %in% c("burn_in", "equilibrium", "threshold")) {
     res <- if (method == "burn_in") {
@@ -127,8 +154,10 @@ sg_init <- function(model,
       } else {
         .sg_hw_weights(model, alleles)
       }
-      start <- .sg_init_constant(model, .sg_init_values(values, per, model$area), weights)
-      .sg_init_burn_in(model, start, years, weather)
+      start <- .sg_init_constant_nodes(model, values, per, weights, start_nodes)
+      .sg_init_burn_in(model, start, years, weather, node_extinction = node_extinction)
+    } else if (multi) {
+      .sg_init_equilibrium_nodes(model, temperature, method)
     } else {
       if (is.null(temperature)) {
         temperature <- .sg_forcing_constant_temp(model$forcing, model$params)
@@ -151,14 +180,12 @@ sg_init <- function(model,
     return(out)
   }
   x <- switch(EXPR = method,
-    state = .sg_init_state(model, state),
-    constant = .sg_init_constant(
-      model, .sg_init_values(values, per, model$area),
-      .sg_init_weights(model, genotypes)
+    state = .sg_init_state(model, .sg_state_from_list(model, state)),
+    constant = .sg_init_constant_nodes(
+      model, values, per, .sg_init_weights(model, genotypes), start_nodes
     ),
-    hardy_weinberg = .sg_init_constant(
-      model, .sg_init_values(values, per, model$area),
-      .sg_hw_weights(model, alleles)
+    hardy_weinberg = .sg_init_constant_nodes(
+      model, values, per, .sg_hw_weights(model, alleles), start_nodes
     )
   )
   names(x) <- sg_state_names(model)
@@ -167,6 +194,9 @@ sg_init <- function(model,
 
 #' @export
 print.sg_state <- function(x, ...) {
+  if (any(grepl("@", names(x), fixed = TRUE))) {
+    return(.sg_print_state_nodes(x))
+  }
   tot <- .sg_state_block_totals(unclass(x))
   cat("<sg_state> ", length(x), " states, total ", format(sum(x), digits = 6L), "\n", sep = "")
   b <- attr(x, "burn_in")
@@ -201,6 +231,60 @@ print.sg_state <- function(x, ...) {
 }
 
 # ---- internal ------------------------------------------------------------------
+
+# print() of a state of several nodes: fly totals by stage and node, hosts by
+# node, and how the state was made.
+.sg_print_state_nodes <- function(x) {
+  v <- unclass(x)
+  nm <- names(v)
+  node <- sub("^[^@]*@", "", nm)
+  ids <- unique(node)
+  host <- grepl("^H[SWI]\\[", nm)
+  cat(
+    "<sg_state> ", length(v), " states in ", length(ids), " nodes, total ",
+    format(sum(v[!host]), digits = 6L), " flies\n",
+    sep = ""
+  )
+  b <- attr(x, "burn_in")
+  if (!is.null(b)) {
+    cat(sprintf(
+      "  after a %d-year burn-in (%s); effect of the starting state %.2g\n",
+      b$years, b$source, b$start_effect
+    ))
+  }
+  for (kind in c("equilibrium", "threshold")) {
+    e <- attr(x, kind)
+    if (is.null(e)) next
+    cat(
+      "  ", if (kind == "threshold") "Allee threshold" else "equilibrium",
+      " per node (without movement):\n",
+      sep = ""
+    )
+    print(e, row.names = FALSE, digits = 4L)
+  }
+  blocks <- c("E", "L", "P", "M", "U", "F")
+  stage <- substr(nm, 1L, 1L)
+  tot <- vapply(ids, function(id) {
+    vapply(blocks, function(bk) sum(v[!host & node == id & stage == bk]), 0)
+  }, numeric(length(blocks)))
+  tot <- matrix(tot, length(blocks), length(ids), dimnames = list(blocks, ids))
+  print(round(tot, 6L))
+  if (any(host)) {
+    hosts <- vapply(ids, function(id) {
+      sel <- host & node == id
+      c(
+        without_wound = sum(v[sel & startsWith(nm, "HS")]),
+        wounded = sum(v[sel & startsWith(nm, "HW")]),
+        infested = sum(v[sel & startsWith(nm, "HI")])
+      )
+    }, numeric(3L))
+    cat("hosts:\n")
+    print(round(matrix(hosts, 3L, length(ids), dimnames = list(
+      c("without wound", "wounded", "infested"), ids
+    )), 6L))
+  }
+  invisible(x)
+}
 
 # Positions of all host states (D-030); empty without a host block.
 .sg_host_index <- function(model) {
@@ -350,6 +434,112 @@ print.sg_state <- function(x, ...) {
   x[sg_state_index(model, "HW")] <- p0 * h$n
   x[sg_state_index(model, "HI")] <- 0
   x
+}
+
+# "constant" (or "hardy_weinberg") start in the nodes `start_nodes` (all
+# nodes of a one-node model): each such node gets the one-node start of its
+# own one-node model (values per km^2 scaled by that node's area); every node
+# gets its hosts at their fly-free steady state (D-032).
+.sg_init_constant_nodes <- function(model, values, per, weights, start_nodes) {
+  if (is.null(model$landscape)) {
+    return(.sg_init_constant(model, .sg_init_values(values, per, model$area), weights))
+  }
+  x <- numeric(model$n_states)
+  for (i in seq_len(model$dims$n_node)) {
+    nm <- .sg_node_model(model, i)
+    x[.sg_node_positions(model, i)] <- if (i %in% start_nodes) {
+      .sg_init_constant(nm, .sg_init_values(values, per, nm$area), weights)
+    } else {
+      .sg_init_hosts(nm, numeric(nm$n_states))
+    }
+  }
+  x
+}
+
+# method = "state" with a named list of per-node vectors (one per node, in any
+# order) or a full vector.
+.sg_state_from_list <- function(model, state) {
+  if (!is.list(state)) {
+    return(state)
+  }
+  ids <- .sg_node_ids(model)
+  if (is.null(names(state)) || !setequal(names(state), ids) || anyDuplicated(names(state))) {
+    .sg_stop(
+      "A list `state` needs one element per node, named by the node ids (",
+      .sg_wrap_names(ids), ")."
+    )
+  }
+  n_s <- .sg_n_states_node(model)
+  parts <- lapply(ids, function(id) {
+    v <- state[[id]]
+    if (!is.numeric(v) || length(v) != n_s) {
+      .sg_stop("`state$", id, "` must be a numeric vector of length ", n_s, " (states per node).")
+    }
+    as.numeric(v)
+  })
+  unlist(parts, use.names = FALSE)
+}
+
+# "equilibrium" or "threshold" in every node of a landscape, each from its
+# one-node model without movement (D-032). `temperature`: NULL (each node's
+# constant forcing temperature), one value or one per node. Messages of the
+# nodes are collected into one.
+.sg_init_equilibrium_nodes <- function(model, temperature, method) {
+  ids <- .sg_node_ids(model)
+  temps <- .sg_node_temperatures(model, temperature, paste0("method = \"", method, "\""))
+  x <- numeric(model$n_states)
+  notes <- character(0)
+  rows <- vector("list", length(ids))
+  for (i in seq_along(ids)) {
+    nm <- .sg_node_model(model, i)
+    res <- withCallingHandlers(
+      .sg_init_equilibrium(nm, temps[i],
+        what = paste0("method = \"", method, "\""),
+        root = if (method == "threshold") "lower" else "upper"
+      ),
+      message = function(m) {
+        notes <<- c(notes, paste0("node ", ids[i], ": ", trimws(conditionMessage(m))))
+        invokeRestart("muffleMessage")
+      }
+    )
+    x[.sg_node_positions(model, i)] <- res$x
+    inf <- res$info
+    rows[[i]] <- data.frame(
+      node = ids[i], temperature = inf$temperature, R0 = inf$R0, psi = inf$psi,
+      eggs_per_day = inf$eggs_per_day, adult_females = inf$adult_females,
+      stringsAsFactors = FALSE
+    )
+  }
+  if (length(notes) > 0L) .sg_message(paste(notes, collapse = "\n"))
+  info <- do.call(rbind, rows)
+  rownames(info) <- NULL
+  list(x = x, info = info)
+}
+
+# Temperature of each node for equilibria: given (one value or one per node)
+# or each node's constant forcing temperature.
+.sg_node_temperatures <- function(model, temperature, what) {
+  ids <- .sg_node_ids(model)
+  n <- length(ids)
+  if (!is.null(temperature)) {
+    ok <- is.numeric(temperature) && length(temperature) %in% c(1L, n) &&
+      all(is.finite(temperature))
+    if (!ok) {
+      .sg_stop("`temperature` must be one finite value or one per node (", n, ") in degC.")
+    }
+    return(rep_len(as.numeric(temperature), n))
+  }
+  temps <- vapply(seq_len(n), function(i) {
+    t <- .sg_forcing_constant_temp(.sg_node_model(model, i)$forcing, model$params)
+    if (is.null(t)) NA_real_ else t
+  }, 0)
+  if (anyNA(temps)) {
+    .sg_stop(
+      what, " needs a `temperature` (degC): the forcing of node(s) ",
+      paste(ids[is.na(temps)], collapse = ", "), " does not have one constant temperature."
+    )
+  }
+  temps
 }
 
 .sg_init_state <- function(model, state) {

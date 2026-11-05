@@ -12,7 +12,10 @@
 #' @param model An `sg_model` object ([sg_model()]) with a single wild-type
 #'   genotype that produces both sexes and breeds true.
 #' @param temperature Constant temperature(s) in degC.
-#' @return A numeric vector of R0 values, one per temperature.
+#' @return A numeric vector of R0 values, one per temperature. R0 at low
+#'   density does not depend on a node's area, wounds or hosts (wound search
+#'   is at its low-density value), so for a model with a landscape it applies
+#'   to every node at that temperature (D-032).
 #' @details The same quantity defines the constant-temperature equilibrium
 #'   ([sg_init()] with `method = "equilibrium"`, model specification section
 #'   11). The Allee effect (`male_density_half_mating > 0`) is not included: with it, mating fails

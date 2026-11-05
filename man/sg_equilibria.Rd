@@ -19,7 +19,8 @@ A data frame with one row per equilibrium, ordered by egg input:
 \code{temperature}, \code{eggs_per_day}, \code{adult_females} and \code{adult_males} (in the
 node), \code{infested_hosts} and \code{prevalence} (infested / hosts; \code{NA} without
 the host-wound model), \code{wound_search} (Psi) and \code{stable}. Attribute \code{R0}:
-eggs per egg at low density.
+eggs per egg at low density. With a landscape the rows of all nodes, with
+a first column \code{node}, and \code{R0} named by node.
 }
 \description{
 Finds every equilibrium of a wild-type population at a constant
@@ -38,6 +39,11 @@ attractive than clean ones there can be several stable equilibria
 (D-030). Roots closer together than the grid spacing can be missed. The
 extinction equilibrium (B = 0) is always listed; it is stable when the
 population cannot grow from low numbers (R0 <= 1, or an Allee effect).
+
+With a landscape (\code{\link[=sg_landscape]{sg_landscape()}}) every node is treated as a one-node
+model with its own forcing, area, wounds or hosts, without movement
+(D-032); \code{temperature} is then one value or one per node (default: each
+node's constant forcing temperature).
 }
 \examples{
 if (requireNamespace("MGDrivE", quietly = TRUE)) {

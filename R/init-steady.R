@@ -8,13 +8,21 @@
 # it still depends on the starting state. The burn-in
 # weather is either taken from `weather` (the calendar years before the start
 # date) or, without it, the model's first 365 days of forcing repeated (the
-# same season, one year later).
-.sg_init_burn_in <- function(model, x_start, years, weather, check_start = TRUE) {
+# same season, one year later). With a landscape (D-032) the burn-in runs all
+# nodes with movement; without `weather` each node repeats its own forcing
+# series, and `weather` is one data frame for all nodes or a list per node.
+# node_extinction is passed to simulate_ode() (MODEL_SPEC N5).
+.sg_init_burn_in <- function(model, x_start, years, weather, check_start = TRUE,
+                             node_extinction = FALSE) {
   ok <- is.numeric(years) && length(years) == 1L && is.finite(years) && years >= 1 &&
     years == round(years)
   if (!ok) .sg_stop("`years` must be a whole number >= 1.")
   start <- model$forcing$dates[1L]
-  if (is.null(weather)) {
+  if (!is.null(model$landscape)) {
+    burn <- .sg_burn_in_landscape(model, years, weather)
+    forcing <- burn$forcing
+    source <- attr(burn, "source")
+  } else if (is.null(weather)) {
     if (model$forcing$n_days < 365L) {
       .sg_stop(
         "A burn-in without `weather` repeats the model's first year of forcing, but the ",
@@ -30,11 +38,17 @@
     forcing <- sg_forcing(weather, model$params, start = burn_start, end = start - 1)
     source <- "weather before the start date"
   }
-  burn <- model
-  burn$forcing <- forcing
+  if (is.null(model$landscape)) {
+    burn <- model
+    burn$forcing <- forcing
+  }
   burn$releases <- model$releases[0L, , drop = FALSE]
   run <- function(x0) {
-    x <- unname(simulate_ode(burn, init = as.numeric(x0), output_every = forcing$n_days)$state)
+    sim <- simulate_ode(burn,
+      init = as.numeric(x0), output_every = forcing$n_days,
+      node_extinction = node_extinction
+    )
+    x <- unname(sim$state)
     x <- x[nrow(x), ]
     x[x < 0] <- 0 # round-off near extinction
     x
@@ -62,6 +76,56 @@
     years = as.integer(years), source = source, days = forcing$n_days,
     start_effect = effect
   ))
+}
+
+# The burn-in model of a landscape: the same nodes and movement, with burn-in
+# forcing per node (each node's own first year repeated, or from `weather`:
+# one data frame for all nodes or a list with one per node).
+.sg_burn_in_landscape <- function(model, years, weather) {
+  land <- model$landscape
+  ids <- land$nodes$id
+  start <- model$forcing$dates[1L]
+  if (is.null(weather)) {
+    if (model$forcing$n_days < 365L) {
+      .sg_stop(
+        "A burn-in without `weather` repeats each node's first year of forcing, but the ",
+        "model has only ", model$forcing$n_days, " days. Give the weather of the years ",
+        "before the start in `weather`."
+      )
+    }
+    idx <- rep_len(seq_len(365L), 365L * years)
+    dates <- start - rev(seq_along(idx))
+    series <- lapply(land$forcing, .sg_forcing_subset, idx = idx, dates = dates)
+    forcings <- series[land$nodes$forcing_series]
+    source <- "each node's first year of forcing, repeated"
+  } else {
+    burn_start <- seq(start, by = "-1 year", length.out = years + 1L)[years + 1L]
+    make <- function(w) sg_forcing(w, model$params, start = burn_start, end = start - 1)
+    if (is.data.frame(weather)) {
+      forcings <- rep(list(make(weather)), length(ids))
+    } else {
+      if (!is.list(weather) || length(weather) != length(ids)) {
+        .sg_stop(
+          "`weather` must be one data frame for all nodes or a list with one per node (",
+          length(ids), ")."
+        )
+      }
+      if (!is.null(names(weather)) && any(nzchar(names(weather)))) {
+        if (!setequal(names(weather), ids)) {
+          .sg_stop("Names of the `weather` list must be the node ids (", .sg_wrap_names(ids), ").")
+        }
+        weather <- weather[ids]
+      }
+      forcings <- lapply(weather, make)
+    }
+    source <- "weather before the start date"
+  }
+  nodes <- land$nodes[, setdiff(names(land$nodes), "forcing_series")]
+  burn <- model
+  burn$landscape <- sg_landscape(nodes, forcings)
+  burn$forcing <- burn$landscape$forcing[[burn$landscape$nodes$forcing_series[1L]]]
+  attr(burn, "source") <- source
+  burn
 }
 
 # A forcing object with the days `idx` of `forcing`, on new dates.
@@ -118,8 +182,13 @@
   pair <- (gi - 1L) * s$n_g + gi
   # fertile batches per egg laid: s_w batches per searching female, each
   # fertile with the share of its batch viability (D-026, D-031)
-  fertile_per_egg <- .sg_batch_factor(p, rates$phi_ov) * s$search_weight[gi] *
-    .sg_fertile_share(s$batch_viability[pair], .sg_clutch(p, rates$phi_ov)) / egg_balance
+  # (below the oviposition threshold no eggs are laid: no fertile batches)
+  fertile_per_egg <- if (egg_balance > 0) {
+    .sg_batch_factor(p, rates$phi_ov) * s$search_weight[gi] *
+      .sg_fertile_share(s$batch_viability[pair], .sg_clutch(p, rates$phi_ov)) / egg_balance
+  } else {
+    0
+  }
 
   psi_of <- function(n_s, wounds) {
     if (n_s > 0) {
@@ -324,11 +393,17 @@
 #'   (D-030). Roots closer together than the grid spacing can be missed. The
 #'   extinction equilibrium (B = 0) is always listed; it is stable when the
 #'   population cannot grow from low numbers (R0 <= 1, or an Allee effect).
+#'
+#'   With a landscape ([sg_landscape()]) every node is treated as a one-node
+#'   model with its own forcing, area, wounds or hosts, without movement
+#'   (D-032); `temperature` is then one value or one per node (default: each
+#'   node's constant forcing temperature).
 #' @return A data frame with one row per equilibrium, ordered by egg input:
 #'   `temperature`, `eggs_per_day`, `adult_females` and `adult_males` (in the
 #'   node), `infested_hosts` and `prevalence` (infested / hosts; `NA` without
 #'   the host-wound model), `wound_search` (Psi) and `stable`. Attribute `R0`:
-#'   eggs per egg at low density.
+#'   eggs per egg at low density. With a landscape the rows of all nodes, with
+#'   a first column `node`, and `R0` named by node.
 #' @seealso [sg_init()] with `method = "equilibrium"` or `"threshold"`
 #' @export
 #' @examples
@@ -344,7 +419,17 @@ sg_equilibria <- function(model, temperature = NULL) {
   if (!inherits(model, "sg_model")) {
     .sg_stop("`model` must be an sg_model object; create one with sg_model().")
   }
-  .sg_one_node_only(model, "sg_equilibria()")
+  if (!is.null(model$landscape)) {
+    # each node from its one-node model, without movement (D-032)
+    ids <- .sg_node_ids(model)
+    temps <- .sg_node_temperatures(model, temperature, "sg_equilibria()")
+    eqs <- lapply(seq_along(ids), function(i) {
+      .sg_equilibria_core(.sg_node_model(model, i), temps[i], "sg_equilibria()")
+    })
+    tab <- do.call(rbind, Map(function(id, eq) cbind(node = id, eq$table), ids, eqs))
+    rownames(tab) <- NULL
+    return(structure(tab, R0 = stats::setNames(vapply(eqs, `[[`, 0, "r0"), ids)))
+  }
   if (is.null(temperature)) {
     temperature <- .sg_forcing_constant_temp(model$forcing, model$params)
     if (is.null(temperature)) {

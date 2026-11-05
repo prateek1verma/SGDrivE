@@ -221,3 +221,15 @@ test_that("there is no Allee threshold without an Allee effect", {
     tolerance = 1e-3
   )
 })
+
+test_that("host-model equilibria below the oviposition threshold are empty, not an error", {
+  # found in phase 1 WP7: no egg laying made the fertile batches per egg 0 / 0
+  p <- sg_params(wound_model = "hosts", host_density = 50, wounded_fraction = 0.1)
+  wx <- sg_forcing(sg_constant_weather(13, days = 30), p)
+  m <- sg_model(p, sg_cube(sg_test_cube_mendelian()), wx)
+  expect_message(x <- sg_init(m, "equilibrium"), "No positive equilibrium at 13 degC")
+  fly <- unlist(lapply(c("E", "L", "P", "M", "U", "F"), function(b) sg_state_index(m, b)))
+  expect_identical(sum(x[fly]), 0)
+  expect_equal(sum(x[-fly]), m$hosts$n)
+  expect_identical(nrow(sg_equilibria(m)), 1L)
+})
