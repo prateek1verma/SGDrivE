@@ -14,7 +14,8 @@ simulate_ode(
   output_every = 1L,
   stiff_fallback = NULL,
   node_extinction = FALSE,
-  max_memory = 1e+09
+  max_memory = 1e+09,
+  record = "state"
 )
 }
 \arguments{
@@ -64,14 +65,26 @@ several nodes (D-032); see Details.}
 (states on output days and daily counters; default 1e9) and, with more
 than one node, of the dense Jacobian of the deSolve methods \code{"lsoda"},
 \code{"lsode"}, \code{"bdf"} and \code{"radau"}. Larger runs stop before they start.}
+
+\item{record}{What the run stores: \code{"state"} (default: full states on
+output days and all daily counters), \code{"totals"} (totals by stage and
+genotype per node, and all counters), or an \code{\link[=sg_record]{sg_record()}} object with
+chosen quantities and counter sums, computed in C++ during the run.}
 }
 \value{
 An object of class \code{sg_sim}, a list with:
 \describe{
 \item{\code{day}, \code{date}}{Output days (0 = initial state) and dates.}
 \item{\code{state}}{Matrix of states (rows: output days; columns:
-\code{\link[=sg_state_names]{sg_state_names()}}), counts per node at the end of each day.}
-\item{\code{counters}}{Matrix of daily flow totals (rows: days 1 to n).}
+\code{\link[=sg_state_names]{sg_state_names()}}), counts per node at the end of each day; \code{NULL}
+when not recorded.}
+\item{\code{totals}, \code{recorded}}{With \code{\link[=sg_record]{sg_record()}}: totals by stage and
+genotype, and the recorded quantities (rows: output days).}
+\item{\code{counters}}{Matrix of daily flow totals (rows: days 1 to n);
+\code{NULL} when only counter sums are recorded.}
+\item{\code{counter_sums}}{With \code{sg_counter()} terms: daily counter sums.}
+\item{\code{final_state}}{The state at the end of the run (named), to
+continue from.}
 \item{\code{releases}}{Matrix of individuals released per day and block.}
 \item{\code{diagnostics}}{Data frame of daily solver diagnostics.}
 \item{\code{meta}}{Backend, method, tolerances, stiff fallback setting and

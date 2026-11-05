@@ -175,6 +175,32 @@ ci <- sg_cold_index(sg_example_weather())
 ci[ci$year %in% c(1971, 1979), c("year", "mu_cold")]
 ```
 
+## Several nodes and adult movement (v0.2, in development)
+
+A landscape of nodes, each with its own weather, area, wounds or hosts, with
+adults moving between them by leave rates and destination probabilities on a
+degree-day or calendar clock (design: [`dev/MOVEMENT_DESIGN.md`](dev/MOVEMENT_DESIGN.md),
+equations: MODEL_SPEC section 8a). The ODE solver, initial states,
+summaries, an optional node extinction rule and a recorder that keeps only
+chosen quantities are available; the stochastic solver follows.
+
+```{r nodes, eval = requireNamespace("MGDrivE", quietly = TRUE)}
+land <- sg_landscape(
+  data.frame(id = c("south", "middle", "north"), area = 100, role = c("source", "study", "study")),
+  sg_forcing(sg_example_weather(), p, start = "1971-01-01", end = "1971-12-31")
+)
+chain <- sg_movement_layer(
+  rate = list(male = 0.05, virgin = 0.1, mated = -log(1 - 0.16)), # 16% of females leave per day
+  dest = rbind(c(0, 1, 0), c(0.5, 0, 0.5), c(0, 1, 0))
+)
+mod3 <- sg_model(p, cube, landscape = land, movement = chain)
+sim3 <- simulate_ode(mod3,
+  init = sg_init(mod3, nodes = "south"), node_extinction = TRUE,
+  record = sg_record("totals", sg_quantity("adults", stage = "adults", by = "node"))
+)
+tail(sim3$recorded, 3)
+```
+
 ## Roadmap
 
 | Milestone | Content |
@@ -187,6 +213,7 @@ ci[ci$year %in% c(1971, 1979), c("year", "mu_cold")]
 | M5 ✔ | Checks, summaries, calibration and plots |
 | M6 | Scientific validation |
 | M7 | Documentation and v0.1.0 release |
+| v0.2 | Several nodes and adult movement: phase 1 (ODE) done, chain-binomial next |
 
 See [`dev/ROADMAP.md`](dev/ROADMAP.md) for completion criteria.
 

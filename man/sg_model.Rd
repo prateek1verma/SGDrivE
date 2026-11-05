@@ -138,6 +138,22 @@ if (requireNamespace("MGDrivE", quietly = TRUE)) {
   mod <- sg_model(p, cube, wx, rel, area = 1)
   mod
   head(sg_state_names(mod))
+
+  # three nodes in a row, the first a source, with adult movement (D-032)
+  land <- sg_landscape(
+    data.frame(
+      id = c("south", "middle", "north"), area = 100,
+      role = c("source", "study", "study")
+    ),
+    wx
+  )
+  chain <- sg_movement_layer(
+    list(male = 0.05, virgin = 0.1, mated = 0.17),
+    rbind(c(0, 1, 0), c(0.5, 0, 0.5), c(0, 1, 0))
+  )
+  mod3 <- sg_model(p, cube, landscape = land, movement = chain)
+  mod3
+  head(sg_state_names(mod3))
 }
 }
 \seealso{

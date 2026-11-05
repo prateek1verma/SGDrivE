@@ -248,8 +248,15 @@ print.sg_sim_cb <- function(x, ...) {
     function(g, b) paste0(b, "[", g, "]")
   ))
   if (any(host)) cols <- c(cols, paste0(.sg_host_blocks, "[", model$hosts$classes, "]"))
+  # several nodes (D-032): the same columns for each node, with "@id"
+  ids <- .sg_node_ids(model)
+  suffix <- rep("", length(nm))
+  if (length(ids) > 1L) {
+    cols <- paste0(rep(cols, length(ids)), "@", rep(ids, each = length(cols)))
+    suffix <- paste0("@", .sg_name_node(nm))
+  }
   agg <- matrix(0, length(nm), length(cols), dimnames = list(NULL, cols))
-  agg[cbind(seq_along(nm), match(paste0(block, "[", geno, "]"), cols))] <- 1
+  agg[cbind(seq_along(nm), match(paste0(block, "[", geno, "]", suffix), cols))] <- 1
   agg
 }
 

@@ -704,6 +704,31 @@ Parameters `movement_t_ref` and `movement_kappa_max` enter the parameter
 table with the code (phase 1). Effects: with one node and no movement every
 result is unchanged (bitwise for the ODE).
 
+Findings during implementation of phase 1 (ODE; PRs #14, #15 and PR C,
+2026-11-05; details in dev/MOVEMENT_PHASE1_PLAN.md):
+
+* State layout node-major (one copy of the one-node vector per node); state
+  and counter names get "@id" for more than one node; forcing is stored once
+  per distinct series. Day rates and the movement clock are recomputed per
+  evaluation (a few operations per node) instead of cached.
+* `stiff_fallback` defaults to `TRUE` for one node and `FALSE` for several;
+  a new `max_memory` check stops oversized runs before they start, also for
+  one node. Dormand-Prince reports the node that limits the step size.
+* The bitwise single-node check holds only on the machine and R version
+  that made its fixture (other platforms differ by about 1e-15 relative);
+  it is bitwise with `SCREWDRIVE_BITWISE_BASELINE=true` and uses tolerances
+  of 1e-9 or tighter elsewhere.
+* Initial states run the one-node code on each node's one-node model; the
+  default start puts the starting state into every node (user choice).
+  Fixed on the way, also for one node: host-model equilibria below the
+  oviposition threshold stopped with an error (0 / 0).
+* Summaries default to the study nodes; multi-node runs store releases per
+  stage and node so that `sg_flow_balance()` can balance each node.
+* Recorder: counter sums are kept in `sim$counter_sums` beside (or instead
+  of) the counters; `node = NULL` in `sg_quantity()` and `sg_counter()`
+  means the study nodes; totals are rows of the same weight matrix. The
+  recorder saves memory, not run time (integration dominates).
+
 ---
 
 ## Open questions

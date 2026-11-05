@@ -10,9 +10,9 @@ experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](h
 [![R-CMD-check](https://github.com/prateek1verma/SGDrivE/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/prateek1verma/SGDrivE/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
-ScrewDrivE will simulate genotype-resolved population dynamics of the New
-World screwworm (*Cochliomyia hominivorax*) under genetic control: the
-sterile insect technique (SIT), precision-guided SIT (pgSIT),
+ScrewDrivE will simulate genotype-resolved population dynamics of the
+New World screwworm (*Cochliomyia hominivorax*) under genetic control:
+the sterile insect technique (SIT), precision-guided SIT (pgSIT),
 female-specific RIDL (fsRIDL) and gene drives.
 
 > **Status: under development (milestone M5, outputs, checks and
@@ -82,7 +82,7 @@ mod
 #>   male chain: [0, 202.8) dd: 10
 #>   node area 1 km^2; wounds H = 5 per node; mating "rate"; search competitors "searching_females"
 #>   releases: 20 events on 20 days (days 60 to 193), 10,000 individuals
-#>   hash: f057a3f76040568befa4ee309ec70ba9
+#>   hash: c8b85b69296942665994be05f730d975
 ```
 
 ## Deterministic simulation (milestones M2 and M3)
@@ -94,7 +94,7 @@ sim
 #>   final totals: E 0.49452, L 0.30710, P 0.67484, M 0.47005, U 0.01378, F 0.45628
 #>   eggs laid 2669.2; adults emerged 1229.2; released 10000
 #>   solver: 17 steps/day (max 60), stiffness detected on 0 of 731 days, 0 integrated by the lsoda fallback, largest rate 13.5 per day, min state 0
-#>   run time 0.03 s
+#>   run time 0.28 s
 ```
 
 `simulate_ode()` integrates the model one day at a time with a
@@ -133,7 +133,7 @@ sim_cb
 #>   extinct: 0 of 10 replicates
 #>   wild type eliminated: 0 of 10 replicates
 #>   eggs laid 2,674,116 and released 10,000 per replicate (mean)
-#>   seed 1; run time 1.38 s
+#>   seed 1; run time 3.36 s
 ```
 
 `simulate_cb()` divides each day into steps (0.1 day by default). Within
@@ -182,7 +182,7 @@ cal <- calibrate_wound_density(sg_model(p, cube, wx_1971), target = 100) # adult
 cal
 #> <sg_calibration>
 #>   wound_density = 18.4955 wounds per km^2 (proportional, 2 model runs)
-#>   mean of adults per km^2: target 100, achieved 100 (relative difference 4.9e-13)
+#>   mean of adults per km^2: target 100, achieved 100 (relative difference 4.8e-13)
 ```
 
 Output tables work the same for deterministic and stochastic results:
@@ -222,6 +222,37 @@ ci[ci$year %in% c(1971, 1979), c("year", "mu_cold")]
 #> 20 1979 9.798071
 ```
 
+## Several nodes and adult movement (v0.2, in development)
+
+A landscape of nodes, each with its own weather, area, wounds or hosts,
+with adults moving between them by leave rates and destination
+probabilities on a degree-day or calendar clock (design:
+[`dev/MOVEMENT_DESIGN.md`](dev/MOVEMENT_DESIGN.md), equations:
+MODEL_SPEC section 8a). The ODE solver, initial states, summaries, an
+optional node extinction rule and a recorder that keeps only chosen
+quantities are available; the stochastic solver follows.
+
+``` r
+land <- sg_landscape(
+  data.frame(id = c("south", "middle", "north"), area = 100, role = c("source", "study", "study")),
+  sg_forcing(sg_example_weather(), p, start = "1971-01-01", end = "1971-12-31")
+)
+chain <- sg_movement_layer(
+  rate = list(male = 0.05, virgin = 0.1, mated = -log(1 - 0.16)), # 16% of females leave per day
+  dest = rbind(c(0, 1, 0), c(0.5, 0, 0.5), c(0, 1, 0))
+)
+mod3 <- sg_model(p, cube, landscape = land, movement = chain)
+sim3 <- simulate_ode(mod3,
+  init = sg_init(mod3, nodes = "south"), node_extinction = TRUE,
+  record = sg_record("totals", sg_quantity("adults", stage = "adults", by = "node"))
+)
+tail(sim3$recorded, 3)
+#>        adults@middle adults@north
+#> [364,]      845.5399     519.6342
+#> [365,]      840.5676     518.6648
+#> [366,]      841.0626     522.5564
+```
+
 ## Roadmap
 
 | Milestone | Content |
@@ -234,6 +265,7 @@ ci[ci$year %in% c(1971, 1979), c("year", "mu_cold")]
 | M5 ✔ | Checks, summaries, calibration and plots |
 | M6 | Scientific validation |
 | M7 | Documentation and v0.1.0 release |
+| v0.2 | Several nodes and adult movement: phase 1 (ODE) done, chain-binomial next |
 
 See [`dev/ROADMAP.md`](dev/ROADMAP.md) for completion criteria.
 

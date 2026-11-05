@@ -189,8 +189,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // sg_ode_run_cpp
-Rcpp::List sg_ode_run_cpp(SEXP ptr, const Rcpp::NumericVector& x0, int day_from, int day_to, double rtol, double atol, const Rcpp::LogicalVector& record, bool stop_on_stiff, double max_steps, bool extinction, double ext_threshold, int ended_index);
-RcppExport SEXP _ScrewDrivE_sg_ode_run_cpp(SEXP ptrSEXP, SEXP x0SEXP, SEXP day_fromSEXP, SEXP day_toSEXP, SEXP rtolSEXP, SEXP atolSEXP, SEXP recordSEXP, SEXP stop_on_stiffSEXP, SEXP max_stepsSEXP, SEXP extinctionSEXP, SEXP ext_thresholdSEXP, SEXP ended_indexSEXP) {
+Rcpp::List sg_ode_run_cpp(SEXP ptr, const Rcpp::NumericVector& x0, int day_from, int day_to, double rtol, double atol, const Rcpp::LogicalVector& record, bool stop_on_stiff, double max_steps, bool extinction, double ext_threshold, int ended_index, SEXP recorder);
+RcppExport SEXP _ScrewDrivE_sg_ode_run_cpp(SEXP ptrSEXP, SEXP x0SEXP, SEXP day_fromSEXP, SEXP day_toSEXP, SEXP rtolSEXP, SEXP atolSEXP, SEXP recordSEXP, SEXP stop_on_stiffSEXP, SEXP max_stepsSEXP, SEXP extinctionSEXP, SEXP ext_thresholdSEXP, SEXP ended_indexSEXP, SEXP recorderSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -206,7 +206,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< bool >::type extinction(extinctionSEXP);
     Rcpp::traits::input_parameter< double >::type ext_threshold(ext_thresholdSEXP);
     Rcpp::traits::input_parameter< int >::type ended_index(ended_indexSEXP);
-    rcpp_result_gen = Rcpp::wrap(sg_ode_run_cpp(ptr, x0, day_from, day_to, rtol, atol, record, stop_on_stiff, max_steps, extinction, ext_threshold, ended_index));
+    Rcpp::traits::input_parameter< SEXP >::type recorder(recorderSEXP);
+    rcpp_result_gen = Rcpp::wrap(sg_ode_run_cpp(ptr, x0, day_from, day_to, rtol, atol, record, stop_on_stiff, max_steps, extinction, ext_threshold, ended_index, recorder));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -225,7 +226,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_ScrewDrivE_sg_kernel_new_cpp", (DL_FUNC) &_ScrewDrivE_sg_kernel_new_cpp, 1},
     {"_ScrewDrivE_sg_kernel_rates_cpp", (DL_FUNC) &_ScrewDrivE_sg_kernel_rates_cpp, 3},
     {"_ScrewDrivE_sg_kernel_max_rate_cpp", (DL_FUNC) &_ScrewDrivE_sg_kernel_max_rate_cpp, 3},
-    {"_ScrewDrivE_sg_ode_run_cpp", (DL_FUNC) &_ScrewDrivE_sg_ode_run_cpp, 12},
+    {"_ScrewDrivE_sg_ode_run_cpp", (DL_FUNC) &_ScrewDrivE_sg_ode_run_cpp, 13},
     {NULL, NULL, 0}
 };
 
