@@ -398,9 +398,23 @@ print.sg_sim <- function(x, ...) {
 }
 
 # Largest total rate (transfer + mortality, and mating for unmated females;
-# D-026) of any compartment that is in use.
+# D-026) of any compartment that is in use. With several nodes: the largest
+# over nodes of the node's largest rate plus its largest total leave rate
+# (MODEL_SPEC 8a).
 .sg_max_rate <- function(day, x, setup) {
-  a <- .sg_rates_r(day, x, setup, aux = TRUE)$aux
+  if (is.null(setup$node_setups)) {
+    return(.sg_max_rate_node(day, x, setup))
+  }
+  n_s <- setup$n_states_node
+  mv <- .sg_movement_r(day, x, setup)
+  max(vapply(seq_len(setup$n_node), function(i) {
+    r <- .sg_max_rate_node(day, x[(i - 1L) * n_s + seq_len(n_s)], setup$node_setups[[i]])
+    r + if (is.null(mv)) 0 else max(mv$lambda[, i])
+  }, 0))
+}
+
+.sg_max_rate_node <- function(day, x, setup) {
+  a <- .sg_rates_node(day, x, setup, aux = TRUE)$aux
   p <- setup$p
   nu_i <- if (p$mating_mode == "instant") {
     rep(p$mating_rate * a$g_find, setup$n_A)

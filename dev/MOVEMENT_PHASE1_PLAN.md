@@ -270,9 +270,11 @@ Model view additions (validated in the `ModelView` constructor):
 
 Kernel changes:
 
-* `DayRates` computed per node from the node's forcing series and cached
-  per day (one vector of N `DayRates`, refreshed when the day changes), so
-  an evaluation does not recompute them.
+* `DayRates` computed per node from the node's forcing series.
+  *Implemented (2026-11-05):* recomputed at each evaluation, like the
+  movement clock κ, instead of cached per day: a few operations per node
+  against the node's aggregates, so a cache would save little; revisit if
+  the phase 3 profile shows it.
 * `eval()` loops over nodes and runs today's body on `y + i·S`,
   `dydt + i·S`, `counters + i·C` with node i's `H`, `h_M`, `N_H` and day
   rates (the body becomes `eval_node()`, with the same floating-point
