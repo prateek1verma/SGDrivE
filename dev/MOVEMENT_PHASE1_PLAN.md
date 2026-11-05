@@ -450,6 +450,11 @@ other. **(confirmed)** Three pull requests, each green on CI:
 * Single-node bitwise check: a fixture of states and counters from
   `main` (gp2014 preset, McAllen, Mendelian and homing cubes, static and
   host mode) saved before WP3; `identical()` after every PR.
+  *Found on CI (2026-11-05):* bitwise equality holds only on the machine and
+  R version that made the fixture (CI differs by about 1e-15 relative, and
+  the hash differs on Windows), so the test is bitwise with
+  `SCREWDRIVE_BITWISE_BASELINE=true` (`dev/check.R`) and uses tolerances of
+  1e-9 or tighter elsewhere.
 * `lintr::lint_package()` clean (with the package installed so
   `object_usage_linter` resolves), `Rscript dev/style.R`, clang-format.
 * `bash dev/sanitize.sh` after src/ changes (WP4, WP5, WP6, WP9).

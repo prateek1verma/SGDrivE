@@ -8,6 +8,10 @@ if (!nzchar(Sys.which("pandoc")) && dir.exists(rstudio_pandoc)) {
   Sys.setenv(RSTUDIO_PANDOC = rstudio_pandoc)
 }
 
+# the single-node baseline is bitwise on the machine that made its fixture
+# (tests/testthat/test-single-node-baseline.R)
+Sys.setenv(SCREWDRIVE_BITWISE_BASELINE = "true")
+
 devtools::document(".")
 devtools::build_readme(".", quiet = TRUE)
 # lintr resolves internal functions in the installed package, so install the

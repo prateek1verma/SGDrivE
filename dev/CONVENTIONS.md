@@ -164,6 +164,12 @@ boundary.
   properties, not exact draws, unless testing reproducibility or R/C++
   equality (see Random numbers).
 * Slow tests (> 5 s) are skipped on CRAN with `skip_on_cran()`.
+* `test-single-node-baseline.R` compares one-node results with the code
+  before the multi-node work. It is bitwise only with
+  `SCREWDRIVE_BITWISE_BASELINE=true` (set by `dev/check.R`) on the machine
+  and R version that made the fixture; elsewhere, including CI, it uses
+  tolerances of 1e-9 or tighter, because platforms differ in the last bits
+  of floating-point results.
 
 ## Version control
 
