@@ -176,4 +176,10 @@ boundary.
 * `main` is always releasable: `devtools::check()` gives 0 errors, 0
   warnings, 0 notes.
 * Work on a branch, open a pull request, merge when CI passes.
+* CI saves GitHub Actions minutes (private repository; macOS counts 10x,
+  Windows 2x): pull requests run lint and R CMD check on Ubuntu (current R)
+  only; pushes to `main` run the full matrix (macOS, Windows, Ubuntu with
+  R-devel, release, oldrel and 4.1). Start the full matrix on a branch from
+  the Actions tab ("Run workflow") when a change is platform-sensitive,
+  e.g. C++. Changes to `dev/`, `data-raw/` or Markdown files start no run.
 * Commit messages: short imperative summary line, blank line, details.
