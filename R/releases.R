@@ -23,11 +23,15 @@
 #'   model is assembled; D-009).
 #' @param split For `sex = "both"`: fraction of each release that is female
 #'   (default 0.5, D-013).
+#' @param node Node id(s) where the release takes place, for models with a
+#'   landscape of several nodes ([sg_landscape()]); each node given receives
+#'   `number` per event. Required when the model has more than one node;
+#'   ignored for one-node models. Releases per km^2 use each node's area.
 #'
 #' @return An object of class `sg_releases` holding a data frame of events
-#'   (one row per event, stage and sex) with columns `time`, `time_type`
+#'   (one row per event, stage, sex and node) with columns `time`, `time_type`
 #'   (`"day"` or `"date"`), `genotype`, `stage`, `sex` (`NA` for eggs and
-#'   pupae), `number` and `per`.
+#'   pupae), `number`, `per` and `node` (`NA` when not given).
 #' @seealso `c()` to combine schedules; `as.data.frame()` to inspect them.
 #' @export
 #' @examples
@@ -50,8 +54,14 @@
 #' # Combine schedules given in the same way (day numbers here)
 #' pupae <- sg_releases("S", stage = "pupa", times = 100, number = 50)
 #' c(rel, pupae)
+#'
+#' # In a landscape: the same weekly release in two named nodes
+#' sg_releases("S",
+#'   stage = "adult", sex = "male", times = seq(30, by = 7, length.out = 4),
+#'   number = 500, per = "km2", node = c("south", "middle")
+#' )
 sg_releases <- function(genotype, stage = c("egg", "pupa", "adult"), sex = NULL,
-                        times, number, per = c("node", "km2"), split = 0.5) {
+                        times, number, per = c("node", "km2"), split = 0.5, node = NULL) {
   geno_ok <- is.character(genotype) && length(genotype) == 1L && !is.na(genotype) &&
     nzchar(genotype)
   if (!geno_ok) {
@@ -82,12 +92,24 @@ sg_releases <- function(genotype, stage = c("egg", "pupa", "adult"), sex = NULL,
 
   tm <- .sg_release_times(times)
   number <- .sg_release_number(number, length(tm$time))
+  if (!is.null(node)) {
+    node_ok <- (is.character(node) || is.numeric(node)) && length(node) >= 1L &&
+      !anyNA(node) && all(nzchar(as.character(node))) && !anyDuplicated(node)
+    if (!node_ok) .sg_stop("`node` must be distinct node ids, e.g. \"north\".")
+  }
 
   ev <- data.frame(
     time = tm$time, time_type = tm$type, genotype = genotype, stage = stage,
     sex = if (is.null(sex)) NA_character_ else sex, number = number, per = per,
-    stringsAsFactors = FALSE
+    node = NA_character_, stringsAsFactors = FALSE
   )
+  if (!is.null(node)) {
+    ev <- do.call(rbind, lapply(as.character(node), function(nd) {
+      e <- ev
+      e$node <- nd
+      e
+    }))
+  }
   if (identical(sex, "both")) {
     males <- ev
     males$sex <- "male"
@@ -115,7 +137,7 @@ c.sg_releases <- function(...) {
       "use one or the other."
     )
   }
-  .sg_new_releases(do.call(rbind, lapply(parts, function(x) x$events)))
+  .sg_new_releases(do.call(rbind, lapply(parts, function(x) .sg_release_node_col(x$events))))
 }
 
 #' @export
@@ -135,12 +157,17 @@ print.sg_releases <- function(x, ...) {
   if (nrow(ev) == 0L) {
     return(invisible(x))
   }
-  key <- paste(ev$genotype, ev$stage, ifelse(is.na(ev$sex), "", ev$sex), ev$per, sep = "\r")
+  ev <- .sg_release_node_col(ev)
+  key <- paste(ev$genotype, ev$stage, ifelse(is.na(ev$sex), "", ev$sex), ev$per,
+    ifelse(is.na(ev$node), "", ev$node),
+    sep = "\r"
+  )
   for (k in unique(key)) {
     d <- ev[key == k, , drop = FALSE]
     who <- paste0(
       d$genotype[1], " ", d$stage[1],
-      if (!is.na(d$sex[1])) paste0(" (", d$sex[1], ")") else ""
+      if (!is.na(d$sex[1])) paste0(" (", d$sex[1], ")") else "",
+      if (!is.na(d$node[1])) paste0(" @", d$node[1]) else ""
     )
     is_date <- inherits(d$time, "Date")
     when <- if (nrow(d) == 1L) {
@@ -162,9 +189,16 @@ print.sg_releases <- function(x, ...) {
 # ---- internal ------------------------------------------------------------------
 
 .sg_new_releases <- function(ev) {
-  ev <- ev[order(ev$time, ev$genotype, ev$stage, ev$sex, na.last = TRUE), , drop = FALSE]
+  ev <- .sg_release_node_col(ev)
+  ev <- ev[order(ev$time, ev$genotype, ev$stage, ev$sex, ev$node, na.last = TRUE), , drop = FALSE]
   rownames(ev) <- NULL
   structure(list(events = ev), class = "sg_releases")
+}
+
+# Release events made before releases had a node get node = NA.
+.sg_release_node_col <- function(ev) {
+  if (is.null(ev$node)) ev$node <- rep(NA_character_, nrow(ev))
+  ev
 }
 
 .sg_match_choice <- function(x, choices, what) {
@@ -223,8 +257,10 @@ print.sg_releases <- function(x, ...) {
 
 # Resolve releases for a model (used by sg_model()): dates -> simulation days,
 # per-km2 numbers -> counts per node, genotypes checked against the cube.
-# Returns a data frame with columns day, genotype, stage, sex, count.
-.sg_resolve_releases <- function(releases, dates, area, genotypes) {
+# Returns a data frame with columns day, genotype, stage, sex, count; with
+# more than one node (node_ids of length > 1) also node (1-based number), and
+# every event must name a node (D-032). `area` has one value per node.
+.sg_resolve_releases <- function(releases, dates, area, genotypes, node_ids = "1") {
   empty <- data.frame(
     day = integer(0), genotype = character(0), stage = character(0),
     sex = character(0), count = numeric(0), stringsAsFactors = FALSE
@@ -266,9 +302,31 @@ print.sg_releases <- function(x, ...) {
       "), e.g. ", when, "."
     )
   }
-  count <- ifelse(ev$per == "km2", ev$number * area, ev$number)
+  if (length(node_ids) == 1L) {
+    count <- ifelse(ev$per == "km2", ev$number * area[1L], ev$number)
+    return(data.frame(
+      day = day, genotype = ev$genotype, stage = ev$stage, sex = ev$sex,
+      count = count, stringsAsFactors = FALSE
+    ))
+  }
+  ev <- .sg_release_node_col(ev)
+  if (anyNA(ev$node)) {
+    .sg_stop(
+      "In a model with several nodes every release needs a node: ",
+      "sg_releases(..., node = ) with node ids from ", .sg_wrap_names(node_ids), "."
+    )
+  }
+  node <- match(ev$node, node_ids)
+  if (anyNA(node)) {
+    bad <- ev$node[is.na(node)][1L]
+    .sg_stop(
+      "Release node \"", bad, "\" is not a node of the landscape.", .sg_suggest(bad, node_ids),
+      " Nodes: ", .sg_wrap_names(node_ids), "."
+    )
+  }
+  count <- ifelse(ev$per == "km2", ev$number * area[node], ev$number)
   data.frame(
     day = day, genotype = ev$genotype, stage = ev$stage, sex = ev$sex,
-    count = count, stringsAsFactors = FALSE
+    count = count, node = node, stringsAsFactors = FALSE
   )
 }

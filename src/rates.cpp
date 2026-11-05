@@ -29,17 +29,26 @@ RateKernel::RateKernel(const ModelView& mv)
     for (std::size_t k = 0; k < ng; ++k) pair_egg_total_[pair] += mv.egg_tensor[k * n_cross + pair];
     pair_search_[pair] = mv.search_weight[pair / ng];  // female genotype g = pair / n_g
   }
+  set_node(0);
+}
+
+void RateKernel::set_node(int node) {
+  node_ = node;
+  forcing_off_ = mv_.forcing_index[node] * mv_.n_days;
+  H_ = mv_.node_H[node];
+  h_M_ = mv_.node_h_M[node];
+  N_H_ = mv_.node_N_H[node];
 }
 
 // Larval hazard (S7); with the host-wound model plus treatment and crowding
 // per infested host (H2, floor 1e-6 * N_H as in .sg_crowd_floor).
 double RateKernel::larval_hazard(double sum_l, double sum_hi) const {
   double mu_l = mv_.mu_L0;
-  if (mv_.larval_per_wound && mv_.H > 0) mu_l += mv_.gamma_L * sum_l / mv_.H;
+  if (mv_.larval_per_wound && H_ > 0) mu_l += mv_.gamma_L * sum_l / H_;
   if (mv_.host_model) {
     mu_l += mv_.host_treatment;
     if (mv_.larval_per_infested_host) {
-      mu_l += mv_.gamma_L * sum_l / (sum_hi + 1e-6 * mv_.N_H);
+      mu_l += mv_.gamma_L * sum_l / (sum_hi + 1e-6 * N_H_);
     }
   }
   return mu_l;
@@ -56,7 +65,7 @@ double RateKernel::fertile_rate(const DayRates& r) const {
 
 DayRates RateKernel::day_rates(int day) const {
   const ModelView& v = mv_;
-  const int d = day - 1;  // 0-based index into the daily forcing
+  const int d = forcing_off_ + day - 1;  // 0-based index into the node's daily forcing
   DayRates r;
   // daily forcing (S1-S4, S7)
   r.dx = v.dx[d];
@@ -126,7 +135,7 @@ void RateKernel::aggregate(const DayRates& r, const double* y) {
   // searching females are weighted by fecundity: females that produce no
   // eggs do not compete for wounds (D-031)
   a.n_s = v.search_all_adults ? (a.sum_m + a.sum_u + a.sum_f) : a.sum_search;
-  const double wounds = v.host_model ? a.sites : v.H;  // fixed H, or A_s (H2)
+  const double wounds = v.host_model ? a.sites : H_;  // fixed H, or A_s (H2)
   a.psi = a.n_s > 0.0 ? v.sigma0 * (1.0 - std::exp(-v.a_s * r.dx * wounds / a.n_s)) : v.sigma0;
   const int n_cross = ng * ng;
   for (int k = 0; k < ng; ++k) {
@@ -148,7 +157,7 @@ void RateKernel::aggregate(const DayRates& r, const double* y) {
     a.m_tot += mb;
   }
   if (v.h_M_param > 0) {
-    a.g_find = a.m_tot / (v.h_M + a.m_tot);
+    a.g_find = a.m_tot / (h_M_ + a.m_tot);
   } else {
     a.g_find = a.m_tot > 0.0 ? 1.0 : 0.0;
   }
@@ -167,6 +176,90 @@ void RateKernel::aggregate(const DayRates& r, const double* y) {
 }
 
 void RateKernel::eval(int day, const double* y, double* dydt, double* counters) {
+  const ModelView& v = mv_;
+  if (v.n_node == 1 && v.n_groups == 0) {  // one node: the one-node body, unchanged
+    eval_node(day, y, dydt, counters);
+    return;
+  }
+  const std::size_t stride = v.node_stride;
+  for (int i = 0; i < v.n_node; ++i) {
+    set_node(i);
+    eval_node(day, y + i * stride, dydt + i * stride,
+              counters == nullptr ? nullptr : counters + i * v.n_counters_node);
+  }
+  set_node(0);
+  if (v.n_groups > 0) {
+    movement(day, y, dydt,
+             counters == nullptr ? nullptr : counters + v.n_node * v.n_counters_node);
+  }
+}
+
+double RateKernel::kappa(int g, int i, int day) const {
+  if (mv_.group_clock[g] == 1) return 1.0;  // calendar clock
+  const double dx = mv_.dx[mv_.forcing_index[i] * mv_.n_days + day - 1];
+  return std::min(mv_.kappa_max, dx / mv_.dx_ref);  // (N3) capped degree-day clock
+}
+
+// (N1, N2) Movement of adults between nodes: for each group, node i and class
+// s (M, U, F), the node's class block leaves at lambda = kappa * delta and
+// arrives in each destination j with share pi; the rest leaves the landscape.
+// Movers keep genotype, mate genotype and sub-stage (same position in the
+// destination's block).
+void RateKernel::movement(int day, const double* y, double* dydt, double* move_counters) {
+  const ModelView& v = mv_;
+  const int nn = v.n_node;
+  const std::size_t stride = v.node_stride;
+  const int ng = v.n_g, nA = v.n_A;
+  const int block_off[3] = {v.offsets[kM], v.offsets[kU], v.offsets[kF]};
+  const int block_len[3] = {ng * nA, ng * nA, ng * ng * nA};
+  if (move_counters != nullptr) {
+    std::fill(move_counters, move_counters + ModelView::kMoveCounters * nn, 0.0);
+  }
+  for (int g = 0; g < v.n_groups; ++g) {
+    const int* rp = v.group_row_ptr.data() + static_cast<std::size_t>(g) * (nn + 1);
+    const int e0 = v.group_edge_start[g];
+    for (int s = 0; s < 3; ++s) {
+      for (int i = 0; i < nn; ++i) {
+        const std::size_t gi = (static_cast<std::size_t>(g) * nn + i) * 3 + s;
+        const double lam = kappa(g, i, day) * v.group_rate[gi];
+        if (lam == 0.0) continue;
+        const double* x = y + i * stride + block_off[s];
+        double* d_from = dydt + i * stride + block_off[s];
+        double total = 0.0;
+        for (int k = 0; k < block_len[s]; ++k) {
+          d_from[k] -= lam * x[k];
+          total += x[k];
+        }
+        double* mc = move_counters;
+        if (mc != nullptr) {
+          mc[i * ModelView::kMoveCounters + s] += lam * total;  // emigrants
+          mc[i * ModelView::kMoveCounters + 6 + s] += lam * v.group_loss[gi] * total;  // lost
+        }
+        for (int e = e0 + rp[i]; e < e0 + rp[i + 1]; ++e) {
+          const int j = v.group_col[e];
+          const double w = lam * v.group_prob[static_cast<std::size_t>(e) * 3 + s];
+          if (w == 0.0) continue;
+          double* d_to = dydt + j * stride + block_off[s];
+          for (int k = 0; k < block_len[s]; ++k) d_to[k] += w * x[k];
+          if (mc != nullptr) mc[j * ModelView::kMoveCounters + 3 + s] += w * total;  // immigrants
+        }
+      }
+    }
+  }
+}
+
+void RateKernel::node_leave_rates(int i, int day) {
+  const ModelView& v = mv_;
+  lambda_[0] = lambda_[1] = lambda_[2] = 0.0;
+  for (int g = 0; g < v.n_groups; ++g) {
+    const double k = kappa(g, i, day);
+    for (int s = 0; s < 3; ++s) {
+      lambda_[s] += k * v.group_rate[(static_cast<std::size_t>(g) * v.n_node + i) * 3 + s];
+    }
+  }
+}
+
+void RateKernel::eval_node(int day, const double* y, double* dydt, double* counters) {
   const ModelView& v = mv_;
   const int ng = v.n_g, nE = v.n_E, nL = v.n_L, nP = v.n_P, nA = v.n_A;
   const double* egg = y + v.offsets[kE];
@@ -363,6 +456,21 @@ void RateKernel::eval(int day, const double* y, double* dydt, double* counters) 
 }
 
 double RateKernel::max_rate(int day, const double* y) {
+  const ModelView& v = mv_;
+  if (v.n_node == 1 && v.n_groups == 0) return max_rate_node(day, y);
+  double best = 0.0;
+  for (int i = 0; i < v.n_node; ++i) {
+    set_node(i);
+    node_leave_rates(i, day);
+    const double lam = std::max({lambda_[0], lambda_[1], lambda_[2]});
+    const double* yi = y + static_cast<std::size_t>(i) * v.node_stride;
+    best = std::max(best, max_rate_node(day, yi) + lam);
+  }
+  set_node(0);
+  return best;
+}
+
+double RateKernel::max_rate_node(int day, const double* y) {
   const ModelView& v = mv_;
   const DayRates r = day_rates(day);
   aggregate(r, y);  // larval crowding, male availability (S7, S12)

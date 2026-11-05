@@ -270,9 +270,11 @@ Model view additions (validated in the `ModelView` constructor):
 
 Kernel changes:
 
-* `DayRates` computed per node from the node's forcing series and cached
-  per day (one vector of N `DayRates`, refreshed when the day changes), so
-  an evaluation does not recompute them.
+* `DayRates` computed per node from the node's forcing series.
+  *Implemented (2026-11-05):* recomputed at each evaluation, like the
+  movement clock κ, instead of cached per day: a few operations per node
+  against the node's aggregates, so a cache would save little; revisit if
+  the phase 3 profile shows it.
 * `eval()` loops over nodes and runs today's body on `y + i·S`,
   `dydt + i·S`, `counters + i·C` with node i's `H`, `h_M`, `N_H` and day
   rates (the body becomes `eval_node()`, with the same floating-point
@@ -448,6 +450,11 @@ other. **(confirmed)** Three pull requests, each green on CI:
 * Single-node bitwise check: a fixture of states and counters from
   `main` (gp2014 preset, McAllen, Mendelian and homing cubes, static and
   host mode) saved before WP3; `identical()` after every PR.
+  *Found on CI (2026-11-05):* bitwise equality holds only on the machine and
+  R version that made the fixture (CI differs by about 1e-15 relative, and
+  the hash differs on Windows), so the test is bitwise with
+  `SCREWDRIVE_BITWISE_BASELINE=true` (`dev/check.R`) and uses tolerances of
+  1e-9 or tighter elsewhere.
 * `lintr::lint_package()` clean (with the package installed so
   `object_usage_linter` resolves), `Rscript dev/style.R`, clang-format.
 * `bash dev/sanitize.sh` after src/ changes (WP4, WP5, WP6, WP9).

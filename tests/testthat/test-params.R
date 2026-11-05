@@ -157,3 +157,30 @@ test_that("settings without effect in the chosen wound model give warnings", {
   p <- sg_params(wound_model = "hosts", host_density = 50, wounded_fraction = 0.1)
   expect_error(update(p, wounded_fraction = NA), "needs wounded_fraction")
 })
+
+test_that("movement parameters have defaults, ranges and accept Inf only for the cap (D-032)", {
+  p <- sg_params()
+  expect_identical(p$movement_t_ref, 27)
+  expect_identical(p$movement_kappa_max, 1)
+  expect_identical(sg_params(movement_kappa_max = Inf)$movement_kappa_max, Inf)
+  expect_identical(sg_params(movement_kappa_max = 1.3)$movement_kappa_max, 1.3)
+  expect_error(sg_params(movement_kappa_max = 0), "outside its allowed range")
+  expect_error(sg_params(movement_kappa_max = -Inf), "finite number or Inf")
+  expect_error(sg_params(movement_kappa_max = NA), "cannot be NA")
+  expect_error(sg_params(movement_t_ref = Inf), "finite number;")
+  expect_error(sg_params(wound_density = Inf), "finite number;")
+  expect_error(sg_params(movement_t_ref = 46), "outside its allowed range")
+  # the reference temperature must be above the development threshold
+  expect_error(sg_params(movement_t_ref = 14.5), "greater than dev_temp_min")
+  expect_silent(sg_params(movement_t_ref = 20, dev_temp_min = 10))
+  expect_error(update(p, dev_temp_min = 30), "movement_t_ref")
+})
+
+test_that("movement parameters do not change the hash of models without movement", {
+  skip_if_not_installed("MGDrivE")
+  wx <- sg_forcing(sg_constant_weather(25, days = 5), sg_params())
+  cube <- sg_cube(MGDrivE::cubeMendelian())
+  h0 <- sg_model(sg_params(), cube, wx)$meta$hash
+  expect_identical(sg_model(sg_params(movement_kappa_max = Inf), cube, wx)$meta$hash, h0)
+  expect_identical(sg_model(sg_params(movement_t_ref = 25), cube, wx)$meta$hash, h0)
+})

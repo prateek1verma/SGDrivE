@@ -12,7 +12,8 @@ A data frame with one row per parameter and columns:
 \item{\code{name}}{Argument name used in \code{\link[=sg_params]{sg_params()}}.}
 \item{\code{symbol}}{Mathematical symbol in the model specification.}
 \item{\code{group}}{Parameter group (temperature, development, stages,
-thresholds, mortality, reproduction, mating, hosts, numerical).}
+thresholds, mortality, reproduction, mating, hosts, movement,
+numerical).}
 \item{\code{type}}{\code{"real"}, \code{"integer"} or \code{"choice"}.}
 \item{\code{default}}{Default value, as text.}
 \item{\code{lower}, \code{upper}}{Allowed range (numeric parameters).}
@@ -22,6 +23,8 @@ thresholds, mortality, reproduction, mating, hosts, numerical).}
 \code{"|"}.}
 \item{\code{allow_na}}{Whether \code{NA} is allowed (meaning "derive
 automatically", or for the host parameters "not set").}
+\item{\code{allow_inf}}{Whether \code{Inf} is allowed (only
+\code{movement_kappa_max}, where it means uncapped).}
 \item{\code{units}}{Units: \code{degC} degrees Celsius, \code{dd} degree-days, \code{d}
 days, \code{d^-1} per day, \code{km^-2} per square kilometre.}
 \item{\code{source}}{\code{GP2014} (Gutierrez & Ponti 2014), \code{G2019}

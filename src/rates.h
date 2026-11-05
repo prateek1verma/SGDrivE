@@ -1,9 +1,15 @@
-// C++ rate kernel of the ScrewDrivE v0.1 model (D-021).
+// C++ rate kernel of the ScrewDrivE model (D-021).
 //
 // A block-by-block translation of the R reference rate function
 // .sg_rates_r() (R/reference-rates.R), which implements dev/MODEL_SPEC.md
-// S7-S14. The two must agree to floating-point round-off; the R version is
-// the readable reference and the test oracle.
+// S7-S14 and, for several nodes, section 8a N1-N3 (D-032). The two must agree
+// to floating-point round-off; the R version is the readable reference and
+// the test oracle.
+//
+// Several nodes: eval() runs the one-node body on each node's part of the
+// state (with the node's forcing, wounds, mate finding and hosts, selected by
+// set_node()), then adds the movement terms. A model with one node and no
+// movement runs the one-node body exactly as before.
 //
 // The day's forcing-dependent rates (day_rates) and the state-dependent
 // aggregates (aggregate) are separate steps so that the chain-binomial solver
@@ -56,21 +62,29 @@ class RateKernel {
  public:
   explicit RateKernel(const ModelView& mv);
 
-  // Forcing-dependent rates of simulation day `day` (1-based).
+  // Select the node used by day_rates() and aggregate() (default node 0):
+  // its forcing series, wounds H, mate-finding h_M and host count N_H.
+  void set_node(int node);
+
+  // Forcing-dependent rates of simulation day `day` (1-based) for the
+  // selected node.
   DayRates day_rates(int day) const;
 
-  // State-dependent aggregates for state `y` (stored in agg()).
+  // State-dependent aggregates for the selected node's state `y` (pointer to
+  // the node's first state; stored in agg()).
   void aggregate(const DayRates& r, const double* y);
   const Aggregates& agg() const { return agg_; }
 
   // Derivatives of all states (dydt, length n_states) and rates of the
   // cumulative counters (counters, length n_counters; order of
-  // .sg_counter_names()) on simulation day `day` (1-based), whose forcing is
-  // held constant. `counters` may be nullptr when not needed.
+  // .sg_model_counter_names()) on simulation day `day` (1-based), whose
+  // forcing is held constant. `counters` may be nullptr when not needed.
   void eval(int day, const double* y, double* dydt, double* counters);
 
   // Largest total rate (transfer + mortality) of any compartment in use on
-  // `day` for state `y` (solver diagnostics; .sg_max_rate() in R).
+  // `day` for state `y` (solver diagnostics; .sg_max_rate() in R); with
+  // several nodes the largest over nodes of the node's rate plus its total
+  // leave rate.
   double max_rate(int day, const double* y);
 
   const ModelView& view() const { return mv_; }
@@ -85,11 +99,27 @@ class RateKernel {
  private:
   const ModelView& mv_;
   Aggregates agg_;
+  // selected node (set_node): forcing offset and node quantities
+  int node_ = 0, forcing_off_ = 0;
+  double H_ = 0.0, h_M_ = 0.0, N_H_ = 0.0;
+  // [3]: total leave rate of the selected node by class, for max_rate()
+  double lambda_[3] = {0.0, 0.0, 0.0};
   std::vector<double> pair_egg_total_, pair_search_, v_batch_;
   // working arrays of eval() (sizes in comments)
   std::vector<double> in_m_, in_f_, in_u_, in_f_mated_;  // [n_g]
   std::vector<double> mating_flux_;  // [n_A * n_g]: [substage, genotype]
 
+  // one-node body of eval() and max_rate() for the selected node; y, dydt and
+  // counters point to the node's first state and counter
+  void eval_node(int day, const double* y, double* dydt, double* counters);
+  double max_rate_node(int day, const double* y);
+  // movement clock kappa (N3) of group g for node i on day `day`
+  double kappa(int g, int i, int day) const;
+  // movement terms (N1, N2) of all nodes; move_counters (9 per node) may be
+  // nullptr
+  void movement(int day, const double* y, double* dydt, double* move_counters);
+  // total leave rate of node i by class, summed over groups (lambda_)
+  void node_leave_rates(int i, int day);
   double larval_hazard(double sum_l, double sum_hi) const;
   // fertile oviposition events per day (D-026): psi * batch factor * sum of
   // searching females (s_g-weighted, D-031) times the share of batches with a

@@ -718,9 +718,10 @@ parameters by descriptive names (D-027). Symbol, name, default and units:
 | kappa_max | `movement_kappa_max` | 1 | - |
 
 `larval_crowding_mode` also takes `"per_infested_host"` (host-wound model).
-`movement_t_ref` and `movement_kappa_max` (N3, v0.2) enter `R/param-table.R`
-with the movement code (phase 1 of the design note); `movement_kappa_max`
-takes `Inf` for uncapped scaling. The node extinction rule (N5) is an
+`movement_t_ref` and `movement_kappa_max` (N3, v0.2; group "movement" of
+`R/param-table.R`) act only when the model has movement, and enter the model
+hash only then; `movement_kappa_max` is the only parameter that takes `Inf`
+(uncapped scaling). The node extinction rule (N5) is an
 argument of `simulate_ode()`, not a parameter.
 
 Cube-derived quantities (ℓ_g, φ_g, ξ_F,g, ξ_M,g, s_g, η, ih, τ) come from

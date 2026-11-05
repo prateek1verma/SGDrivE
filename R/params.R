@@ -207,8 +207,12 @@ sg_params <- function(..., preset = c("default", "gp2014")) {
     }
     return(x)
   }
-  if (!is.numeric(x) || !is.finite(x)) {
-    .sg_stop("Parameter '", nm, "' must be a finite number; got ", .sg_fmt(x), ".")
+  inf_ok <- isTRUE(r$allow_inf) && is.numeric(x) && identical(as.numeric(x), Inf)
+  if (!inf_ok && (!is.numeric(x) || !is.finite(x))) {
+    .sg_stop(
+      "Parameter '", nm, "' must be a finite number",
+      if (isTRUE(r$allow_inf)) " or Inf" else "", "; got ", .sg_fmt(x), "."
+    )
   }
   if (r$type == "integer") {
     if (abs(x - round(x)) > 1e-8) {
@@ -233,6 +237,13 @@ sg_params <- function(..., preset = c("default", "gp2014")) {
     .sg_stop(
       "dev_temp_decline (", v$dev_temp_decline, ") must be greater than dev_temp_min (",
       v$dev_temp_min, ")."
+    )
+  }
+  if (v$movement_t_ref <= v$dev_temp_min) {
+    .sg_stop(
+      "movement_t_ref (", v$movement_t_ref, ") must be greater than dev_temp_min (",
+      v$dev_temp_min, "), so that movement rates at the reference temperature are ",
+      "defined (MODEL_SPEC N3)."
     )
   }
   if (v$oviposition_temp_max <= v$dev_temp_min) {

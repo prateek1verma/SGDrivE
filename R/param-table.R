@@ -8,28 +8,32 @@
 #
 # Spec tags H1-H3 refer to the host-wound model (dev/HOST_WOUND_DESIGN.md,
 # section 3, D-030): H1 host states and equations, H2 coupling to the flies,
-# H3 chain-binomial host step.
+# H3 chain-binomial host step. Tags N1-N5 refer to several nodes and adult
+# movement (MODEL_SPEC section 8a, D-032).
 #
 # Source tags: GP2014 = Gutierrez & Ponti (2014) paper or Pascal code;
 # G2019 = Gutierrez, Ponti & Arias (2019); MGDrivE2 = MGDrivE2 lifecycle model;
 # adapted = new for ScrewDrivE (decision number given in the description).
 
 # One row of the table. `default` keeps its exact R value (e.g. log(2)).
+# `allow_inf` lets a real parameter take the value Inf (its range must then
+# include Inf, i.e. upper = Inf with a closed upper bound).
 .prow <- function(name, default, group, units, source, spec, description,
                   type = "real", lower = -Inf, upper = Inf, bounds = "[]",
-                  choices = NA_character_, allow_na = FALSE, symbol = name) {
+                  choices = NA_character_, allow_na = FALSE, symbol = name,
+                  allow_inf = FALSE) {
   list(
     name = name, symbol = symbol, group = group, type = type,
     default = default, lower = lower, upper = upper, bounds = bounds,
-    choices = choices, allow_na = allow_na, units = units, source = source,
-    spec = spec, description = description
+    choices = choices, allow_na = allow_na, allow_inf = allow_inf, units = units,
+    source = source, spec = spec, description = description
   )
 }
 
 # Display order of groups in print() and in the documentation.
 .sg_param_groups <- c(
   "temperature", "development", "stages", "thresholds", "mortality",
-  "reproduction", "mating", "hosts", "numerical"
+  "reproduction", "mating", "hosts", "movement", "numerical"
 )
 
 .sg_param_rows <- function() {
@@ -329,6 +333,27 @@
       lower = 0, symbol = "kappa"
     ),
 
+    # ---- movement: several nodes (MODEL_SPEC section 8a, D-032) -------------
+    .prow("movement_t_ref", 27, "movement", "degC", "adapted", "N3",
+      paste(
+        "Reference temperature of the movement rates: leave rates are given per",
+        "day at this temperature, and the physiological clock scales them by",
+        "dx(T) / dx(movement_t_ref) (D-032). Near the survival optimum and the",
+        "temperatures at which field leave rates were measured; not a biological",
+        "limit."
+      ),
+      lower = 0, upper = 45, symbol = "T_ref"
+    ),
+    .prow("movement_kappa_max", 1, "movement", "-", "adapted", "N3",
+      paste(
+        "Cap on the physiological movement clock kappa = min(kappa_max,",
+        "dx(T) / dx(T_ref)): 1 = the given rate at and above T_ref (capped),",
+        "Inf = uncapped degree-day scaling (D-032). No study supports either;",
+        "compare both."
+      ),
+      lower = 0, bounds = "(]", symbol = "kappa_max", allow_inf = TRUE
+    ),
+
     # ---- numerical ----------------------------------------------------------
     .prow("extinction_threshold", 1, "numerical", "individuals", "adapted", "S10",
       "Extinction threshold for all wild stages combined.",
@@ -355,7 +380,8 @@
 #'     \item{`name`}{Argument name used in [sg_params()].}
 #'     \item{`symbol`}{Mathematical symbol in the model specification.}
 #'     \item{`group`}{Parameter group (temperature, development, stages,
-#'       thresholds, mortality, reproduction, mating, hosts, numerical).}
+#'       thresholds, mortality, reproduction, mating, hosts, movement,
+#'       numerical).}
 #'     \item{`type`}{`"real"`, `"integer"` or `"choice"`.}
 #'     \item{`default`}{Default value, as text.}
 #'     \item{`lower`, `upper`}{Allowed range (numeric parameters).}
@@ -365,6 +391,8 @@
 #'       `"|"`.}
 #'     \item{`allow_na`}{Whether `NA` is allowed (meaning "derive
 #'       automatically", or for the host parameters "not set").}
+#'     \item{`allow_inf`}{Whether `Inf` is allowed (only
+#'       `movement_kappa_max`, where it means uncapped).}
 #'     \item{`units`}{Units: `degC` degrees Celsius, `dd` degree-days, `d`
 #'       days, `d^-1` per day, `km^-2` per square kilometre.}
 #'     \item{`source`}{`GP2014` (Gutierrez & Ponti 2014), `G2019`
@@ -392,6 +420,7 @@ sg_param_table <- function() {
     bounds = col("bounds"),
     choices = col("choices"),
     allow_na = col("allow_na"),
+    allow_inf = col("allow_inf"),
     units = col("units"),
     source = col("source"),
     spec = col("spec"),

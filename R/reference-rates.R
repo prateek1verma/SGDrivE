@@ -1,8 +1,14 @@
-# Reference rate function (pure R) of the ScrewDrivE v0.1 model.
+# Reference rate function (pure R) of the ScrewDrivE model.
 #
-# A direct, readable translation of dev/MODEL_SPEC.md S7-S14, used as the
-# "truth" against which the C++ kernel (milestone M3) is tested. Speed is not
-# a goal here; each block cites the specification equation it implements.
+# A direct, readable translation of dev/MODEL_SPEC.md S7-S14 (one node) and
+# section 8a N1-N3 (several nodes and adult movement, D-032), used as the
+# "truth" against which the C++ kernel is tested. Speed is not a goal here;
+# each block cites the specification equation it implements.
+#
+# With several nodes the state vector holds one per-node vector after another
+# (node slowest); each node's rates are those of the one-node model with the
+# node's forcing, wounds or hosts and mate-finding half-saturation, and the
+# movement terms are added afterwards.
 #
 # State layout (sg_model(), CONVENTIONS.md): blocks E, L, P, M, U, F; within a
 # block the sub-stage varies fastest, then mate genotype (F only), then
@@ -39,7 +45,7 @@
   flag_or_all <- function(ch, name) {
     if (name %in% names(ch$flags)) ch$flags[[name]] else rep(TRUE, d$n_A)
   }
-  list(
+  s <- list(
     geno = geno, n_g = n_g, n_E = d$n_E, n_L = d$n_L, n_P = d$n_P, n_A = d$n_A,
     idx = idx, n_states = model$n_states,
     p = p, counts = model$counts,
@@ -62,7 +68,47 @@
     hosts = model$hosts,
     counter_names = .sg_counter_names(geno, hosts = !is.null(model$hosts))
   )
+  if (d$n_node == 1L && is.null(model$movement)) {
+    return(s) # one node: the setup of the one-node model, unchanged
+  }
+  # several nodes or movement: one one-node setup per node, with the node's
+  # forcing series, wounds, mate finding and hosts (MODEL_SPEC 8a)
+  n_node_states <- .sg_n_states_node(model)
+  series <- model$landscape$forcing
+  series_of <- model$landscape$nodes$forcing_series
+  s$node_setups <- lapply(seq_len(d$n_node), function(i) {
+    si <- s
+    si$forcing <- series[[series_of[i]]]
+    si$counts$H <- model$counts$H[i]
+    si$counts$h_M <- model$counts$h_M[i]
+    if (!is.null(si$hosts)) si$hosts$n <- model$hosts$n[i]
+    si$n_states <- n_node_states
+    si
+  })
+  s$n_node <- d$n_node
+  s$n_states_node <- n_node_states
+  s$movement <- model$movement
+  s$counter_names <- .sg_model_counter_names(model)
+  s
 }
+
+# Counter names of a model: the one-node counters of every node (with an
+# "@id" suffix when there are several nodes), then, with movement, the
+# emigrants, immigrants and lost flies of each node by class (N2).
+.sg_model_counter_names <- function(model) {
+  base <- .sg_counter_names(model$cube$genotypes, hosts = !is.null(model$hosts))
+  ids <- .sg_node_ids(model)
+  per_node <- function(x) {
+    if (length(ids) == 1L) x else paste0(rep(x, length(ids)), "@", rep(ids, each = length(x)))
+  }
+  out <- per_node(base)
+  if (!is.null(model$movement)) out <- c(out, per_node(.sg_movement_counter_names))
+  out
+}
+
+.sg_movement_counter_names <- paste0(
+  rep(c("emigrants_", "immigrants_", "lost_"), each = 3L), c("M", "U", "F")
+)
 
 # Crowding floor of the per-infested-host larval hazard (D-030, design note
 # 3.5): epsilon * N_H keeps the term finite when larvae outlive the
@@ -130,6 +176,80 @@
 #'   per day) and, if requested, `aux`.
 #' @noRd
 .sg_rates_r <- function(day, state, setup, aux = FALSE) {
+  if (is.null(setup$node_setups)) {
+    return(.sg_rates_node(day, state, setup, aux))
+  }
+  # several nodes (MODEL_SPEC 8a): each node's own rates, then movement (N1, N2)
+  n_s <- setup$n_states_node
+  deriv <- numeric(length(state))
+  counters <- vector("list", setup$n_node)
+  node_aux <- vector("list", setup$n_node)
+  for (i in seq_len(setup$n_node)) {
+    at <- (i - 1L) * n_s + seq_len(n_s)
+    r <- .sg_rates_node(day, state[at], setup$node_setups[[i]], aux)
+    deriv[at] <- r$deriv
+    counters[[i]] <- unname(r$counters)
+    node_aux[i] <- list(r$aux)
+  }
+  counters <- unlist(counters)
+  mv <- .sg_movement_r(day, state, setup)
+  if (!is.null(mv)) {
+    deriv <- deriv + mv$deriv
+    counters <- c(counters, mv$counters)
+  }
+  names(counters) <- setup$counter_names
+  out <- list(deriv = deriv, counters = counters)
+  if (aux) out$aux <- list(nodes = node_aux, lambda = if (is.null(mv)) NULL else mv$lambda)
+  out
+}
+
+# Movement terms of all nodes (MODEL_SPEC 8a, N1-N3): derivatives (length of
+# the state), counters (emigrants, immigrants, lost by class M, U, F for each
+# node, node slowest) and the total leave rate lambda[class, node] of the day.
+# NULL without movement.
+.sg_movement_r <- function(day, state, setup) {
+  mv <- setup$movement
+  if (is.null(mv)) {
+    return(NULL)
+  }
+  n_node <- setup$n_node
+  n_s <- setup$n_states_node
+  blocks <- setup$idx[c("M", "U", "F")] # positions within a node
+  deriv <- numeric(length(state))
+  emig <- immig <- lost <- lambda <- matrix(0, 3L, n_node)
+  dx <- vapply(setup$node_setups, function(ns) ns$forcing$dx[day], 0)
+  for (g in mv$groups) {
+    # (N3) movement clock of each node on this day
+    kappa <- if (g$clock == "calendar") rep(1, n_node) else pmin(mv$kappa_max, dx / mv$dx_ref)
+    for (s in 1:3) {
+      for (i in seq_len(n_node)) {
+        lam <- kappa[i] * g$rate[s, i] # lambda^G_{s,i}
+        if (lam == 0) next
+        lambda[s, i] <- lambda[s, i] + lam
+        from <- (i - 1L) * n_s + blocks[[s]]
+        x <- state[from]
+        # (N1) leaving node i ...
+        deriv[from] <- deriv[from] - lam * x
+        emig[s, i] <- emig[s, i] + lam * sum(x)
+        # ... arriving in its destinations j
+        edges <- seq.int(g$row_ptr[i], length.out = g$row_ptr[i + 1L] - g$row_ptr[i])
+        for (e in edges) {
+          j <- g$col[e]
+          w <- lam * g$prob[s, e]
+          to <- (j - 1L) * n_s + blocks[[s]]
+          deriv[to] <- deriv[to] + w * x
+          immig[s, j] <- immig[s, j] + w * sum(x)
+        }
+        # (N2) leaving the landscape
+        lost[s, i] <- lost[s, i] + lam * g$loss[s, i] * sum(x)
+      }
+    }
+  }
+  list(deriv = deriv, counters = as.vector(rbind(emig, immig, lost)), lambda = lambda)
+}
+
+# Rates of one node (the one-node model, S7-S14).
+.sg_rates_node <- function(day, state, setup, aux = FALSE) {
   s <- setup
   p <- s$p
   f <- s$forcing

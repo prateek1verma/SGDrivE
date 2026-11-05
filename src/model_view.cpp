@@ -33,6 +33,15 @@ double get_double(const Rcpp::List& view, const char* name) {
   return x[0];
 }
 
+// A single number that may be +Inf (the cap of the movement clock).
+double get_double_or_inf(const Rcpp::List& view, const char* name) {
+  Rcpp::NumericVector x(field(view, name));
+  if (x.size() != 1 || std::isnan(x[0]) || x[0] == R_NegInf) {
+    Rcpp::stop("model view: field '%s' must be a single number or Inf", name);
+  }
+  return x[0];
+}
+
 std::vector<int> get_ints(const Rcpp::List& view, const char* name, R_xlen_t n) {
   Rcpp::IntegerVector x(field(view, name));
   if (n >= 0 && x.size() != n) {
@@ -73,7 +82,12 @@ ModelView::ModelView(const Rcpp::List& view) {
   n_states = get_int(view, "n_states");
   n_days = get_int(view, "n_days");
   n_counters = get_int(view, "n_counters");
-  if (n_g < 1 || n_E < 1 || n_L < 1 || n_P < 1 || n_A < 1 || n_days < 1) {
+  n_node = get_int(view, "n_node");
+  node_stride = get_int(view, "node_stride");
+  n_counters_node = get_int(view, "n_counters_node");
+  n_series = get_int(view, "n_series");
+  if (n_g < 1 || n_E < 1 || n_L < 1 || n_P < 1 || n_A < 1 || n_days < 1 || n_node < 1 ||
+      n_series < 1) {
     Rcpp::stop("model view: dimensions must be >= 1");
   }
   host_model = get_int(view, "host_model") == 1;
@@ -83,15 +97,16 @@ ModelView::ModelView(const Rcpp::List& view) {
   }
   if (!host_model && n_I != 0) Rcpp::stop("model view: n_I must be 0 without hosts");
   const int fly_states = n_g * (n_E + n_L + n_P + 2 * n_A) + n_g * n_g * n_A;
-  const int expected_states = fly_states + (host_model ? 2 + n_I : 0);
-  if (n_states != expected_states) {
-    Rcpp::stop("model view: n_states = %d, expected %d", n_states, expected_states);
+  const int expected_stride = fly_states + (host_model ? 2 + n_I : 0);
+  if (node_stride != expected_stride || n_states != n_node * node_stride) {
+    Rcpp::stop("model view: n_states = %d, expected %d per node for %d nodes", n_states,
+               expected_stride, n_node);
   }
-  // counters: eggs_laid[k] (n_g), 6 flow totals, matings[g|m] (n_g^2),
-  // 6 deaths by block, 3 deaths by old age, and 6 host flows with the
+  // counters per node: eggs_laid[k] (n_g), 6 flow totals, matings[g|m]
+  // (n_g^2), 6 deaths by block, 3 deaths by old age, and 6 host flows with the
   // host-wound model (see .sg_counter_names())
-  if (n_counters != n_g + n_g * n_g + 16 + (host_model ? 6 : 0)) {
-    Rcpp::stop("model view: n_counters = %d does not match n_g = %d", n_counters, n_g);
+  if (n_counters_node != n_g + n_g * n_g + 16 + (host_model ? 6 : 0)) {
+    Rcpp::stop("model view: n_counters_node = %d does not match n_g = %d", n_counters_node, n_g);
   }
 
   offsets = get_ints(view, "offsets", 6);
@@ -179,12 +194,77 @@ ModelView::ModelView(const Rcpp::List& view) {
   wild = get_ints(view, "wild", n_g);
   check_flags(wild, "wild");
 
-  dx = get_doubles(view, "dx", n_days);
-  dx_egg = get_doubles(view, "dx_egg", n_days);
-  mu_T = get_doubles(view, "mu_T", n_days);
-  mu_E = get_doubles(view, "mu_E", n_days);
-  phi_ov = get_doubles(view, "phi_ov", n_days);
-  moisture = get_doubles(view, "moisture", n_days);
+  const R_xlen_t n_forcing = static_cast<R_xlen_t>(n_days) * n_series;
+  dx = get_doubles(view, "dx", n_forcing);
+  dx_egg = get_doubles(view, "dx_egg", n_forcing);
+  mu_T = get_doubles(view, "mu_T", n_forcing);
+  mu_E = get_doubles(view, "mu_E", n_forcing);
+  phi_ov = get_doubles(view, "phi_ov", n_forcing);
+  moisture = get_doubles(view, "moisture", n_forcing);
+
+  // nodes (D-032)
+  forcing_index = get_ints(view, "forcing_index", n_node);
+  for (int s : forcing_index) {
+    if (s < 0 || s >= n_series) Rcpp::stop("model view: forcing_index out of range");
+  }
+  node_H = get_doubles(view, "node_H", n_node);
+  node_h_M = get_doubles(view, "node_h_M", n_node);
+  node_N_H = get_doubles(view, "node_N_H", n_node);
+  for (int i = 0; i < n_node; ++i) {
+    if (node_H[i] < 0 || node_h_M[i] < 0 || node_N_H[i] < 0 ||
+        (host_model && node_N_H[i] <= 0)) {
+      Rcpp::stop("model view: wounds, h_M or hosts of node %d out of range", i + 1);
+    }
+  }
+  if (node_H[0] != H || node_h_M[0] != h_M || (host_model && node_N_H[0] != N_H)) {
+    Rcpp::stop("model view: node 1 values differ from H, h_M, N_H");
+  }
+
+  // movement groups (MODEL_SPEC 8a)
+  n_groups = get_int(view, "n_groups");
+  if (n_groups < 0) Rcpp::stop("model view: n_groups must be >= 0");
+  group_clock = get_ints(view, "group_clock", n_groups);
+  check_flags(group_clock, "group_clock");
+  group_rate = get_doubles(view, "group_rate", static_cast<R_xlen_t>(3) * n_node * n_groups);
+  group_loss = get_doubles(view, "group_loss", static_cast<R_xlen_t>(3) * n_node * n_groups);
+  group_row_ptr = get_ints(view, "group_row_ptr", static_cast<R_xlen_t>(n_node + 1) * n_groups);
+  group_edge_start = get_ints(view, "group_edge_start", n_groups);
+  group_col = get_ints(view, "group_col", -1);
+  const R_xlen_t n_edges = static_cast<R_xlen_t>(group_col.size());
+  group_prob = get_doubles(view, "group_prob", 3 * n_edges);
+  int edge = 0;
+  for (int g = 0; g < n_groups; ++g) {
+    const int* rp = group_row_ptr.data() + static_cast<std::size_t>(g) * (n_node + 1);
+    if (group_edge_start[g] != edge || rp[0] != 0) {
+      Rcpp::stop("model view: edges of movement group %d do not follow on", g + 1);
+    }
+    for (int i = 0; i < n_node; ++i) {
+      if (rp[i + 1] < rp[i]) Rcpp::stop("model view: row pointers must not decrease");
+    }
+    edge += rp[n_node];
+  }
+  if (edge != n_edges) Rcpp::stop("model view: %d edges expected, %d given", edge,
+                                  static_cast<int>(n_edges));
+  for (int c : group_col) {
+    if (c < 0 || c >= n_node) Rcpp::stop("model view: movement destination out of range");
+  }
+  for (double r : group_rate) {
+    if (r < 0) Rcpp::stop("model view: leave rates must be >= 0");
+  }
+  for (double p : group_prob) {
+    if (p < 0 || p > 1) Rcpp::stop("model view: destination probabilities must be in [0, 1]");
+  }
+  for (double l : group_loss) {
+    if (l < 0 || l > 1) Rcpp::stop("model view: loss shares must be in [0, 1]");
+  }
+  dx_ref = get_double(view, "dx_ref");
+  kappa_max = get_double_or_inf(view, "kappa_max");
+  if (dx_ref <= 0 || kappa_max <= 0) {
+    Rcpp::stop("model view: dx_ref and kappa_max must be > 0");
+  }
+  if (n_counters != n_node * n_counters_node + (n_groups > 0 ? kMoveCounters * n_node : 0)) {
+    Rcpp::stop("model view: n_counters = %d does not match %d nodes", n_counters, n_node);
+  }
 
   rel_day = get_ints(view, "rel_day", -1);
   rel_index = get_ints(view, "rel_index", static_cast<R_xlen_t>(rel_day.size()));

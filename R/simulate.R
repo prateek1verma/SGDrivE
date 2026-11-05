@@ -21,12 +21,18 @@
 #' @param rtol,atol Relative and absolute error tolerances of the integrator.
 #' @param output_every Record the state every this many days (and always on
 #'   the last day). Counters and diagnostics are always daily.
-#' @param stiff_fallback Only for `method = "dopri5"`: if `TRUE` (default), a
+#' @param stiff_fallback Only for `method = "dopri5"`: if `TRUE`, a
 #'   day on which the explicit integrator detects stiffness (or fails) is
 #'   integrated again with `"lsoda"`, using the C++ rates. This needs the
 #'   'deSolve' package, but only when such a day occurs.
 #'   If `FALSE`, stiff days are integrated with Dormand-Prince regardless
-#'   (accurate but slow), and a failure is an error.
+#'   (accurate but slow), and a failure is an error. The default `NULL` means
+#'   `TRUE` for one node and `FALSE` for several nodes, where `TRUE` is an
+#'   error: `lsoda` builds a dense Jacobian of all states (D-032).
+#' @param max_memory Largest allowed size in bytes of the stored results
+#'   (states on output days and daily counters; default 1e9) and, with more
+#'   than one node, of the dense Jacobian of the deSolve methods `"lsoda"`,
+#'   `"lsode"`, `"bdf"` and `"radau"`. Larger runs stop before they start.
 #'
 #' @details
 #' **Day-by-day integration** (D-019). Each day is integrated separately from
@@ -53,9 +59,18 @@
 #' test; `NA` for other methods), whether the day was integrated by the
 #' `lsoda` fallback (steps and evaluations are then those of `lsoda`), the
 #' largest rate of any compartment (transfer plus mortality, plus mating for
-#' unmated females; D-026), and the smallest
+#' unmated females; D-026; with several nodes plus the node's total leave
+#' rate), and the smallest
 #' state value. Values slightly below zero (round-off near extinction) are
-#' reported, not removed.
+#' reported, not removed. With several nodes and `"dopri5"`, the column
+#' `limiting_node` gives the node whose states most often had the largest
+#' error in the day's accepted steps, i.e. the node that limits the step
+#' size (all nodes share one step size).
+#'
+#' **Several nodes** (D-032). A model with a landscape is integrated as one
+#' system; movement terms are part of the rates (MODEL_SPEC 8a). States and
+#' counters are named with the node, e.g. `"M[AA,1]@north"`,
+#' `"emigrants_F@north"`.
 #'
 #' @return An object of class `sg_sim`, a list with:
 #'   \describe{
@@ -85,7 +100,7 @@
 #' }
 simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
                          rtol = 1e-8, atol = 1e-10, output_every = 1L,
-                         stiff_fallback = TRUE) {
+                         stiff_fallback = NULL, max_memory = 1e9) {
   if (!inherits(model, "sg_model")) {
     .sg_stop("`model` must be an sg_model object; create one with sg_model().")
   }
@@ -100,8 +115,30 @@ simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
       "or a deSolve method such as \"ode45\" with backend = \"R\"."
     )
   }
+  n_node <- model$dims$n_node
+  if (is.null(stiff_fallback)) stiff_fallback <- n_node == 1L
   if (!is.logical(stiff_fallback) || length(stiff_fallback) != 1L || is.na(stiff_fallback)) {
-    .sg_stop("`stiff_fallback` must be TRUE or FALSE.")
+    .sg_stop("`stiff_fallback` must be TRUE or FALSE (or NULL for the default).")
+  }
+  if (stiff_fallback && n_node > 1L && method == "dopri5") {
+    .sg_stop(
+      "stiff_fallback = TRUE is not available with several nodes: its lsoda method ",
+      "builds a dense Jacobian of all ", format(model$n_states, big.mark = ","),
+      " states. Use stiff_fallback = FALSE (the default for several nodes)."
+    )
+  }
+  if (!is.numeric(max_memory) || length(max_memory) != 1L || !(max_memory > 0)) {
+    .sg_stop("`max_memory` must be a single positive number (bytes).")
+  }
+  dense <- c("lsoda", "lsode", "bdf", "radau")
+  jac_bytes <- 8 * as.numeric(model$n_states)^2
+  if (n_node > 1L && method %in% dense && jac_bytes > max_memory) {
+    .sg_stop(
+      "Method \"", method, "\" needs a dense Jacobian of ", format(jac_bytes / 1e6, digits = 3L),
+      " MB for ", format(model$n_states, big.mark = ","), " states, more than max_memory (",
+      format(max_memory / 1e6, digits = 3L), " MB). Use method = \"dopri5\" (backend = \"cpp\")",
+      " or a non-stiff deSolve method such as \"ode45\", or raise max_memory."
+    )
   }
   if (method != "dopri5") .sg_need_desolve(paste0("Method \"", method, "\""))
   x0 <- .sg_check_init(model, init)
@@ -119,6 +156,15 @@ simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
   n <- model$n_states
   n_days <- model$forcing$n_days
   out_days <- as.integer(unique(c(seq.int(output_every, n_days, by = output_every), n_days)))
+  n_counters <- length(.sg_model_counter_names(model))
+  out_bytes <- 8 * (as.numeric(length(out_days) + 1L) * n + as.numeric(n_days) * n_counters)
+  if (out_bytes > max_memory) {
+    .sg_stop(
+      "The results would take ", format(out_bytes / 1e6, digits = 3L), " MB (states on ",
+      length(out_days) + 1L, " output days and daily counters), more than max_memory (",
+      format(max_memory / 1e6, digits = 3L), " MB). Use a larger output_every or raise max_memory."
+    )
+  }
 
   # rate functions of the chosen backend: derivatives and counter rates
   # c(dydt, counters) for y = c(state, counters), and the largest rate
@@ -151,10 +197,11 @@ simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
       min_state = NA_real_
     )
   )
+  if (n_node > 1L) res$diag$limiting_node <- NA_character_
   res$state[1L, ] <- x0
   ctx <- list(
     model = model, n = n, n_c = length(cnames), n_days = n_days, out_days = out_days, func = func,
-    max_rate = max_rate, rtol = rtol, atol = atol
+    max_rate = max_rate, rtol = rtol, atol = atol, node_ids = .sg_node_ids(model)
   )
 
   t0 <- proc.time()[["elapsed"]]
@@ -215,15 +262,35 @@ print.sg_sim <- function(x, ...) {
     cat(sprintf(
       "  hosts: %s infested of %s at the end (prevalence %.3g); %s infestations\n",
       format(hs$infested[nrow(hs)], digits = 4L), format(hs$hosts[nrow(hs)], digits = 6L),
-      hs$prevalence[nrow(hs)], format(sum(x$counters[, "infestations"]), digits = 5L)
+      hs$prevalence[nrow(hs)], format(.sg_counter_total(x, "infestations"), digits = 5L)
     ))
   }
   cat(sprintf(
     "  eggs laid %s; adults emerged %s; released %s\n",
-    format(sum(x$counters[, grepl("^eggs_laid", colnames(x$counters))]), digits = 5L),
-    format(sum(x$counters[, c("emerged_male", "emerged_female")]), digits = 5L),
+    format(.sg_counter_total(x, "eggs_laid\\[[^]]*\\]"), digits = 5L),
+    format(.sg_counter_total(x, "emerged_(male|female)"), digits = 5L),
     format(sum(x$releases), digits = 5L)
   ))
+  n_node <- length(unique(sub("^[^@]*@?", "", colnames(x$state))))
+  if (n_node > 1L) {
+    nm <- colnames(x$state)
+    fly <- !grepl("^H[SWI]\\[", nm)
+    last <- x$state[nrow(x$state), fly]
+    node_of <- sub("^[^@]*@", "", nm[fly])
+    node_tot <- tapply(last, factor(node_of, levels = unique(node_of)), sum)
+    cat(sprintf(
+      "  nodes: %d, %d with flies at the end (total >= 1)%s\n", n_node, sum(node_tot >= 1),
+      if (any(grepl("^emigrants_", colnames(x$counters)))) {
+        sprintf(
+          "; movers %s, lost from the landscape %s",
+          format(.sg_counter_total(x, "emigrants_[MUF]"), digits = 5L),
+          format(.sg_counter_total(x, "lost_[MUF]"), digits = 5L)
+        )
+      } else {
+        ""
+      }
+    ))
+  }
   d <- x$diagnostics
   cat(sprintf(
     "  solver: %.0f steps/day (max %d), %s, largest rate %.3g per day, min state %.3g\n",
@@ -245,6 +312,13 @@ print.sg_sim <- function(x, ...) {
 }
 
 # ---- internal ------------------------------------------------------------------
+
+# Total over days (and nodes) of the counters whose name, without the node
+# suffix, matches the regular expression `pattern`.
+.sg_counter_total <- function(sim, pattern) {
+  cn <- colnames(sim$counters)
+  sum(sim$counters[, grepl(paste0("^", pattern, "(@.*)?$"), cn), drop = FALSE])
+}
 
 # Day loop with a deSolve method (either backend's rates), D-019.
 .sg_run_desolve <- function(res, ctx, x, method) {
@@ -285,6 +359,11 @@ print.sg_sim <- function(x, ...) {
       res$diag$stiff[done] <- r$stiff
       res$diag$max_rate[done] <- r$max_rate
       res$diag$min_state[done] <- r$min_state
+      if (length(r$limiting_node) > 0L) {
+        res$diag$limiting_node[done] <- ifelse(r$limiting_node > 0L,
+          ctx$node_ids[pmax(1L, r$limiting_node)], NA_character_
+        )
+      }
       res$state[match(r$state_days, ctx$out_days) + 1L, ] <- r$states
     }
     x <- r$x
@@ -398,9 +477,23 @@ print.sg_sim <- function(x, ...) {
 }
 
 # Largest total rate (transfer + mortality, and mating for unmated females;
-# D-026) of any compartment that is in use.
+# D-026) of any compartment that is in use. With several nodes: the largest
+# over nodes of the node's largest rate plus its largest total leave rate
+# (MODEL_SPEC 8a).
 .sg_max_rate <- function(day, x, setup) {
-  a <- .sg_rates_r(day, x, setup, aux = TRUE)$aux
+  if (is.null(setup$node_setups)) {
+    return(.sg_max_rate_node(day, x, setup))
+  }
+  n_s <- setup$n_states_node
+  mv <- .sg_movement_r(day, x, setup)
+  max(vapply(seq_len(setup$n_node), function(i) {
+    r <- .sg_max_rate_node(day, x[(i - 1L) * n_s + seq_len(n_s)], setup$node_setups[[i]])
+    r + if (is.null(mv)) 0 else max(mv$lambda[, i])
+  }, 0))
+}
+
+.sg_max_rate_node <- function(day, x, setup) {
+  a <- .sg_rates_node(day, x, setup, aux = TRUE)$aux
   p <- setup$p
   nu_i <- if (p$mating_mode == "instant") {
     rep(p$mating_rate * a$g_find, setup$n_A)

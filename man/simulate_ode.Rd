@@ -12,7 +12,8 @@ simulate_ode(
   rtol = 1e-08,
   atol = 1e-10,
   output_every = 1L,
-  stiff_fallback = TRUE
+  stiff_fallback = NULL,
+  max_memory = 1e+09
 )
 }
 \arguments{
@@ -40,12 +41,19 @@ backend, \code{"lsoda"} for the R backend.}
 \item{output_every}{Record the state every this many days (and always on
 the last day). Counters and diagnostics are always daily.}
 
-\item{stiff_fallback}{Only for \code{method = "dopri5"}: if \code{TRUE} (default), a
+\item{stiff_fallback}{Only for \code{method = "dopri5"}: if \code{TRUE}, a
 day on which the explicit integrator detects stiffness (or fails) is
 integrated again with \code{"lsoda"}, using the C++ rates. This needs the
 'deSolve' package, but only when such a day occurs.
 If \code{FALSE}, stiff days are integrated with Dormand-Prince regardless
-(accurate but slow), and a failure is an error.}
+(accurate but slow), and a failure is an error. The default \code{NULL} means
+\code{TRUE} for one node and \code{FALSE} for several nodes, where \code{TRUE} is an
+error: \code{lsoda} builds a dense Jacobian of all states (D-032).}
+
+\item{max_memory}{Largest allowed size in bytes of the stored results
+(states on output days and daily counters; default 1e9) and, with more
+than one node, of the dense Jacobian of the deSolve methods \code{"lsoda"},
+\code{"lsode"}, \code{"bdf"} and \code{"radau"}. Larger runs stop before they start.}
 }
 \value{
 An object of class \code{sg_sim}, a list with:
@@ -90,9 +98,18 @@ detected (\code{lsoda}: finished on its stiff method; Dormand-Prince: Hairer's
 test; \code{NA} for other methods), whether the day was integrated by the
 \code{lsoda} fallback (steps and evaluations are then those of \code{lsoda}), the
 largest rate of any compartment (transfer plus mortality, plus mating for
-unmated females; D-026), and the smallest
+unmated females; D-026; with several nodes plus the node's total leave
+rate), and the smallest
 state value. Values slightly below zero (round-off near extinction) are
-reported, not removed.
+reported, not removed. With several nodes and \code{"dopri5"}, the column
+\code{limiting_node} gives the node whose states most often had the largest
+error in the day's accepted steps, i.e. the node that limits the step
+size (all nodes share one step size).
+
+\strong{Several nodes} (D-032). A model with a landscape is integrated as one
+system; movement terms are part of the rates (MODEL_SPEC 8a). States and
+counters are named with the node, e.g. \code{"M[AA,1]@north"},
+\code{"emigrants_F@north"}.
 }
 \examples{
 if (requireNamespace("deSolve", quietly = TRUE) &&
