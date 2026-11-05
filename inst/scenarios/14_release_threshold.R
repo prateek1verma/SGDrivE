@@ -38,9 +38,9 @@ library(ScrewDrivE)
 
 # 1. Settings -----------------------------------------------------------------
 temperature <- 25 # constant temperature (degC)
-days <- 365*5 # simulated days (two years)
+days <- 365 * 5 # simulated days (five years)
 wild_adults <- 20000 # adults at equilibrium (mgdrive-nws AdPopEQ)
-n_releases <- 52*2 # weekly releases (half a year)
+n_releases <- 52 * 2 # weekly releases (two years)
 release_interval <- 7 # days between releases
 first_release <- 1 # day of the first release (day 1 = first simulated day)
 target_p <- 0.9 # elimination probability the threshold is defined by
