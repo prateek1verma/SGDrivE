@@ -450,28 +450,89 @@ test-outputs.R, test-checks.R.
 
 ### WP9. Recorder for the ODE (L)
 
-Files: new R/record.R, R/model-view.R (recorder part), src/simulate.cpp,
-R/simulate.R, R/outputs.R, tests new test-recorder.R.
+Files: new R/record.R; src/simulate.cpp, R/simulate.R (day loops), R/outputs.R
+(readers), R/simulate-cb.R (shared totals matrix); tests new
+test-recorder.R. The chain-binomial recorder is phase 2; counter sums by
+period, `sg_alleles()`, further built-in sets and summaries that read
+arbitrary recorded quantities are phase 3.
 
-* `sg_record(...)`, `sg_quantity(name, stage, sex, genotype, mate,
-  substage, node, host, by)`, `sg_counter(name, counter, node, by)`,
-  `sg_quantity_weights(W, names)`; built-in sets `"state"` (default) and
-  `"totals"` (3.7).
-* R builds W_x [quantities × states] and W_c [quantities × counters] as
-  CSR (row pointers, columns, weights); the model view carries them.
-* C++ day loop: on output days y = W_x · x instead of copying the state;
-  each day c' = W_c · c when counter terms are given. Final state always
-  returned.
-* R deSolve loop: the same products with the same CSR arrays.
-* `sim$recorded`, `sim$totals`, `sim$counters`, `sim$final_state` (3.7);
-  `.sg_sim_array()` handles ODE totals; summary functions give the
-  "record … to use …" errors.
-* Memory estimate from the recorder's size (WP5 check).
-* Tests: every recorded quantity equals the same sum computed in R from a
-  `record = "state"` run (ODE, both backends, with hosts and several
-  genotypes); `"totals"` equals the v0.1 totals for one node and matches
-  `simulate_cb(keep = "totals")` column names; `sg_quantity_weights()`
-  with a user matrix; continuing from `final_state` equals one long run.
+Goal: a run stores only what is asked for, computed in C++ during the run;
+full states stay the default (decision 13), so existing code is unchanged.
+
+```r
+rec <- sg_record(
+  "totals",
+  sg_quantity("adults", stage = c("M", "U", "F"), by = "node"),
+  sg_quantity("wild_F", stage = "F", genotype = "AA", node = c("a", "b")),
+  sg_counter("cases", counter = "fertile_batches", by = "node")
+)
+sim <- simulate_ode(model, record = rec)
+```
+
+1. `sg_quantity(name, stage, sex, genotype, mate, substage, node, host,
+   by)`: selects states (`stage` E, L, P, M, U, F or `"adults"`,
+   `"juveniles"`; `host` HS, HW, HI); `by` (`"node"`, `"genotype"`,
+   `"stage"`, `"mate"`) splits it into one quantity per group, named in the
+   style of state names, e.g. `adults[AA]@north`.
+2. `sg_counter(name, counter, node, by)`: sums of daily counters by base
+   name (e.g. `"fertile_batches"`, `c("deaths_M", "senescence_M")`); unknown
+   names give an error listing those available (including `removed_*` with
+   the node extinction rule).
+3. `sg_quantity_weights(W, names)`: any weights, as a dense matrix
+   [quantities x states] or a table (`quantity`, `state`, `weight`); covers
+   allele copies and other weighted sums.
+4. `sg_record(...)`: built-in sets `"state"`, `"totals"` and `"counters"`
+   with quantities and counter sums. `record = "state"` (default) keeps
+   `sim$state`; `"totals"` gives `sim$totals` (block x genotype per node and
+   host blocks, the column names of `simulate_cb(keep = "totals")` with
+   "@id" for several nodes); quantities go to `sim$recorded` [output day
+   (with day 0), quantity]; counter sums replace the daily counters in
+   `sim$counters` unless `"counters"` is also requested.
+   `sim$final_state` is always kept.
+5. Internals: R builds W_x [quantities x states] and W_c [counter sums x
+   counters] in CSR form (no `Matrix` dependency).
+6. C++ day loop: on output days y = W_x x (and the state copied when
+   `"state"` is recorded); every day W_c c when counter sums are requested.
+   The recorder is an argument of the run, not part of the model view, and
+   its arrays are validated in C++.
+7. R paths (deSolve loop, single-node fallback day): the same products from
+   the same arrays.
+8. `max_memory` from the recorder's size (quantities x output days, counter
+   columns x days, final state).
+9. Readers: `.sg_sim_array()` reads ODE totals; summaries work with
+   `"state"` or `"totals"` (what needs the full state, e.g. grouping by mate,
+   gives the existing message or `NA`, as for chain-binomial totals);
+   with a custom record without either they stop with a hint such as
+   `record "totals" (or the state) to use sg_totals()`. `sg_cases()`,
+   `sg_flow_balance()` and the counter lines of `print()` need all counters
+   and stop with a hint to add `"counters"` otherwise.
+10. `print.sg_sim()` with only recorded quantities: final values of the
+    quantities and the solver lines.
+11. Tests: every recorded quantity equals the same weighted sum of a
+    `record = "state"` run (both backends, several genotypes, hosts, three
+    nodes with movement); counter sums equal sums of the full counters
+    (with `removed_*`); `"totals"` equals totals from the state and uses the
+    chain-binomial column names; summaries agree between `"totals"` and
+    `"state"`; the single-node baseline is unchanged; two runs continued
+    from `final_state` equal one long run; `by` splitting and names;
+    `sg_quantity_weights()` in both forms; errors for unknown stages,
+    genotypes, nodes and counters; memory limit; hint messages.
+12. Checks: full suite, bitwise baseline, lint with the package installed,
+    sanitizers (the C++ day loop changes), a quick A/B timing (the default
+    `record = "state"` is not slower; a small record is at least as fast).
+
+Choices confirmed by the user (2026-11-05):
+
+1. The recorder is an argument of the run, not part of the model view.
+2. Quantity names follow the state names: `name[group]@node`.
+3. With `sg_counter()` terms only those counter sums are kept; adding
+   `"counters"` keeps all counters too; without them all counters are kept.
+4. Summaries with a custom record (no `"state"` or `"totals"`) stop with a
+   "record ... to use ..." message; reading recorded quantities is phase 3.
+5. `sg_quantity_weights()` takes a dense matrix or a table (`quantity`,
+   `state`, `weight`), without a `Matrix` dependency.
+6. Counter sums by period stay in phase 3 (weekly totals can be computed
+   from daily counter sums in R).
 
 ### WP10. Documentation and housekeeping (S–M)
 
