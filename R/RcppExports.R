@@ -53,7 +53,7 @@ sg_kernel_max_rate_cpp <- function(ptr, day, x) {
     .Call(`_ScrewDrivE_sg_kernel_max_rate_cpp`, ptr, day, x)
 }
 
-sg_ode_run_cpp <- function(ptr, x0, day_from, day_to, rtol, atol, record, stop_on_stiff, max_steps) {
-    .Call(`_ScrewDrivE_sg_ode_run_cpp`, ptr, x0, day_from, day_to, rtol, atol, record, stop_on_stiff, max_steps)
+sg_ode_run_cpp <- function(ptr, x0, day_from, day_to, rtol, atol, record, stop_on_stiff, max_steps, extinction = FALSE, ext_threshold = 1.0, ended_index = -1L) {
+    .Call(`_ScrewDrivE_sg_ode_run_cpp`, ptr, x0, day_from, day_to, rtol, atol, record, stop_on_stiff, max_steps, extinction, ext_threshold, ended_index)
 }
 

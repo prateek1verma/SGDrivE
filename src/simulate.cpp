@@ -13,6 +13,13 @@
 // detected as stiff (when stop_on_stiff is set), the loop stops and returns
 // the state at the start of that day, after its releases, so R can integrate
 // that day with a stiff solver and resume.
+//
+// Node extinction rule (MODEL_SPEC N5, D-032; optional): at the end of each
+// day, every node whose flies (E, L, P, M, U, F) total less than the
+// extinction threshold has its fly states set to zero; with the host-wound
+// model its infested hosts return to HS and are counted in the node's
+// infestations_ended counter. The removed flies by stage and node are
+// returned as extra counters after the integrated ones.
 
 #include <Rcpp.h>
 
@@ -40,6 +47,43 @@ struct KernelHandle {
 }  // namespace screwdrive
 
 namespace {
+
+// (N5) Apply the node extinction rule to state x at the end of a day; add the
+// removed flies (6 per node: E, L, P, M, U, F) to removed and the infested
+// hosts returned to HS to the node's infestations_ended counter in counters
+// (index ended_index within a node's counters; -1 without hosts).
+void node_extinction(const screwdrive::ModelView& mv, double threshold, int ended_index,
+                     double* x, double* counters, double* removed) {
+  const int ng = mv.n_g;
+  const int len[6] = {ng * mv.n_E, ng * mv.n_L, ng * mv.n_P, ng * mv.n_A, ng * mv.n_A,
+                      ng * ng * mv.n_A};
+  for (int i = 0; i < mv.n_node; ++i) {
+    double* xi = x + static_cast<std::size_t>(i) * mv.node_stride;
+    double block_sum[6];
+    double total = 0.0;
+    for (int b = 0; b < 6; ++b) {
+      block_sum[b] = 0.0;
+      const double* xb = xi + mv.offsets[b];
+      for (int k = 0; k < len[b]; ++k) block_sum[b] += xb[k];
+      total += block_sum[b];
+    }
+    if (!(total < threshold)) continue;
+    for (int b = 0; b < 6; ++b) {
+      std::fill(xi + mv.offsets[b], xi + mv.offsets[b] + len[b], 0.0);
+      removed[i * 6 + b] += block_sum[b];
+    }
+    if (mv.host_model) {
+      double* hi = xi + mv.host_offsets[2];
+      double infested = 0.0;
+      for (int j = 0; j < mv.n_I; ++j) {
+        infested += hi[j];
+        hi[j] = 0.0;
+      }
+      xi[mv.host_offsets[0]] += infested;
+      counters[static_cast<std::size_t>(i) * mv.n_counters_node + ended_index] += infested;
+    }
+  }
+}
 
 screwdrive::KernelHandle* handle(SEXP ptr) {
   Rcpp::XPtr<screwdrive::KernelHandle> h(ptr);
@@ -92,13 +136,23 @@ double sg_kernel_max_rate_cpp(SEXP ptr, int day, const Rcpp::NumericVector& x) {
 // 3 stiff, 4 non-finite state). With more than one node also limiting_node:
 // for each completed day the node (1-based) whose state most often had the
 // largest scaled error in the accepted Dormand-Prince steps (0 if none).
+// With extinction = true the node extinction rule (N5) is applied at the end
+// of each day, with threshold `ext_threshold`; the counters then have 6 more
+// columns per node (removed E, L, P, M, U, F), and ended_index is the
+// position of infestations_ended within a node's counters (-1 without hosts).
 // [[Rcpp::export]]
 Rcpp::List sg_ode_run_cpp(SEXP ptr, const Rcpp::NumericVector& x0, int day_from, int day_to,
                           double rtol, double atol, const Rcpp::LogicalVector& record,
-                          bool stop_on_stiff, double max_steps) {
+                          bool stop_on_stiff, double max_steps, bool extinction = false,
+                          double ext_threshold = 1.0, int ended_index = -1) {
   screwdrive::KernelHandle* h = handle(ptr);
   const screwdrive::ModelView& mv = h->mv;
   const int n = mv.n_states, nc = mv.n_counters;
+  if (extinction && mv.host_model && (ended_index < 0 || ended_index >= mv.n_counters_node)) {
+    Rcpp::stop("ended_index is out of range");
+  }
+  const int n_removed = extinction ? 6 * mv.n_node : 0;
+  std::vector<double> removed(n_removed);
   if (x0.size() != n) Rcpp::stop("initial state has the wrong length");
   if (record.size() != mv.n_days) Rcpp::stop("`record` must have one value per day");
   check_day(mv, day_from);
@@ -154,7 +208,12 @@ Rcpp::List sg_ode_run_cpp(SEXP ptr, const Rcpp::NumericVector& x0, int day_from,
       break;
     }
     std::copy(y.begin(), y.begin() + n, x.begin());
+    if (extinction) {
+      std::fill(removed.begin(), removed.end(), 0.0);
+      node_extinction(mv, ext_threshold, ended_index, x.data(), y.data() + n, removed.data());
+    }
     st_counters.insert(st_counters.end(), y.begin() + n, y.end());
+    st_counters.insert(st_counters.end(), removed.begin(), removed.end());
     st_steps.push_back(static_cast<int>(st.steps));
     st_rejected.push_back(static_cast<int>(st.rejected));
     st_evals.push_back(static_cast<int>(st.evaluations));
@@ -178,9 +237,12 @@ Rcpp::List sg_ode_run_cpp(SEXP ptr, const Rcpp::NumericVector& x0, int day_from,
   for (int r = 0; r < n_rec; ++r) {
     for (int i = 0; i < n; ++i) states(r, i) = st_states[static_cast<std::size_t>(r) * n + i];
   }
-  Rcpp::NumericMatrix counters(n_done, nc);
+  const int nc_all = nc + n_removed;
+  Rcpp::NumericMatrix counters(n_done, nc_all);
   for (int r = 0; r < n_done; ++r) {
-    for (int c = 0; c < nc; ++c) counters(r, c) = st_counters[static_cast<std::size_t>(r) * nc + c];
+    for (int c = 0; c < nc_all; ++c) {
+      counters(r, c) = st_counters[static_cast<std::size_t>(r) * nc_all + c];
+    }
   }
   Rcpp::LogicalVector stiff(n_done);
   for (int r = 0; r < n_done; ++r) stiff[r] = st_stiff[r];

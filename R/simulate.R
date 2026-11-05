@@ -29,6 +29,14 @@
 #'   (accurate but slow), and a failure is an error. The default `NULL` means
 #'   `TRUE` for one node and `FALSE` for several nodes, where `TRUE` is an
 #'   error: `lsoda` builds a dense Jacobian of all states (D-032).
+#' @param node_extinction If `TRUE`, the node extinction rule (MODEL_SPEC N5,
+#'   D-032) is applied at the end of each day: every node whose flies (all
+#'   stages, genotypes and sub-stages) total less than `extinction_threshold`
+#'   ([sg_params()], default 1 individual) is set to zero; with the host-wound
+#'   model its infested hosts return to the hosts without an attractive wound
+#'   and are counted in `infestations_ended`. The removed flies are counted by
+#'   node and stage (`removed_E` ... `removed_F`). Default `FALSE`, also for
+#'   several nodes (D-032); see Details.
 #' @param max_memory Largest allowed size in bytes of the stored results
 #'   (states on output days and daily counters; default 1e9) and, with more
 #'   than one node, of the dense Jacobian of the deSolve methods `"lsoda"`,
@@ -72,6 +80,15 @@
 #' counters are named with the node, e.g. `"M[AA,1]@north"`,
 #' `"emigrants_F@north"`.
 #'
+#' **Node extinction** (MODEL_SPEC N5). In the ODE, movement puts tiny amounts
+#' of flies into every connected node, and a node dying out in winter decays
+#' towards zero without reaching it; without an Allee effect such fractions
+#' of a fly grow again in spring. For questions of spread, die-back and
+#' recolonisation use `node_extinction = TRUE` or the chain-binomial solver.
+#' The rule is applied after each day is integrated and before the next day's
+#' releases, so recorded states show the zeros; the flow counters stay
+#' balanced through the `removed_*` counters.
+#'
 #' @return An object of class `sg_sim`, a list with:
 #'   \describe{
 #'     \item{`day`, `date`}{Output days (0 = initial state) and dates.}
@@ -100,7 +117,7 @@
 #' }
 simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
                          rtol = 1e-8, atol = 1e-10, output_every = 1L,
-                         stiff_fallback = NULL, max_memory = 1e9) {
+                         stiff_fallback = NULL, node_extinction = FALSE, max_memory = 1e9) {
   if (!inherits(model, "sg_model")) {
     .sg_stop("`model` must be an sg_model object; create one with sg_model().")
   }
@@ -116,6 +133,9 @@ simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
     )
   }
   n_node <- model$dims$n_node
+  if (!is.logical(node_extinction) || length(node_extinction) != 1L || is.na(node_extinction)) {
+    .sg_stop("`node_extinction` must be TRUE or FALSE.")
+  }
   if (is.null(stiff_fallback)) stiff_fallback <- n_node == 1L
   if (!is.logical(stiff_fallback) || length(stiff_fallback) != 1L || is.na(stiff_fallback)) {
     .sg_stop("`stiff_fallback` must be TRUE or FALSE (or NULL for the default).")
@@ -156,7 +176,8 @@ simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
   n <- model$n_states
   n_days <- model$forcing$n_days
   out_days <- as.integer(unique(c(seq.int(output_every, n_days, by = output_every), n_days)))
-  n_counters <- length(.sg_model_counter_names(model))
+  ext <- if (node_extinction) .sg_extinction_setup(model) else NULL
+  n_counters <- length(.sg_model_counter_names(model)) + length(ext$names)
   out_bytes <- 8 * (as.numeric(length(out_days) + 1L) * n + as.numeric(n_days) * n_counters)
   if (out_bytes > max_memory) {
     .sg_stop(
@@ -190,7 +211,9 @@ simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
     state = matrix(NA_real_, length(out_days) + 1L, n,
       dimnames = list(NULL, sg_state_names(model))
     ),
-    counters = matrix(0, n_days, length(cnames), dimnames = list(NULL, cnames)),
+    counters = matrix(0, n_days, length(cnames) + length(ext$names),
+      dimnames = list(NULL, c(cnames, ext$names))
+    ),
     diag = data.frame(
       day = seq_len(n_days), steps = NA_integer_, rejected = NA_integer_,
       evaluations = NA_integer_, stiff = NA, fallback = FALSE, max_rate = NA_real_,
@@ -201,7 +224,8 @@ simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
   res$state[1L, ] <- x0
   ctx <- list(
     model = model, n = n, n_c = length(cnames), n_days = n_days, out_days = out_days, func = func,
-    max_rate = max_rate, rtol = rtol, atol = atol, node_ids = .sg_node_ids(model)
+    max_rate = max_rate, rtol = rtol, atol = atol, node_ids = .sg_node_ids(model),
+    ext = ext
   )
 
   t0 <- proc.time()[["elapsed"]]
@@ -225,6 +249,7 @@ simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
         backend = backend, method = method, rtol = rtol, atol = atol,
         output_every = as.integer(output_every),
         stiff_fallback = method == "dopri5" && stiff_fallback,
+        node_extinction = node_extinction,
         fallback_days = sum(res$diag$fallback), run_time = run_time,
         model_hash = model$meta$hash, info = .sg_output_info(model),
         package_version = as.character(utils::packageVersion("ScrewDrivE")),
@@ -328,7 +353,7 @@ print.sg_sim <- function(x, ...) {
     # releases: instantaneous jumps at the start of the day (D-005, D-019)
     for (j in which(rel$day == d)) x[rel$index[j]] <- x[rel$index[j]] + rel$count[j]
     res$diag$max_rate[d] <- ctx$max_rate(d, x)
-    step <- .sg_desolve_day(ctx, x, d, method)
+    step <- .sg_extinction_step(.sg_desolve_day(ctx, x, d, method), ctx)
     x <- step$x
     res <- .sg_store_day(res, d, step)
     if (d %in% ctx$out_days) {
@@ -348,7 +373,9 @@ print.sg_sim <- function(x, ...) {
   while (d <= ctx$n_days) {
     r <- sg_ode_run_cpp(
       ptr, x, d, ctx$n_days, ctx$rtol, ctx$atol, record, stiff_fallback,
-      .sg_dopri5_max_steps
+      .sg_dopri5_max_steps, !is.null(ctx$ext),
+      if (is.null(ctx$ext)) 1 else ctx$ext$threshold,
+      if (is.null(ctx$ext)) -1L else ctx$ext$ended_index
     )
     done <- seq.int(d, length.out = length(r$steps))
     if (length(done) > 0L) {
@@ -387,7 +414,7 @@ print.sg_sim <- function(x, ...) {
     ), " (or set stiff_fallback = FALSE)")
     # x is the state at the start of day d, after its releases
     res$diag$max_rate[d] <- ctx$max_rate(d, x)
-    step <- .sg_desolve_day(ctx, x, d, "lsoda")
+    step <- .sg_extinction_step(.sg_desolve_day(ctx, x, d, "lsoda"), ctx)
     step$stiff <- r$stop_status == 3L
     step$rejected <- NA_integer_
     x <- step$x
@@ -437,9 +464,66 @@ print.sg_sim <- function(x, ...) {
   )
 }
 
+# Node extinction rule (MODEL_SPEC N5): positions of each node's fly stages
+# and host blocks, the counter names of the removed flies, the threshold and
+# the position of infestations_ended within a node's counters (0-based for
+# C++, -1 without hosts).
+.sg_extinction_setup <- function(model) {
+  ids <- .sg_node_ids(model)
+  stages <- c("E", "L", "P", "M", "U", "F")
+  base <- paste0("removed_", stages)
+  node_counters <- .sg_counter_names(model$cube$genotypes, hosts = !is.null(model$hosts))
+  ended <- match("infestations_ended", node_counters)
+  list(
+    threshold = model$counts$ext_threshold,
+    names = if (length(ids) == 1L) {
+      base
+    } else {
+      paste0(rep(base, length(ids)), "@", rep(ids, each = length(base)))
+    },
+    stages = lapply(seq_along(ids), function(i) {
+      lapply(stats::setNames(stages, stages), function(b) sg_state_index(model, b, node = i))
+    }),
+    hs = if (is.null(model$hosts)) NULL else sg_state_index(model, "HS"),
+    hi = if (is.null(model$hosts)) {
+      NULL
+    } else {
+      lapply(seq_along(ids), function(i) {
+        sg_state_index(model, "HI", node = i)
+      })
+    },
+    ended_col = if (is.na(ended)) NULL else (seq_along(ids) - 1L) * length(node_counters) + ended,
+    ended_index = if (is.na(ended)) -1L else ended - 1L
+  )
+}
+
+# Apply the node extinction rule to one day's result (R paths; the C++ day
+# loop does the same in node_extinction()). Adds step$removed.
+.sg_extinction_step <- function(step, ctx) {
+  ext <- ctx$ext
+  if (is.null(ext)) {
+    return(step)
+  }
+  removed <- numeric(length(ext$names))
+  for (i in seq_along(ext$stages)) {
+    sums <- vapply(ext$stages[[i]], function(idx) sum(step$x[idx]), 0)
+    if (!(sum(sums) < ext$threshold)) next
+    for (idx in ext$stages[[i]]) step$x[idx] <- 0
+    removed[(i - 1L) * 6L + seq_len(6L)] <- sums
+    if (!is.null(ext$hi)) {
+      infested <- sum(step$x[ext$hi[[i]]])
+      step$x[ext$hi[[i]]] <- 0
+      step$x[ext$hs[i]] <- step$x[ext$hs[i]] + infested
+      step$counters[ext$ended_col[i]] <- step$counters[ext$ended_col[i]] + infested
+    }
+  }
+  step$removed <- removed
+  step
+}
+
 # Store one day's counters and diagnostics.
 .sg_store_day <- function(res, d, step) {
-  res$counters[d, ] <- step$counters
+  res$counters[d, ] <- c(step$counters, step$removed)
   res$diag$steps[d] <- step$steps
   res$diag$evaluations[d] <- step$evaluations
   res$diag$stiff[d] <- step$stiff

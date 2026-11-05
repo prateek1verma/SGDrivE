@@ -13,6 +13,7 @@ simulate_ode(
   atol = 1e-10,
   output_every = 1L,
   stiff_fallback = NULL,
+  node_extinction = FALSE,
   max_memory = 1e+09
 )
 }
@@ -49,6 +50,15 @@ If \code{FALSE}, stiff days are integrated with Dormand-Prince regardless
 (accurate but slow), and a failure is an error. The default \code{NULL} means
 \code{TRUE} for one node and \code{FALSE} for several nodes, where \code{TRUE} is an
 error: \code{lsoda} builds a dense Jacobian of all states (D-032).}
+
+\item{node_extinction}{If \code{TRUE}, the node extinction rule (MODEL_SPEC N5,
+D-032) is applied at the end of each day: every node whose flies (all
+stages, genotypes and sub-stages) total less than \code{extinction_threshold}
+(\code{\link[=sg_params]{sg_params()}}, default 1 individual) is set to zero; with the host-wound
+model its infested hosts return to the hosts without an attractive wound
+and are counted in \code{infestations_ended}. The removed flies are counted by
+node and stage (\code{removed_E} ... \code{removed_F}). Default \code{FALSE}, also for
+several nodes (D-032); see Details.}
 
 \item{max_memory}{Largest allowed size in bytes of the stored results
 (states on output days and daily counters; default 1e9) and, with more
@@ -110,6 +120,15 @@ size (all nodes share one step size).
 system; movement terms are part of the rates (MODEL_SPEC 8a). States and
 counters are named with the node, e.g. \code{"M[AA,1]@north"},
 \code{"emigrants_F@north"}.
+
+\strong{Node extinction} (MODEL_SPEC N5). In the ODE, movement puts tiny amounts
+of flies into every connected node, and a node dying out in winter decays
+towards zero without reaching it; without an Allee effect such fractions
+of a fly grow again in spring. For questions of spread, die-back and
+recolonisation use \code{node_extinction = TRUE} or the chain-binomial solver.
+The rule is applied after each day is integrated and before the next day's
+releases, so recorded states show the zeros; the flow counters stay
+balanced through the \verb{removed_*} counters.
 }
 \examples{
 if (requireNamespace("deSolve", quietly = TRUE) &&

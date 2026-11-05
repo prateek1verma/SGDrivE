@@ -28,7 +28,7 @@ r_home="$(R RHOME)"
 cat > "$tmp/run.R" <<RS
 .libPaths(c("$tmp/lib", .libPaths()))
 res <- testthat::test_dir("tests/testthat", package = "ScrewDrivE", load_package = "installed",
-  filter = "rates-cpp|rates-nodes|movement-ode|single-node|dopri5|model-view|simulate|backend-equivalence|regression|stress|cb-",
+  filter = "rates-cpp|rates-nodes|movement-ode|node-extinction|single-node|dopri5|model-view|simulate|backend-equivalence|regression|stress|cb-",
   reporter = "summary", stop_on_failure = TRUE)
 RS
 NOT_CRAN=true ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=print_stacktrace=1 R_HOME="$r_home" \
