@@ -71,7 +71,7 @@ cube
 # 3. Weather and the wild population ------------------------------------------
 # A region holding wild_adults adults (half of them female) at the
 # equilibrium of the constant temperature, without releases.
-p <- sg_params(female_background_mortality=0.1,male_background_mortality=0.12)
+p <- sg_params(female_background_mortality = 0.1, male_background_mortality = 0.12)
 forcing <- sg_forcing(sg_constant_weather(temperature, days = days), p)
 wild <- sg_model(p, cube, forcing, adult_females = wild_adults / 2)
 wild

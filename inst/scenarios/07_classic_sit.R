@@ -51,7 +51,8 @@ ih <- array(0, dim = c(2, 2, 2), dimnames = dims)
 ih[, , "W"] <- 1
 tau <- array(1, dim = c(2, 2, 2), dimnames = dims)
 tau[, "S", ] <- 0 # eggs sired by sterile males do not hatch
-# tau["S", , ] <- 0 # eggs sired by sterile females do not hatch
+# To make eggs laid by sterile females non-viable too, also set the "S"
+# female slice of tau to 0.
 eta <- matrix(1, 2, 2, dimnames = list(genotypes, genotypes))
 eta[, "S"] <- eta_sterile # females prefer wild males (rows: female, cols: male)
 
@@ -68,7 +69,7 @@ cube
 # 3. Weather and the wild population ------------------------------------------
 # A region holding wild_adults adults (half of them female) at the
 # equilibrium of a constant 25 degC, without releases.
-p <- sg_params(female_background_mortality=0.1,male_background_mortality=0.12)
+p <- sg_params(female_background_mortality = 0.1, male_background_mortality = 0.12)
 forcing <- sg_forcing(sg_constant_weather(temperature, days = days), p)
 wild <- sg_model(p, cube, forcing, adult_females = wild_adults / 2)
 wild

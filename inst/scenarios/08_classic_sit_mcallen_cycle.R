@@ -82,7 +82,7 @@ forcing <- sg_forcing(weather, p)
 unit <- sg_model(p, cube, forcing, area = 1)
 unit_females <- sg_females(simulate_ode(unit, sg_init(unit, "burn_in", years = burn_in_years)))
 area <- (wild_adults / 2) / mean(unit_females$females[unit_females$day %in% 1:365])
-area # km^2
+area # region area in km^2
 
 # 5. Releases (sizes as in scenario 07) ---------------------------------------
 female_ratio <- male_ratio * female_percent / 100
