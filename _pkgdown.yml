@@ -24,6 +24,10 @@ reference:
   - title: Releases
     contents:
       - sg_releases
+  - title: Landscapes and movement
+    contents:
+      - sg_landscape
+      - sg_movement_layer
   - title: Model assembly
     contents:
       - sg_model
