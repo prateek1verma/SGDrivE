@@ -3,9 +3,11 @@
 Status: **accepted**, 2026-11-04 (choices of section 8 confirmed by the
 user the same day). Implements phase 1 of
 dev/MOVEMENT_DESIGN.md (section 9) against MODEL_SPEC section 8a (N1–N3,
-N5) and D-032. No code has been written yet. The chain-binomial step (N4)
+N5) and D-032. The chain-binomial step (N4)
 is phase 2; constructors, `check_movement()`, period sums of counters and
 the first transect are phase 3; several layers and schedules are phase 4.
+Phase 1 implemented 2026-11-05: PR A (WP1–WP5, #14) and PR B (WP6–WP8,
+#15) merged; PR C (WP9–WP10).
 
 ## 1. Goal and ground rules
 
@@ -551,6 +553,10 @@ recorded sums.
   changes in the specification while coding; MODEL_SPEC updated in the
   same PR if so.
 * MOVEMENT_DESIGN.md: phase 1 marked done.
+* *Done (2026-11-05):* 3-node examples in the help of `sg_model()` and
+  `sg_record()` (`sg_landscape()` and `sg_movement_layer()` had them);
+  NEWS entry; README section and roadmap line; D-032 findings; MODEL_SPEC
+  8a outputs note; design note status.
 
 ## 5. Order, dependencies and pull requests
 

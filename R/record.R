@@ -43,6 +43,22 @@
 #'   sim <- simulate_ode(mod, record = rec)
 #'   tail(sim$recorded)
 #'   tail(sim$counter_sums)
+#'
+#'   # three nodes with movement: adults and cases per node
+#'   land <- sg_landscape(data.frame(id = c("a", "b", "c"), area = 100), wx)
+#'   chain <- sg_movement_layer(
+#'     list(male = 0.05, virgin = 0.1, mated = 0.17),
+#'     rbind(c(0, 1, 0), c(0.5, 0, 0.5), c(0, 1, 0))
+#'   )
+#'   mod3 <- sg_model(p, sg_cube(MGDrivE::cubeMendelian()), landscape = land, movement = chain)
+#'   sim3 <- simulate_ode(mod3,
+#'     init = sg_init(mod3, nodes = "a"),
+#'     record = sg_record(
+#'       sg_quantity("adults", stage = "adults", by = "node"),
+#'       sg_counter("cases", counter = "fertile_batches", by = "node")
+#'     )
+#'   )
+#'   tail(sim3$recorded)
 #' }
 sg_record <- function(...) {
   parts <- list(...)

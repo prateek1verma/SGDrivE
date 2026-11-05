@@ -410,8 +410,10 @@ more than one node, and asking for it then is an error. Chain-binomial: one
 dt for all nodes.
 
 **Outputs.** States and counters per node; summaries report study nodes by
-default and source nodes on request. Which quantities a run stores (the
-recorder) and the spread metrics: design note section 7.
+default and source nodes on request (`nodes`). Which quantities a run stores
+(`simulate_ode(record =)`, `sg_record()`: states, totals, weighted sums of
+states and counter sums computed during the run) and the spread metrics:
+design note section 7.
 
 ## 9. Releases (D-005)
 

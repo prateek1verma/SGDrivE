@@ -1,8 +1,9 @@
 # Multiple nodes and fly movement, v0.2 (design note)
 
 Status: **accepted**, 2026-11-04 (phase 0 done); decisions of section 10
-made by the user on 2026-11-02 and 2026-11-04; not implemented (phases
-1–4 open). Equations in MODEL_SPEC section 8a (N1 movement terms, N2
+made by the user on 2026-11-02 and 2026-11-04. Phase 1 (landscape, one
+layer, ODE, recorder) implemented 2026-11-05 (dev/MOVEMENT_PHASE1_PLAN.md;
+findings in D-032); phases 2–4 open. Equations in MODEL_SPEC section 8a (N1 movement terms, N2
 losses, N3 clock, N4 chain-binomial step, N5 node extinction rule);
 decision D-032 (DECISIONS.md), which also records the choices made in
 writing the specification. Biology from the sources in section 2,
@@ -683,7 +684,7 @@ of 5.7 as an exception to "no population floors"); D-032; parameter-table
 entries (`movement_t_ref` = 27 °C, `movement_kappa_max` = 1); this note's
 decisions.
 
-### Phase 1. Landscape, one layer, ODE
+### Phase 1. Landscape, one layer, ODE (done 2026-11-05)
 * `sg_landscape()` with node roles; `sg_movement_layer()`;
   `sg_model(landscape = , movement = )` accepting a list with one layer.
 * `ModelView`: node stride; forcing [n_days, n_nodes]; per-node scalars

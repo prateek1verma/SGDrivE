@@ -1,5 +1,51 @@
 # ScrewDrivE 0.0.0.9000
 
+## Several nodes and adult movement, phase 1: ODE solver (D-032)
+
+Design: `dev/MOVEMENT_DESIGN.md`; equations: MODEL_SPEC section 8a (N1-N5);
+plan: `dev/MOVEMENT_PHASE1_PLAN.md`. One-node models give the same results
+as before.
+
+* `sg_landscape()` defines nodes with their own area, weather, role (study
+  or source) and wound or host density; identical forcings are stored once.
+* `sg_movement_layer()` gives leave rates for males, unmated and mated
+  females and destination probabilities (matrix or edge table; rows below 1
+  are open edges). The rates are per day at `movement_t_ref` (27 degC) and
+  follow a physiological clock, kappa = min(`movement_kappa_max`,
+  dx(T) / dx(T_ref)) (1 by default; `Inf` for uncapped degree-day scaling),
+  or a calendar clock.
+* `sg_model(landscape =, movement =)` builds multi-node models: one copy of
+  the one-node state per node, state names with `"@id"`, releases per node
+  (`sg_releases(node =)`), `sg_state_index(node =)`.
+* `simulate_ode()` integrates landscapes with movement in C++ and in the R
+  reference, reports the node that limits the step size, and has
+  `node_extinction = TRUE` (MODEL_SPEC N5), off by default, which sets nodes
+  with less than one fly to zero at the end of each day. `stiff_fallback`
+  now defaults to `TRUE` for one node and `FALSE` for several. New
+  `max_memory` argument (1e9 bytes): runs whose stored results would exceed
+  it stop before they start, also for one node.
+* `simulate_ode(record =)` with `sg_record()`, `sg_quantity()`,
+  `sg_counter()` and `sg_quantity_weights()` keeps only chosen results
+  (states, totals, weighted sums, counter sums), computed in C++ during the
+  run; `sim$final_state` is always kept. Full states stay the default.
+* `sg_init()` works per node (`nodes`, equilibria and thresholds per node
+  without movement, burn-ins with movement and per-node weather,
+  `node_extinction` for the burn-in, states as lists of per-node vectors);
+  the default start puts the starting state into every node.
+  `sg_equilibria()` returns all nodes with a `node` column.
+* Summaries (`sg_totals()`, `sg_females()`, `sg_allele_freq()`, `sg_cases()`,
+  `sg_hosts()`, plots) take `nodes` (default the study nodes);
+  `sg_totals(by = "node")`; `as.data.frame()` lists all nodes by node.
+  `sg_flow_balance()` balances every node with movement and removals;
+  `check_model()` checks every node and the movement.
+* New parameters `movement_t_ref` and `movement_kappa_max` (group
+  "movement"); the only parameter that may be `Inf` is `movement_kappa_max`.
+* Bug fix: with the host-wound model, equilibria below the oviposition
+  threshold stopped with an error; they now give an empty state with a
+  message.
+* Not yet for several nodes: `simulate_cb()` (next phase) and
+  `calibrate_population()`.
+
 ## Package renamed from SGDrivE to ScrewDrivE
 
 * The package is now called `ScrewDrivE`: use `library(ScrewDrivE)` and
