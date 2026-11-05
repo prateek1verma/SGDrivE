@@ -89,12 +89,24 @@
 #' releases, so recorded states show the zeros; the flow counters stay
 #' balanced through the `removed_*` counters.
 #'
+#' @param record What the run stores: `"state"` (default: full states on
+#'   output days and all daily counters), `"totals"` (totals by stage and
+#'   genotype per node, and all counters), or an [sg_record()] object with
+#'   chosen quantities and counter sums, computed in C++ during the run.
+#'
 #' @return An object of class `sg_sim`, a list with:
 #'   \describe{
 #'     \item{`day`, `date`}{Output days (0 = initial state) and dates.}
 #'     \item{`state`}{Matrix of states (rows: output days; columns:
-#'       [sg_state_names()]), counts per node at the end of each day.}
-#'     \item{`counters`}{Matrix of daily flow totals (rows: days 1 to n).}
+#'       [sg_state_names()]), counts per node at the end of each day; `NULL`
+#'       when not recorded.}
+#'     \item{`totals`, `recorded`}{With [sg_record()]: totals by stage and
+#'       genotype, and the recorded quantities (rows: output days).}
+#'     \item{`counters`}{Matrix of daily flow totals (rows: days 1 to n);
+#'       `NULL` when only counter sums are recorded.}
+#'     \item{`counter_sums`}{With `sg_counter()` terms: daily counter sums.}
+#'     \item{`final_state`}{The state at the end of the run (named), to
+#'       continue from.}
 #'     \item{`releases`}{Matrix of individuals released per day and block.}
 #'     \item{`diagnostics`}{Data frame of daily solver diagnostics.}
 #'     \item{`meta`}{Backend, method, tolerances, stiff fallback setting and
@@ -117,7 +129,8 @@
 #' }
 simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
                          rtol = 1e-8, atol = 1e-10, output_every = 1L,
-                         stiff_fallback = NULL, node_extinction = FALSE, max_memory = 1e9) {
+                         stiff_fallback = NULL, node_extinction = FALSE, max_memory = 1e9,
+                         record = "state") {
   if (!inherits(model, "sg_model")) {
     .sg_stop("`model` must be an sg_model object; create one with sg_model().")
   }
@@ -177,13 +190,19 @@ simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
   n_days <- model$forcing$n_days
   out_days <- as.integer(unique(c(seq.int(output_every, n_days, by = output_every), n_days)))
   ext <- if (node_extinction) .sg_extinction_setup(model) else NULL
-  n_counters <- length(.sg_model_counter_names(model)) + length(ext$names)
-  out_bytes <- 8 * (as.numeric(length(out_days) + 1L) * n + as.numeric(n_days) * n_counters)
+  all_counters <- c(.sg_model_counter_names(model), ext$names)
+  rec <- .sg_recorder(record, model, all_counters)
+  n_out <- as.numeric(length(out_days) + 1L)
+  width_out <- (if (rec$state) n else 0) + length(rec$names_x)
+  width_day <- (if (rec$counters) length(all_counters) else 0) + length(rec$names_c)
+  out_bytes <- 8 * (n_out * width_out + as.numeric(n_days) * width_day + n)
   if (out_bytes > max_memory) {
     .sg_stop(
-      "The results would take ", format(out_bytes / 1e6, digits = 3L), " MB (states on ",
-      length(out_days) + 1L, " output days and daily counters), more than max_memory (",
-      format(max_memory / 1e6, digits = 3L), " MB). Use a larger output_every or raise max_memory."
+      "The results would take ", format(out_bytes / 1e6, digits = 3L), " MB (",
+      if (rec$state) "states" else "recorded quantities", " on ", n_out,
+      " output days and daily counters), more than max_memory (",
+      format(max_memory / 1e6, digits = 3L), " MB). Use a larger output_every, record less ",
+      "(sg_record()) or raise max_memory."
     )
   }
 
@@ -208,20 +227,27 @@ simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
   func <- function(t, y, parms) list(rates(parms$day, y))
 
   res <- list(
-    state = matrix(NA_real_, length(out_days) + 1L, n,
-      dimnames = list(NULL, sg_state_names(model))
-    ),
-    counters = matrix(0, n_days, length(cnames) + length(ext$names),
-      dimnames = list(NULL, c(cnames, ext$names))
-    ),
     diag = data.frame(
       day = seq_len(n_days), steps = NA_integer_, rejected = NA_integer_,
       evaluations = NA_integer_, stiff = NA, fallback = FALSE, max_rate = NA_real_,
       min_state = NA_real_
-    )
+    ),
+    rec = rec
   )
+  if (rec$state) {
+    res$state <- matrix(NA_real_, n_out, n, dimnames = list(NULL, sg_state_names(model)))
+  }
+  if (length(rec$names_x) > 0L) {
+    res$recorded <- matrix(NA_real_, n_out, length(rec$names_x), dimnames = list(NULL, rec$names_x))
+  }
+  if (rec$counters) {
+    res$counters <- matrix(0, n_days, length(all_counters), dimnames = list(NULL, all_counters))
+  }
+  if (length(rec$names_c) > 0L) {
+    res$counter_sums <- matrix(0, n_days, length(rec$names_c), dimnames = list(NULL, rec$names_c))
+  }
   if (n_node > 1L) res$diag$limiting_node <- NA_character_
-  res$state[1L, ] <- x0
+  res <- .sg_record_row(res, 1L, x0)
   ctx <- list(
     model = model, n = n, n_c = length(cnames), n_days = n_days, out_days = out_days, func = func,
     max_rate = max_rate, rtol = rtol, atol = atol, node_ids = .sg_node_ids(model),
@@ -237,12 +263,23 @@ simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
   run_time <- proc.time()[["elapsed"]] - t0
 
   dates <- model$forcing$dates
+  totals <- recorded <- NULL
+  if (!is.null(res$recorded)) {
+    is_total <- seq_len(ncol(res$recorded)) <= rec$n_totals
+    if (any(is_total)) totals <- res$recorded[, is_total, drop = FALSE]
+    if (any(!is_total)) recorded <- res$recorded[, !is_total, drop = FALSE]
+  }
+  final_state <- stats::setNames(res$final_state, sg_state_names(model))
   structure(
     list(
       day = c(0L, out_days),
       date = c(dates[1L] - 1, dates[out_days]),
       state = res$state,
+      totals = totals,
+      recorded = recorded,
       counters = res$counters,
+      counter_sums = res$counter_sums,
+      final_state = final_state,
       releases = .sg_release_matrix(model),
       diagnostics = res$diag,
       meta = list(
@@ -250,6 +287,10 @@ simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
         output_every = as.integer(output_every),
         stiff_fallback = method == "dopri5" && stiff_fallback,
         node_extinction = node_extinction,
+        record = list(
+          sets = rec$record$sets, quantities = setdiff(rec$names_x, colnames(totals)),
+          counter_sums = rec$names_c
+        ),
         fallback_days = sum(res$diag$fallback), run_time = run_time,
         model_hash = model$meta$hash, info = .sg_output_info(model),
         package_version = as.character(utils::packageVersion("ScrewDrivE")),
@@ -267,7 +308,7 @@ simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
 
 #' @export
 print.sg_sim <- function(x, ...) {
-  n_days <- nrow(x$counters)
+  n_days <- nrow(x$diagnostics)
   m <- x$meta
   cat(
     "<sg_sim> ", n_days, " days (", format(x$date[2L]), " to ",
@@ -275,14 +316,19 @@ print.sg_sim <- function(x, ...) {
     m$method, "\"\n",
     sep = ""
   )
-  tot <- .sg_sim_block_totals(x)
-  last <- tot[nrow(tot), ]
-  cat(
-    "  final totals", if (.sg_sim_nodes(x)$multi) " (study nodes)", ": ",
-    paste0(names(last), " ", format(last, digits = 4L), collapse = ", "), "\n",
-    sep = ""
-  )
-  if (!is.null(m$info$hosts)) {
+  # what the run kept (phase 1 WP9): states or totals, all counters
+  stock <- if (!is.null(x$state)) x$state else x$totals
+  has_counters <- !is.null(x$counters)
+  if (!is.null(stock)) {
+    tot <- .sg_sim_block_totals(x)
+    last <- tot[nrow(tot), ]
+    cat(
+      "  final totals", if (.sg_sim_nodes(x)$multi) " (study nodes)", ": ",
+      paste0(names(last), " ", format(last, digits = 4L), collapse = ", "), "\n",
+      sep = ""
+    )
+  }
+  if (!is.null(m$info$hosts) && !is.null(stock) && has_counters) {
     hs <- sg_hosts(x)
     cat(sprintf(
       "  hosts: %s infested of %s at the end (prevalence %.3g); %s infestations\n",
@@ -290,22 +336,24 @@ print.sg_sim <- function(x, ...) {
       hs$prevalence[nrow(hs)], format(sum(sg_cases(x, "year", per = "node")$cases), digits = 5L)
     ))
   }
-  cat(sprintf(
-    "  eggs laid %s; adults emerged %s; released %s\n",
-    format(.sg_counter_total(x, "eggs_laid\\[[^]]*\\]"), digits = 5L),
-    format(.sg_counter_total(x, "emerged_(male|female)"), digits = 5L),
-    format(sum(x$releases), digits = 5L)
-  ))
-  n_node <- length(unique(sub("^[^@]*@?", "", colnames(x$state))))
+  if (has_counters) {
+    cat(sprintf(
+      "  eggs laid %s; adults emerged %s; released %s\n",
+      format(.sg_counter_total(x, "eggs_laid\\[[^]]*\\]"), digits = 5L),
+      format(.sg_counter_total(x, "emerged_(male|female)"), digits = 5L),
+      format(sum(x$releases), digits = 5L)
+    ))
+  }
+  n_node <- if (is.null(stock)) 1L else length(unique(sub("^[^@]*@?", "", colnames(stock))))
   if (n_node > 1L) {
-    nm <- colnames(x$state)
+    nm <- colnames(stock)
     fly <- !grepl("^H[SWI]\\[", nm)
-    last <- x$state[nrow(x$state), fly]
+    last <- stock[nrow(stock), fly]
     node_of <- sub("^[^@]*@", "", nm[fly])
     node_tot <- tapply(last, factor(node_of, levels = unique(node_of)), sum)
     cat(sprintf(
       "  nodes: %d, %d with flies at the end (total >= 1)%s\n", n_node, sum(node_tot >= 1),
-      if (any(grepl("^emigrants_", colnames(x$counters)))) {
+      if (has_counters && any(grepl("^emigrants_", colnames(x$counters)))) {
         sprintf(
           "; movers %s, lost from the landscape %s",
           format(.sg_counter_total(x, "emigrants_[MUF]"), digits = 5L),
@@ -316,6 +364,8 @@ print.sg_sim <- function(x, ...) {
       }
     ))
   }
+  .sg_print_recorded("recorded (last output day)", x$recorded, function(v) v[length(v)])
+  .sg_print_recorded("counter sums (whole run)", x$counter_sums, sum)
   d <- x$diagnostics
   cat(sprintf(
     "  solver: %.0f steps/day (max %d), %s, largest rate %.3g per day, min state %.3g\n",
@@ -338,6 +388,22 @@ print.sg_sim <- function(x, ...) {
 
 # ---- internal ------------------------------------------------------------------
 
+# print() lines for recorded quantities or counter sums: up to six values.
+.sg_print_recorded <- function(label, m, fun) {
+  if (is.null(m) || ncol(m) == 0L) {
+    return(invisible(NULL))
+  }
+  v <- apply(m, 2L, fun)
+  show <- utils::head(v, 6L)
+  cat(
+    "  ", label, ": ",
+    paste0(names(show), " ", format(show, digits = 4L), collapse = ", "),
+    if (length(v) > 6L) paste0(", ... (", length(v), " in all)"), "\n",
+    sep = ""
+  )
+  invisible(NULL)
+}
+
 # Total over days (and nodes) of the counters whose name, without the node
 # suffix, matches the regular expression `pattern`.
 .sg_counter_total <- function(sim, pattern) {
@@ -358,9 +424,10 @@ print.sg_sim <- function(x, ...) {
     res <- .sg_store_day(res, d, step)
     if (d %in% ctx$out_days) {
       row <- row + 1L
-      res$state[row, ] <- x
+      res <- .sg_record_row(res, row, x)
     }
   }
+  res$final_state <- x
   res
 }
 
@@ -375,11 +442,13 @@ print.sg_sim <- function(x, ...) {
       ptr, x, d, ctx$n_days, ctx$rtol, ctx$atol, record, stiff_fallback,
       .sg_dopri5_max_steps, !is.null(ctx$ext),
       if (is.null(ctx$ext)) 1 else ctx$ext$threshold,
-      if (is.null(ctx$ext)) -1L else ctx$ext$ended_index
+      if (is.null(ctx$ext)) -1L else ctx$ext$ended_index,
+      res$rec[c("state", "counters", "wx", "wc")]
     )
     done <- seq.int(d, length.out = length(r$steps))
     if (length(done) > 0L) {
-      res$counters[done, ] <- r$counters
+      if (!is.null(res$counters)) res$counters[done, ] <- r$counters
+      if (!is.null(res$counter_sums)) res$counter_sums[done, ] <- r$counter_sums
       res$diag$steps[done] <- r$steps
       res$diag$rejected[done] <- r$rejected
       res$diag$evaluations[done] <- r$evaluations
@@ -391,7 +460,9 @@ print.sg_sim <- function(x, ...) {
           ctx$node_ids[pmax(1L, r$limiting_node)], NA_character_
         )
       }
-      res$state[match(r$state_days, ctx$out_days) + 1L, ] <- r$states
+      rows <- match(r$state_days, ctx$out_days) + 1L
+      if (!is.null(res$state)) res$state[rows, ] <- r$states
+      if (!is.null(res$recorded)) res$recorded[rows, ] <- r$recorded
     }
     x <- r$x
     if (r$stopped_day == 0L) break
@@ -420,9 +491,18 @@ print.sg_sim <- function(x, ...) {
     x <- step$x
     res <- .sg_store_day(res, d, step)
     res$diag$fallback[d] <- TRUE
-    if (record[d]) res$state[match(d, ctx$out_days) + 1L, ] <- x
+    if (record[d]) res <- .sg_record_row(res, match(d, ctx$out_days) + 1L, x)
     d <- d + 1L
   }
+  res$final_state <- x
+  res
+}
+
+# Record state x on output row `row` (R paths): the full state and/or the
+# recorded weighted sums W_x x (phase 1 WP9).
+.sg_record_row <- function(res, row, x) {
+  if (!is.null(res$state)) res$state[row, ] <- x
+  if (!is.null(res$recorded)) res$recorded[row, ] <- .sg_csr_multiply(res$rec$wx, x)
   res
 }
 
@@ -523,7 +603,9 @@ print.sg_sim <- function(x, ...) {
 
 # Store one day's counters and diagnostics.
 .sg_store_day <- function(res, d, step) {
-  res$counters[d, ] <- c(step$counters, step$removed)
+  full <- c(step$counters, step$removed)
+  if (!is.null(res$counters)) res$counters[d, ] <- full
+  if (!is.null(res$counter_sums)) res$counter_sums[d, ] <- .sg_csr_multiply(res$rec$wc, full)
   res$diag$steps[d] <- step$steps
   res$diag$evaluations[d] <- step$evaluations
   res$diag$stiff[d] <- step$stiff
@@ -616,7 +698,7 @@ print.sg_sim <- function(x, ...) {
 # several nodes over the study nodes (D-032).
 .sg_sim_block_totals <- function(sim) {
   st <- sim$state
-  if (inherits(sim, "sg_sim") && .sg_sim_nodes(sim)$multi) {
+  if (inherits(sim, "sg_sim") && (is.null(st) || .sg_sim_nodes(sim)$multi)) {
     a <- .sg_sim_array(sim)
     st <- matrix(a$array[, , 1L], dim(a$array)[1L], dimnames = list(NULL, dimnames(a$array)[[2L]]))
   }

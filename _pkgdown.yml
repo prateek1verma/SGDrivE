@@ -37,6 +37,7 @@ reference:
   - title: Simulation
     contents:
       - simulate_ode
+      - sg_record
       - simulate_cb
   - title: Outputs
     contents:

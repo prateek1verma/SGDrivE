@@ -76,6 +76,7 @@ sg_r0 <- function(model, temperature) {
 #' }
 sg_flow_balance <- function(sim) {
   sel <- .sg_sim_nodes(sim, default = "all")
+  .sg_need_counters(sim, "sg_flow_balance()")
   if (!sel$multi) {
     return(.sg_flow_balance_unit(sim, .sg_sim_array(sim)$array, sim$counters, sim$releases))
   }

@@ -534,6 +534,13 @@ Choices confirmed by the user (2026-11-05):
 6. Counter sums by period stay in phase 3 (weekly totals can be computed
    from daily counter sums in R).
 
+*Implemented (2026-11-05).* Two details settled while coding: counter sums
+are stored in their own `sim$counter_sums` (and `sim$counters` is `NULL` when
+only sums are kept), so both can be kept side by side; and `node = NULL` in
+`sg_quantity()` and `sg_counter()` means the study nodes, as in the summary
+functions. Totals are W_x rows too, so the C++ loop has one product for all
+recorded sums.
+
 ### WP10. Documentation and housekeeping (S–M)
 
 * roxygen for every new exported function (purpose, arguments with units,

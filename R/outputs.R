@@ -277,7 +277,7 @@ sg_cases <- function(sim, period = c("day", "week", "month", "year"), per = c("k
       "model's own host density."
     )
   }
-  k <- sim$counters
+  k <- .sg_need_counters(sim, "sg_cases()")
   sel <- .sg_sim_nodes(sim, nodes)
   if (!sel$multi && !"fertile_batches" %in% dimnames(k)[[2L]]) {
     .sg_stop("This simulation was made by an older version of ScrewDrivE; run it again.")
@@ -441,6 +441,17 @@ sg_hosts <- function(sim, per = c("node", "km2"), nodes = NULL) {
   list(pos = pos, ids = nd$id[pos], area = sum(nd$area[pos]), multi = TRUE, all = nd)
 }
 
+# The daily counters of a simulation, or a hint to record them (phase 1 WP9).
+.sg_need_counters <- function(sim, what) {
+  if (is.null(sim$counters)) {
+    .sg_stop(
+      what, " needs all daily counters; add \"counters\" to sg_record() ",
+      "(the run kept only counter sums)."
+    )
+  }
+  sim$counters
+}
+
 # Node id of each name with an "@id" suffix (NA without one).
 .sg_name_node <- function(nm) {
   ifelse(grepl("@", nm, fixed = TRUE), sub("^[^@]*@", "", nm), NA_character_)
@@ -464,10 +475,19 @@ sg_hosts <- function(sim, per = c("node", "km2"), nodes = NULL) {
 .sg_sim_array <- function(sim, nodes = NULL, default = "study") {
   .sg_sim_info(sim)
   out <- if (inherits(sim, "sg_sim")) {
-    a <- sim$state
+    # states, or with sg_record() the totals (phase 1 WP9)
+    level <- if (!is.null(sim$state)) "state" else "totals"
+    m <- if (level == "state") sim$state else sim$totals
+    if (is.null(m)) {
+      .sg_stop(
+        "This summary needs the states or totals of the run; simulate with ",
+        "record = \"totals\" or \"state\" (or add \"totals\" to sg_record())."
+      )
+    }
+    a <- m
     dim(a) <- c(dim(a), 1L)
-    dimnames(a) <- list(NULL, colnames(sim$state), NULL)
-    list(array = a, level = "state")
+    dimnames(a) <- list(NULL, colnames(m), NULL)
+    list(array = a, level = level)
   } else if (!is.null(sim$state)) {
     list(array = sim$state, level = "state")
   } else {
@@ -507,7 +527,10 @@ sg_hosts <- function(sim, per = c("node", "km2"), nodes = NULL) {
   node <- a$node[fly]
   nm <- dimnames(a$array)[[2L]]
   if (a$level == "totals" && need_mate) {
-    .sg_stop("Mate genotypes need the full state; run simulate_cb() with keep = \"state\".")
+    .sg_stop(
+      "Mate genotypes need the full state: simulate_ode() with record = \"state\" or ",
+      "simulate_cb() with keep = \"state\"."
+    )
   }
   block <- substr(nm, 1L, 1L)
   # names are "E[g,1]", "F[g|m,1]" (states) or "E[g]" (totals); a "]" first
