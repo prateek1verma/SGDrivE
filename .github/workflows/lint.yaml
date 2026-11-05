@@ -1,14 +1,23 @@
 # Static code analysis with lintr (configuration in .lintr).
 # Based on https://github.com/r-lib/actions/tree/v2/examples
+# Changes that touch only dev/, data-raw/ (both excluded in .lintr) or
+# Markdown files start no run; a newer push to a pull request cancels its run
+# still in progress (saves GitHub Actions minutes, see R-CMD-check.yaml).
 on:
   push:
     branches: [main]
+    paths-ignore: ['dev/**', 'data-raw/**', '**.md']
   pull_request:
+    paths-ignore: ['dev/**', 'data-raw/**', '**.md']
   workflow_dispatch:
 
 name: lint
 
 permissions: read-all
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   lint:

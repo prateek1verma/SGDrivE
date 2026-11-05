@@ -1,16 +1,31 @@
 # R CMD check on macOS, Windows and Ubuntu.
 # Based on https://github.com/r-lib/actions/tree/v2/examples
-# Ubuntu also runs R-devel, the previous release and R 4.1 (the minimum
-# version declared in DESCRIPTION).
+#
+# To save GitHub Actions minutes in this private repository (macOS minutes
+# count 10x, Windows 2x):
+# * pull requests run only Ubuntu with the current R release;
+# * pushes to main and manual runs (workflow_dispatch, which can be started
+#   on any branch from the Actions tab) run the full matrix: macOS, Windows
+#   and Ubuntu with R-devel, the current and previous release and R 4.1 (the
+#   minimum version declared in DESCRIPTION);
+# * changes that touch only files outside the package build (dev/,
+#   data-raw/, bench/) or Markdown files start no run;
+# * a newer push to a pull request cancels its run still in progress.
 on:
   push:
     branches: [main]
+    paths-ignore: ['dev/**', 'data-raw/**', 'bench/**', '**.md']
   pull_request:
+    paths-ignore: ['dev/**', 'data-raw/**', 'bench/**', '**.md']
   workflow_dispatch:
 
 name: R-CMD-check
 
 permissions: read-all
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   R-CMD-check:
@@ -21,13 +36,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        config:
-          - {os: macos-latest,   r: 'release'}
-          - {os: windows-latest, r: 'release'}
-          - {os: ubuntu-latest,  r: 'devel', http-user-agent: 'release'}
-          - {os: ubuntu-latest,  r: 'release'}
-          - {os: ubuntu-latest,  r: 'oldrel-1'}
-          - {os: ubuntu-latest,  r: '4.1'}
+        # pull requests: Ubuntu release only; otherwise the full matrix
+        config: ${{ fromJSON(github.event_name == 'pull_request' && '[{"os":"ubuntu-latest","r":"release"}]' || '[{"os":"macos-latest","r":"release"},{"os":"windows-latest","r":"release"},{"os":"ubuntu-latest","r":"devel","http-user-agent":"release"},{"os":"ubuntu-latest","r":"release"},{"os":"ubuntu-latest","r":"oldrel-1"},{"os":"ubuntu-latest","r":"4.1"}]') }}
 
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
