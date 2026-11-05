@@ -1,10 +1,12 @@
 # Multiple nodes and fly movement, v0.2 (design note)
 
-Status: **proposed**, 2026-11-02; decisions of section 10 made by the user
-on 2026-11-02; not implemented. Biology from the sources in section 2,
-including Medical and Veterinary Entomology 23, Suppl. 1 (2009). Once
-accepted, the model goes into MODEL_SPEC (new section) and DECISIONS
-(D-032).
+Status: **accepted**, 2026-11-04 (phase 0 done); decisions of section 10
+made by the user on 2026-11-02 and 2026-11-04; not implemented (phases
+1–4 open). Equations in MODEL_SPEC section 8a (N1 movement terms, N2
+losses, N3 clock, N4 chain-binomial step, N5 node extinction rule);
+decision D-032 (DECISIONS.md), which also records the choices made in
+writing the specification. Biology from the sources in section 2,
+including Medical and Veterinary Entomology 23, Suppl. 1 (2009).
 
 ## 1. Why
 
@@ -161,35 +163,75 @@ in the interface until there is evidence for it.
 
 ### 5.3 Movement clock (decision 2)
 
-    κ^ℓ(T) = min(1, Δx(T) / Δx(T_ref))   clock = "physiological" (default)
-    κ^ℓ(T) = 1                           clock = "calendar"
+    κ^ℓ(T) = min(κ_max, Δx(T) / Δx(T_ref))   clock = "physiological" (default)
+    κ^ℓ(T) = 1                                clock = "calendar"
 
-The physiological clock is **capped degree-day scaling**: at and above
-T_ref flies move at the given daily rate (calendar time); below T_ref
-movement declines with Δx and stops at the development threshold
-(14.5 °C). Because rates are given at T_ref, field numbers (e.g. a daily
-leave fraction, Matlock & Skoda 2009, measured at about 25–28 °C) go in
-directly. The calendar clock is for wind-borne layers (wind transport does
-not scale with fly development) and for the MGDrivE2 cross-check.
+with T_ref = `movement_t_ref` (default 27 °C) and κ_max =
+`movement_kappa_max`, one value for the model: **1 by default (capped)**,
+`Inf` for uncapped degree-day scaling, values in between allowed. The cap
+is a multiplier, not a temperature, because Δx rises to a maximum near
+36 °C and falls above it, so a cap temperature would be ambiguous. κ_max
+is the same for all layers, so it does not add groups when layers are
+merged (5.4).
+
+* **Capped** (κ_max = 1, default): at and above T_ref flies move at the
+  given daily rate (calendar time); below T_ref movement declines with Δx
+  and stops at the development threshold T_L = 14.5 °C (with
+  `dev_rate_floor` > 0 it keeps a small positive value). κ falls below 1
+  again only above about 41 °C, where Δx drops under Δx(T_ref).
+* **Uncapped** (κ_max = `Inf`): movement per day follows Δx at all
+  temperatures, up to about 1.57× the reference rate near 35–36 °C.
+* **Calendar**: for wind-borne layers (wind transport does not scale
+  with fly development) and for the MGDrivE2 cross-check.
+
+Rates are given at T_ref, so field numbers (e.g. a daily leave fraction,
+Matlock & Skoda 2009, measured at about 25–28 °C) go in directly. 27 °C is
+a reference point near T_opt (27.2 °C), not a biological limit.
+
+**What the clock controls.** Within a node, leaving competes with death
+and ageing, so the clock mainly sets how **lifetime** dispersal changes
+with temperature. Female leave rate 0.17 d⁻¹ at T_ref, default adult chain
+(n_A = 10, X_A = 202.8 dd), temperature mortality μ_T of S2, constant
+temperature (computed 2026-11-04):
+
+| T (°C) | Adult life (d) | Δx / Δx(T_ref) | Moves per lifetime: calendar | capped | uncapped |
+|---|---|---|---|---|---|
+| 18 | 24.6 | 0.28 | 4.19 | 1.17 | 1.17 |
+| 22 | 23.3 | 0.60 | 3.96 | 2.38 | 2.38 |
+| 27 | 16.5 | 1.00 | 2.81 | 2.81 | 2.81 |
+| 30 | 13.1 | 1.24 | 2.24 | 2.24 | 2.77 |
+| 35 | 9.4 | 1.57 | 1.59 | 1.59 | 2.50 |
+
+* Calendar: most lifetime movement in cool weather; flies at 18–22 °C
+  leave at the full summer rate, also on days too cold to fly.
+* Capped: lifetime movement falls in heat (life shortens while the daily
+  rate is fixed).
+* Uncapped: lifetime movement about constant above about 25 °C (the daily
+  rate rises as calendar life shortens).
+* Below T_ref capped and uncapped are identical. Both give less lifetime
+  movement in the cold, because the calendar-time mortality μ_T ends life
+  before many degree-days accumulate; scaling with Δx keeps dispersal only
+  roughly consistent with ageing in degree-days (D-002).
 
 **Evidence and assumptions.** No NWS study relates movement rate to
-temperature or degree-days. The choice makes the fewest assumptions:
+temperature, and no study supports 27 °C or the cap.
 
-* in warm weather it claims nothing beyond the measured daily rate (an
-  uncapped Δx ratio would give about 1.6× more movement at 35 °C than at
-  27 °C, with no evidence);
-* in the cold, less movement has qualitative support (activity falls
+* In the cold, less movement has qualitative support (activity falls
   below about 21 °C in autumn and flies do poorly below about 7 °C;
-  Oklahoma State and Drovers extension notes) and keeps dispersal
-  consistent with ageing in degree-days (D-002): with a calendar clock, a
-  fly that lives many calendar days in cool weather would keep leaving at
-  the full rate, so winter flies would disperse farther per lifetime than
-  summer flies, also on days too cold to fly.
+  Oklahoma State and Drovers extension notes).
+* In heat the two physiological variants differ. Capped claims nothing
+  beyond the measured daily rate; at daily means above about 30 °C midday
+  temperatures are high enough that flies may shelter rather than fly
+  more. Uncapped keeps lifetime dispersal nearly independent of
+  temperature, a reasonable null. The data do not separate them.
+* The shape of the decline below T_ref is borrowed from the development
+  curve as a convenience; a flight-activity curve has its own threshold.
 
-The remaining assumption is the **shape** of the decline below T_ref,
-borrowed from the development curve. The first transect scenario (phase 3)
-compares the capped and calendar clocks; if winter die-back and spring
-spread barely change, the choice does not matter in practice.
+**Sensitivity test (phase 3).** The first transect runs with all three
+clocks (calendar, capped, uncapped). Capped vs uncapped differ only on days
+above T_ref (south Texas summers); calendar vs physiological differ mainly
+on cool days. If winter die-back and spring spread barely change, the
+choice does not matter in practice.
 
 ### 5.4 Equations (ODE)
 
@@ -269,7 +311,7 @@ fractions of a fly.
 whose fly population (E, L, P, M, U, F, all genotypes) totals less than
 `extinction_threshold` (default 1 individual) is set to zero. In the
 host-wound model, its infested hosts end their infestation as when the
-larvae leave (exact rule in the MODEL_SPEC section, phase 0). The amount
+larvae leave and are counted in infestations_ended (MODEL_SPEC N5). The amount
 removed is counted per node (a counter), so the conservation checks still
 balance. The ODE is integrated one day at a time, so the rule costs
 nothing and does not disturb the step-size control.
@@ -280,9 +322,9 @@ nothing and does not disturb the step-size control.
 * Spread, die-back and recolonisation questions use either the ODE with
   the rule on or the chain-binomial solver (integer counts, no
   atto-flies). The phase 3 transect runs both.
-* Whether the rule should be on by default for more than one node is an
-  open point for the user (a default that depends on the run is less
-  predictable).
+* Off by default also for more than one node (decision 12, user,
+  2026-11-04): the rule stays an optional feature, not a default that
+  depends on the run.
 
 ### 5.8 Later options (not v0.2)
 
@@ -307,7 +349,8 @@ nothing and does not disturb the step-size control.
   host density, role ("study" or "source"). Default: one study node.
 * `sg_movement_layer(rate, dest, clock = "physiological")`: `rate` a named
   list or matrix of leave rates per day at T_ref (`movement_t_ref` in
-  `sg_params()`) for `male`, `virgin`, `mated` (scalar or one per node);
+  `sg_params()`; the cap of the physiological clock is
+  `movement_kappa_max`, 5.3) for `male`, `virgin`, `mated` (scalar or one per node);
   `dest` a sparse destination matrix with rows ≤ 1, shared by the three
   classes. Validates dimensions, π_ii = 0, rows ≤ 1, rates ≥ 0.
 * `sg_model(..., landscape = , movement = )`: `movement` is one layer or a
@@ -364,7 +407,10 @@ For each layer, node and class, at T_ref:
 * expected number of moves per lifetime δ E[τ] and, with coordinates,
   expected path length per lifetime (δ E[τ] Σ_j π_ij d_ij) and implied
   D = δ Σ_j π_ij d_ij² / (2 · dimension);
-* share of movers lost from the landscape.
+* share of movers lost from the landscape;
+* optionally, the lifetime numbers above over a range of constant
+  temperatures, with the clock and κ_max in use (the table of 5.3), so the
+  effect of the clock on lifetime dispersal is visible.
 
 Also included in `check_model()`. Warnings for a lifetime leave probability
 above 0.99 and for κδ dt above 0.5 in the chain-binomial step; the
@@ -415,7 +461,7 @@ sim <- simulate_ode(model, record = rec, output_every = 1)
   genotype, mate genotype, node, host state, and group with `by`;
   `sg_quantity_weights(W)` takes any user matrix.
 * Built-in sets: `"totals"` (the current block × genotype totals, per
-  node; the default) in phase 1; others (`"adults_by_node"`,
+  node; whether it becomes the default is decision 13) in phase 1; others (`"adults_by_node"`,
   `"cases_by_node"`, `"alleles"`) added when a scenario needs them.
 * `output_every` (every k days) as now.
 * `sg_totals()`, `sg_cases()`, `sg_hosts()` and allele frequencies read
@@ -469,7 +515,9 @@ phases 1–2 as planned (ODE in phase 1, chain-binomial in phase 2), not as
 a stand-alone step before phase 1, although it needs nothing from
 movement.
 
-Open point (for the user to decide when implementation starts):
+Open point (deferred by the user, 2026-11-04, decision 13: decided once
+the recorder is fully integrated in the package; until then v0.1's full
+`sim$state` stays the default output):
 
 * **Change from v0.1.** v0.1 returns full states (`sim$state`), read in
   `R/outputs.R`, `R/checks.R`, `R/init-steady.R`, `R/simulate.R`,
@@ -499,8 +547,11 @@ Open point (for the user to decide when implementation starts):
   loss counter.
 * Genotype, mate genotype and sub-stage preserved by moves.
 * Clocks: calendar rates constant; physiological rates scale with Δx below
-  T_ref, are zero at and below the development threshold, and equal the
-  given rates at and above T_ref.
+  T_ref and are zero at and below the development threshold; with
+  κ_max = 1 they equal the given rates from T_ref to about 41 °C; with
+  κ_max = `Inf` they follow Δx / Δx(T_ref) at all temperatures; an
+  intermediate κ_max caps κ at that value. The lifetime moves of the 5.3
+  table are reproduced by `check_movement()`.
 * R reference vs C++: rates (ODE) and draws (CB), as in
   `test-rates-cpp.R` and `test-backend-equivalence.R`.
 * Deterministic CB map vs ODE as dt → 0.
@@ -526,7 +577,7 @@ Open point (for the user to decide when implementation starts):
 * Recorder: every recorded quantity equals the same sum computed in R
   from a full-state run (`record = "state"`), for both solvers and every
   replicate; period sums of counters equal the sums of the daily
-  counters; the default `"totals"` matches the v0.1 totals for one node.
+  counters; `"totals"` matches the v0.1 totals for one node.
 * Optional: two-node cross-check against MGDrivE2fast in the
   mosquito-like limit (M6), calendar clock, U rate 0 (MGDrivE2 does not
   move unmated females). The costliest test to set up; the symmetric
@@ -558,8 +609,8 @@ aim is to keep it linear and avoid the traps below.
    chain-binomial). 30,000 states × 365 days × 24 years is about 260
    million doubles (2 GB) per run, more with replicates; all counters
    every day add about 500 MB. The recorder (section 7.1) stores only the
-   requested quantities, computed in C++ during the run; the default is
-   `"totals"` per node; full states only with `record = "state"`. The
+   requested quantities, computed in C++ during the run (e.g. `"totals"`
+   per node); the default output is decision 13. The
    `max_memory` check applies to both solvers.
 
 ### 8a.2 Savings
@@ -626,10 +677,11 @@ and M4, so speed regressions are visible. Targets:
 
 ## 9. Implementation plan (work packages)
 
-### Phase 0. Specification
-MODEL_SPEC movement section (N1, N2, 5.3, 5.6, the node extinction rule
+### Phase 0. Specification (done 2026-11-04)
+MODEL_SPEC section 8a (N1–N5) (N1, N2, 5.3, 5.6, the node extinction rule
 of 5.7 as an exception to "no population floors"); D-032; parameter-table
-entry (`movement_t_ref` default); this note's decisions.
+entries (`movement_t_ref` = 27 °C, `movement_kappa_max` = 1); this note's
+decisions.
 
 ### Phase 1. Landscape, one layer, ODE
 * `sg_landscape()` with node roles; `sg_movement_layer()`;
@@ -655,7 +707,8 @@ entry (`movement_t_ref` default); this note's decisions.
 * Recorder (7.1) for the ODE: `sg_record()`, `sg_quantity()`,
   `sg_counter()`, `sg_quantity_weights()`; W_x and W_c in compressed
   sparse row form in `ModelView`; the products in the C++ output step;
-  final state kept; the `"totals"` set as the default; `record = "state"`.
+  final state kept; the `"totals"` set; `record = "state"` (full states
+  stay the default until decision 13 is made).
 
 ### Phase 2. Chain-binomial movement
 Section 5.6 in `.sg_cb_step_r()` and `cb_step.cpp`; counters (emigrants,
@@ -687,8 +740,9 @@ estimate from the recorder's size.
   on (5.7), and once with the rule off to show the atto-fly effect. Checks:
   winter die-back in the north, spring recolonisation, front speed against
   80–160 km per generation with local movement only (expected to be too
-  slow, section 2); the same run with the calendar clock, to see whether
-  the clock choice matters (section 5.3).
+  slow, section 2); the same run with all three clocks (calendar, capped
+  κ_max = 1, uncapped κ_max = `Inf`), to see whether the clock choice
+  matters for die-back and spring spread (section 5.3).
 ### Phase 4. Several layers
 * Lists of layers in `sg_model()`; a schedule per layer (one daily
   multiplier, the same in every node; section 5.2). Mostly R work: layers
@@ -727,14 +781,19 @@ kept sparse (cutoff). Realistic host numbers (about 1000 km² per node or
 more) as for the host model. Performance rules and
 targets: section 8a.
 
-## 10. Decisions (made by the user, 2026-11-02)
+## 10. Decisions (made by the user, 2026-11-02; 12–13 and revision of 2 on 2026-11-04)
 
 1. Unmated females (U) move.
-2. Movement clock: capped degree-day scaling, κ = min(1, Δx(T)/Δx(T_ref)),
-   rates given per day at T_ref; calendar clock available per layer. No
-   direct evidence for either clock; the cap avoids claiming more movement
-   in heat, the decline in the cold has qualitative support (section 5.3).
-   Revised 2026-11-02 from uncapped degree-day scaling.
+2. Movement clock: degree-day scaling with an adjustable cap,
+   κ = min(κ_max, Δx(T)/Δx(T_ref)), rates given per day at T_ref = 27 °C;
+   `movement_kappa_max` = 1 by default (capped), `Inf` for uncapped;
+   calendar clock available per layer. No study supports 27 °C, the cap or
+   any of the clocks: the cap avoids claiming more daily movement in heat,
+   uncapped keeps lifetime dispersal nearly constant in warm weather, and
+   the decline in the cold has qualitative support (section 5.3). The
+   clock is therefore a sensitivity dimension: the phase 3 transect runs
+   calendar, capped and uncapped. Revised 2026-11-02 from uncapped to
+   capped; revised 2026-11-04 to make the cap a parameter (user).
 3. Parameterisation: raw rates and destination probabilities as the only
    model input (MGDrivE2 style), with constructors that take a
    user-supplied kernel, exact conversion helpers and `check_movement()`
@@ -755,8 +814,8 @@ targets: section 8a.
    series) deferred until a scenario needs them.
 9. Outputs: a recorder stores only the quantities requested (weighted sums
    of states and of counters, computed in C++ during the run; ratios in R
-   afterwards), with `"totals"` as the default and full states only on
-   request (section 7.1).
+   afterwards), with full states available through `record = "state"`
+   (section 7.1); the default output is decision 13.
 10. The recorder is built in phases 1–2 as planned (ODE in phase 1,
     chain-binomial in phase 2), not earlier as a stand-alone step; it also
     serves one-node runs with many genotypes (section 7.1).
@@ -776,6 +835,12 @@ targets: section 8a.
     * fixed habitat differences through per-node rates; host-dependent
       dispersal stays a later option (5.8);
     * MGDrivE2fast cross-check optional (section 8).
+12. The ODE node extinction rule stays optional and off by default, also
+    for multi-node runs (user, 2026-11-04; section 5.7).
+13. Whether `"totals"` replaces v0.1's full `sim$state` as the default
+    output everywhere is decided once the recorder is fully integrated in
+    the package (user, 2026-11-04; section 7.1). Until then full states
+    remain the default and `"totals"` is available on request.
 
 ## References
 

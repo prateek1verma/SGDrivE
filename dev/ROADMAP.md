@@ -15,7 +15,7 @@
 
 | Version | Adds |
 |---|---|
-| v0.2 | Multiple nodes and fly movement |
+| v0.2 | Multiple nodes and fly movement (specified: MODEL_SPEC section 8a, D-032, dev/MOVEMENT_DESIGN.md) |
 | v0.3 | Host and wound model; modelled case counts |
 | v0.4 | Host movement, larval transport, quarantine and treatment |
 | later | Explicit gonotrophic cycle; male mating capacity |

@@ -23,6 +23,8 @@ Source tags: **[GP2014]** Gutierrez & Ponti (2014) paper or Pascal code;
 * Wounds: a fixed number of wounds (`wound_model = "static"`, default), or
   the stage-1 host-wound model (`"hosts"`, section 7a, D-030) with hosts
   that are wounded, heal and are infested, one host class.
+* v0.2 (specified 2026-11-04, D-032; not yet implemented): several nodes
+  and adult movement, section 8a (N1–N5).
 * Not in v0.1: movement, several host classes, host demography and
   myiasis mortality, seasonal wounding, larval transport, explicit
   gonotrophic cycle, male mating capacity.
@@ -279,6 +281,138 @@ females go directly to F_{g,m,1} with weights π_{g,m}, or to U_{g,1} only when
 M̄ = 0; U then mates at rate ν once males appear. Equivalent to the limit
 ν → ∞ with X_rec = 0, without stiffness.
 
+## 8a. Several nodes and adult movement (v0.2, D-032)
+
+Design note: dev/MOVEMENT_DESIGN.md (biology, interface, outputs, work
+packages). Specified 2026-11-04 (phase 0); implemented in phases 1–4 of
+that note: ODE with one movement group (phase 1), chain-binomial (phase 2),
+several groups and schedules (phase 4). With one node and no movement the
+model is that of the other sections, bitwise for the ODE.
+
+**Nodes.** A landscape has nodes i = 1, …, n_N. Each node has its own area
+A_i, daily forcing (temperature T_i(t), rainfall), wounds H_i = wound
+density × A_i or hosts N_H,i = host density × A_i, releases, a role
+("study" or "source") and optional coordinates; all other parameters are
+shared. Every quantity of sections 4–9 is computed per node from that
+node's forcing and states: S1–S4, the wound search S8, male availability
+S12 (with h_M A_i), larval crowding S7 and the host model H1–H3 involve
+only the node's own states. States keep the index order of CONVENTIONS with
+the node slowest, so node i's block starts at (i − 1) × (states per node)
+and every single-node offset is an offset within a node. Source nodes are
+simulated like study nodes; the role only selects the default outputs.
+
+**What moves.** Adults only, classes s ∈ {M, U, F} (unmated females move).
+A mover keeps its genotype g, mate genotype m (F) and sub-stage a:
+X_{i,g,(m),a} → X_{j,g,(m),a}, so maturity thresholds (S6) are unaffected
+and a mated female carries her mate's sperm. Eggs, larvae, pupae and hosts
+do not move (v0.4).
+
+**Layers and groups.** A movement layer ℓ has leave rates δ^ℓ_{s,i} ≥ 0
+(d⁻¹ at T_ref, by class and node), destination probabilities π^ℓ_{ij} ≥ 0
+with π^ℓ_{ii} = 0 and Σ_j π^ℓ_{ij} ≤ 1 (one matrix for all classes), a
+clock (N3) and a schedule m^ℓ(t) ≥ 0 (one value per day, the same in every
+node; default 1; from phase 4). Before the run, layers with the same clock
+and schedule are merged into one group G:
+
+    δ^G_{s,i}  = Σ_{ℓ∈G} δ^ℓ_{s,i}
+    π^G_{s,ij} = Σ_{ℓ∈G} δ^ℓ_{s,i} π^ℓ_{ij} / δ^G_{s,i}       (0 when δ^G_{s,i} = 0)
+
+The merged destinations depend on the class when the layers' rates do. The
+equations below use groups only; the result does not depend on the order of
+the layers. A factor by adult sub-stage multiplying δ (e.g. for laying
+females) is reserved; it is 1 in v0.2 and not exposed.
+
+**(N3) Movement clock.** For group G and node i on day t:
+
+    κ^G_i(t) = min(κ_max, Δx(T_i(t)) / Δx(T_ref))        clock = "physiological" (default)
+    κ^G_i(t) = 1                                         clock = "calendar"
+    λ^G_{s,i}(t) = κ^G_i(t) m^G(t) δ^G_{s,i}             effective leave rate [d⁻¹]
+
+with Δx from S1 (including dx_floor), T_ref = `movement_t_ref` (27 °C;
+must exceed T_L so that Δx(T_ref) > 0) and κ_max = `movement_kappa_max`
+(1 by default: the given rate at and above T_ref; `Inf`: uncapped
+degree-day scaling). λ is constant within a day, like the other
+temperature-driven terms. With the default dx_floor = 0, movement on the
+physiological clock stops at and below T_L. Evidence and the effect of the
+clock on lifetime dispersal: design note section 5.3.
+
+**(N1) Movement terms (ODE).** Added to S13 for every adult compartment X of
+class s (each genotype, mate genotype and sub-stage):
+
+    dX_j/dt += Σ_G [ Σ_i λ^G_{s,i} π^G_{s,ij} X_i − λ^G_{s,j} X_j ]
+
+The terms are linear in the states.
+
+**(N2) Losses from the landscape.** Of the flies leaving node i in group G,
+the share 1 − Σ_j π^G_{s,ij} leaves the landscape:
+
+    lost_{s,i} = Σ_G λ^G_{s,i} (1 − Σ_j π^G_{s,ij}) X_i
+
+Rows summing to 1 are closed edges, rows summing below 1 open edges.
+Counters per node and class: emigrants (Σ_G λ^G_{s,i} X_i), immigrants and
+lost. Movement changes the network total of each compartment only through
+the losses; with closed edges emigrants and immigrants sum to the same
+network total.
+
+**(N4) Chain-binomial movement step.** After the chain moves (S16) and
+before emergence (S19) and arrivals. For each adult compartment in state
+order (node slowest; within a node M, U, F, then genotype, mate genotype,
+sub-stage), with X its count after S16, λ_{s,i} = Σ_G λ^G_{s,i} and
+w_G = λ^G_{s,i} / λ_{s,i}:
+
+    E                   ~ Binomial(X, 1 − e^{−λ_{s,i} dt})          emigrants
+    p_ij = Σ_G w_G π^G_{s,ij},     p_lost = Σ_G w_G (1 − Σ_j π^G_{s,ij})
+    ((E_j)_j, E_lost)   ~ Multinomial(E; p_{i·}, p_lost)            destinations, lost
+
+The multinomial is drawn as sequential conditional binomials over the
+destinations j in increasing node order (the union of the groups' edges
+from node i, fixed at setup), then lost. Emigrants are removed when drawn;
+immigrants are added after every compartment has been drawn, so no fly
+moves twice in a step, and they meet the hazards of their new node from the
+next step (first-order operator splitting; movement changes neither age nor
+genotype). One emigration draw per compartment, however many groups;
+p is recomputed only when κ or m changes (once a day). A compartment with
+X = 0 or λ_{s,i} = 0 uses no random numbers, so skipping empty nodes keeps
+the draw-for-draw match between the R and C++ steps. Counters: emigrants,
+immigrants and lost, as integers. In the deterministic map each draw is
+replaced by its expectation; it converges to N1–N2 as dt → 0.
+
+**(N5) Node extinction rule (ODE, optional).** In the ODE, movement puts
+tiny amounts into every connected node, and a node dying out decays towards
+zero without reaching it; without an Allee effect such fractions of a fly
+grow again ("atto-flies"). With `simulate_ode(node_extinction = TRUE)`
+(default `FALSE`, also for several nodes; D-032), at the end of each day,
+after the day is integrated and before the next day's releases, every node
+whose fly total (E, L, P, M, U, F over all genotypes, mate genotypes and
+sub-stages) is below `extinction_threshold` (default 1 individual) has all
+its fly compartments set to zero. In the host-wound model its infested
+hosts return to S, as at the end of an infestation (H1), and are counted
+in infestations_ended. The removed individuals are counted per node and
+stage (counter `removed`), so flow balances still close. This is the only
+exception to "no population floors" (section 10). It applies to any number
+of nodes; the chain-binomial solver does not use it (integer counts).
+
+**Releases, initial states and checks.** Releases are given per node
+(`sg_releases(node = )`); sizes per km² use A_i. Initial states are given
+per node; `"burn_in"` runs the multi-node ODE with movement.
+`"equilibrium"` and `"threshold"` (section 11) are computed per node from
+that node's quantities without movement: exact for a node whose net
+movement is zero (e.g. identical nodes, symmetric movement, closed edges),
+otherwise a starting point for a burn-in. R0 (`sg_r0()`) is per node and
+local (without movement); with open edges or movement into unsuitable nodes
+the growth of the landscape can be lower. `check_movement()` (design note
+6.2) translates the rates into lifetime leave probability, path length and
+implied D, and warns when λ dt > 0.5 in the chain-binomial step.
+
+**Solvers.** ODE: one system for all nodes, integrated day by day with one
+step size. The `lsoda` stiff fallback (dense Jacobian) is off by default for
+more than one node, and asking for it then is an error. Chain-binomial: one
+dt for all nodes.
+
+**Outputs.** States and counters per node; summaries report study nodes by
+default and source nodes on request. Which quantities a run stores (the
+recorder) and the spread metrics: design note section 7.
+
 ## 9. Releases (D-005)
 
 Release events at day boundaries add individuals of a release genotype r:
@@ -411,6 +545,7 @@ the rest die at emergence. Survivors arrive in the adult chains (S16, S18).
 m fastest: events, fertile events, then eggs, then split); hosts (H3, host-wound
 model); mating (S18, genotype then sub-stage); chain moves (S16) block by
 block (E, L, P, M, U, F) and compartment by compartment in state order;
+movement (N4, several nodes; adult compartments in state order);
 emergence (S19, by genotype); arrivals block by block in state order (eggs
 by genotype, larvae, pupae, males; then females by genotype: death, mating,
 mates, placement of unmated, placement of mated by mate genotype). All draws
@@ -430,8 +565,9 @@ bias in each replicate: x → ⌊x⌋ + Bernoulli(x − ⌊x⌋). Counts never b
 negative. Random numbers come from R's generator; replicate r uses
 L'Ecuyer-CMRG stream r derived from the seed (D-022).
 
-**Extinction.** No population floors. A stochastic replicate is extinct on
-the first day that ends with every fly compartment at zero (host states do
+**Extinction.** No population floors, except the optional node extinction
+rule of the ODE (N5). A stochastic replicate is extinct on the first day
+that ends with every fly compartment of every node at zero (host states do
 not count; host-mode runs continue, as the hosts keep changing). Eradication
 summaries with an extinction threshold (default 1 individual) for the ODE
 follow in M5.
@@ -578,8 +714,14 @@ parameters by descriptive names (D-027). Symbol, name, default and units:
 | n_I | `infestation_substages` | 6 | - |
 | alpha | `infested_wound_attractiveness` | 1 | - |
 | kappa | `treatment_rate` | 0 | d^-1 |
+| T_ref | `movement_t_ref` | 27 | degC |
+| kappa_max | `movement_kappa_max` | 1 | - |
 
 `larval_crowding_mode` also takes `"per_infested_host"` (host-wound model).
+`movement_t_ref` and `movement_kappa_max` (N3, v0.2) enter `R/param-table.R`
+with the movement code (phase 1 of the design note); `movement_kappa_max`
+takes `Inf` for uncapped scaling. The node extinction rule (N5) is an
+argument of `simulate_ode()`, not a parameter.
 
 Cube-derived quantities (ℓ_g, φ_g, ξ_F,g, ξ_M,g, s_g, η, ih, τ) come from
 `sg_cube()`; the node area A comes from `sg_model()`.
