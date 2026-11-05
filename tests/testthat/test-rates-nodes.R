@@ -2,6 +2,9 @@
 # 8a, N1-N3, D-032): the C++ kernel against the R reference, each node
 # against the one-node model, conservation, losses and the movement clock.
 
+# built once at the top level, so helper functions below can use it
+rn_cube <- sg_cube(sg_test_cube_mendelian())
+
 rn_params <- function(hosts = FALSE, ...) {
   if (hosts) {
     sg_params(
@@ -112,7 +115,7 @@ test_that("without movement each node has the rates of its own one-node model", 
 
 # Movement part of the derivatives and its counters (C++ kernel).
 rn_movement_part <- function(p, layer, x = NULL, day = 3L,
-                             cube = sg_cube(sg_test_cube_mendelian())) {
+                             cube = rn_cube) {
   land <- rn_landscape(p)
   m0 <- sg_model(p, cube, landscape = land)
   m1 <- sg_model(p, cube, landscape = land, movement = layer)
@@ -183,7 +186,7 @@ rn_lambda <- function(temps, layer_clock = "physiological", ...) {
   dest <- matrix(1 / (n - 1), n, n)
   diag(dest) <- 0
   layer <- sg_movement_layer(list(male = 0, virgin = 0, mated = 0.2), dest, clock = layer_clock)
-  m <- sg_model(p, sg_cube(sg_test_cube_mendelian()), landscape = land, movement = layer)
+  m <- sg_model(p, rn_cube, landscape = land, movement = layer)
   x <- numeric(m$n_states)
   x[sg_state_index(m, "F")] <- 1
   v <- .sg_model_view(m)
