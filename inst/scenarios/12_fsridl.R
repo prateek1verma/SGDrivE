@@ -84,7 +84,7 @@ cube
 # 3. Weather and the wild population ------------------------------------------
 # A region holding wild_adults adults (half of them female) at the
 # equilibrium of the constant temperature, without releases.
-p <- sg_params(female_background_mortality=0.1,male_background_mortality=0.12)
+p <- sg_params(female_background_mortality = 0.1, male_background_mortality = 0.12)
 forcing <- sg_forcing(sg_constant_weather(temperature, days = days), p)
 wild <- sg_model(p, cube, forcing, adult_females = wild_adults / 2)
 wild
@@ -142,26 +142,32 @@ ggplot(wt_cb, aes(day, wild_type, group = replicate)) +
 # Frequency of allele H among adult males: high during releases, then
 # carried on by sons for a few generations and lost (self-limiting).
 
-# h_cb <- sg_allele_freq(cb, stages = "males")
-# h_cb <- h_cb[h_cb$allele == "H", ]
-# h_ode <- sg_allele_freq(ode, stages = "males")
-# h_ode <- h_ode[h_ode$allele == "H", ]
-# ggplot(h_cb, aes(day, freq, group = replicate)) +
-#   annotate("rect",
-#     xmin = release_window[1], xmax = release_window[2],
-#     ymin = -Inf, ymax = Inf, fill = "#E69F00", alpha = 0.12
-#   ) +
-#   geom_line(colour = "#009E73", alpha = 0.45, linewidth = 0.4) +
-#   geom_line(data = h_ode, aes(day, freq), colour = "black", linewidth = 0.8,
-#             inherit.aes = FALSE) +
-#   scale_x_continuous(breaks = seq(0, days, by = 90)) +
-#   coord_cartesian(xlim = c(0, days), ylim = c(0, 1)) +
-#   labs(
-#     x = "days", y = "frequency of H among adult males",
-#     title = "fsRIDL transgene among adult males",
-#     subtitle = "stochastic replicates (green), ODE (black); shaded: release period"
-#   ) +
-#   theme_minimal()
+# The plot is off by default; set plot_transgene to TRUE to draw it.
+plot_transgene <- FALSE
+if (plot_transgene) {
+  h_cb <- sg_allele_freq(cb, stages = "males")
+  h_cb <- h_cb[h_cb$allele == "H", ]
+  h_ode <- sg_allele_freq(ode, stages = "males")
+  h_ode <- h_ode[h_ode$allele == "H", ]
+  print(ggplot(h_cb, aes(day, freq, group = replicate)) +
+    annotate("rect",
+      xmin = release_window[1], xmax = release_window[2],
+      ymin = -Inf, ymax = Inf, fill = "#E69F00", alpha = 0.12
+    ) +
+    geom_line(colour = "#009E73", alpha = 0.45, linewidth = 0.4) +
+    geom_line(
+      data = h_ode, aes(day, freq), colour = "black", linewidth = 0.8,
+      inherit.aes = FALSE
+    ) +
+    scale_x_continuous(breaks = seq(0, days, by = 90)) +
+    coord_cartesian(xlim = c(0, days), ylim = c(0, 1)) +
+    labs(
+      x = "days", y = "frequency of H among adult males",
+      title = "fsRIDL transgene among adult males",
+      subtitle = "stochastic replicates (green), ODE (black); shaded: release period"
+    ) +
+    theme_minimal())
+}
 
 # Notes
 # * Unlike SIT and pgSIT males, fsRIDL males are fertile: their sons survive
