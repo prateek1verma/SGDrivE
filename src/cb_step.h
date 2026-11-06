@@ -158,6 +158,14 @@ class CbStepper {
   std::vector<double> cur_, nx_;      // state at step start (after mating), new state
   std::vector<double> ym_;
   std::vector<double> buf_, rest_;    // multinomial output and work
+  // movement (N4): destinations of each node, the union of the groups' edges
+  // in increasing node order (CSR), and the union position of every group
+  // edge; per day the probability of leaving [3, n_node], the destination
+  // probabilities [3, union edges] and the probability of being lost
+  // [3, n_node]; immigrants of the step; one row's probabilities
+  std::vector<int> move_row_ptr_, move_col_, move_map_;
+  std::vector<double> move_pe_, move_prob_, move_lost_, imm_;
+  std::vector<double> move_p_, move_buf_, move_rest_;
 
   void prepare(PreparedChain& ch, ChainAdvance& adv, const double* q, int n, int last,
                double mu);
@@ -170,6 +178,9 @@ class CbStepper {
   void part1(int node, D& draws);
   template <class D>
   void part3(int node, double* flows, D& draws);
+  void prepare_movement(int day);
+  template <class D>
+  void movement(double* move_counters, D& draws);
 };
 
 // ---- template members --------------------------------------------------------
@@ -208,14 +219,54 @@ void CbStepper::step(double* x, double* flows, D& draws) {
   std::copy(x, x + v.n_states, cur_.begin());
   std::fill(nx_.begin(), nx_.end(), 0.0);
   for (int i = 0; i < v.n_node; ++i) part1(i, draws);
-  // movement of all nodes (N4): phase 2 WP3
+  if (v.n_groups > 0) movement(flows + static_cast<std::size_t>(v.n_node) * v.n_counters_node, draws);
   for (int i = 0; i < v.n_node; ++i) {
     part3(i, flows + static_cast<std::size_t>(i) * v.n_counters_node, draws);
   }
-  const int n_move = v.n_counters - v.n_node * v.n_counters_node;
-  std::fill(flows + v.n_node * v.n_counters_node, flows + v.n_node * v.n_counters_node + n_move,
-            0.0);
   std::copy(nx_.begin(), nx_.end(), x);
+}
+
+// (N4) Movement of all nodes, between part 1 and part 3: the adults after
+// the chain moves (in nx_) leave with the day's probability, compartment by
+// compartment in state order (node slowest; M, U, F; genotype, mate genotype,
+// sub-stage); emigrants are split over the destinations in increasing node
+// order and "lost" (sequential conditional binomials); immigrants are added
+// after all draws, so no fly moves twice in a step. Counters: emigrants,
+// immigrants and lost by class for each node (9 per node).
+template <class D>
+void CbStepper::movement(double* mc, D& draws) {
+  const ModelView& v = mv_;
+  const int ng = v.n_g, nA = v.n_A;
+  const int block_off[3] = {v.offsets[kM], v.offsets[kU], v.offsets[kF]};
+  const int block_len[3] = {ng * nA, ng * nA, ng * ng * nA};
+  std::fill(mc, mc + ModelView::kMoveCounters * v.n_node, 0.0);
+  std::fill(imm_.begin(), imm_.end(), 0.0);
+  for (int i = 0; i < v.n_node; ++i) {
+    const std::size_t base = static_cast<std::size_t>(i) * v.node_stride;
+    const int e0 = move_row_ptr_[i], deg = move_row_ptr_[i + 1] - move_row_ptr_[i];
+    for (int s = 0; s < 3; ++s) {
+      const double pe = move_pe_[static_cast<std::size_t>(i) * 3 + s];
+      if (pe == 0.0) continue;
+      for (int d = 0; d < deg; ++d) move_p_[d] = move_prob_[static_cast<std::size_t>(e0 + d) * 3 + s];
+      move_p_[deg] = move_lost_[static_cast<std::size_t>(i) * 3 + s];
+      double* x = nx_.data() + base + block_off[s];
+      for (int k = 0; k < block_len[s]; ++k) {
+        if (x[k] == 0.0) continue;
+        const double e = draws.binom(x[k], pe);
+        if (e == 0.0) continue;
+        x[k] -= e;
+        mc[i * ModelView::kMoveCounters + s] += e;  // emigrants
+        draws.multinom(e, move_p_.data(), deg + 1, move_buf_.data(), move_rest_.data());
+        for (int d = 0; d < deg; ++d) {
+          const int j = move_col_[e0 + d];
+          imm_[static_cast<std::size_t>(j) * v.node_stride + block_off[s] + k] += move_buf_[d];
+          mc[j * ModelView::kMoveCounters + 3 + s] += move_buf_[d];  // immigrants
+        }
+        mc[i * ModelView::kMoveCounters + 6 + s] += move_buf_[deg];  // lost
+      }
+    }
+  }
+  for (std::size_t q = 0; q < nx_.size(); ++q) nx_[q] += imm_[q];
 }
 
 // Part 1 of node i's step: aggregates (S15), eggs (S17), hosts (H3), mating

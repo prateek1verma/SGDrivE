@@ -175,6 +175,8 @@
   work <- lapply(seq_len(s$n_node), function(i) {
     .sg_cb_part1(x[at(i)], info$nodes[[i]], s$node_setups[[i]], dt, draw)
   })
+  moved <- .sg_cb_move_r(work, info$day, s, dt, draw)
+  work <- moved$work
   new_x <- numeric(length(x))
   node_flows <- vector("list", s$n_node)
   for (i in seq_len(s$n_node)) {
@@ -182,11 +184,98 @@
     new_x[at(i)] <- r$x
     node_flows[[i]] <- unname(r$flows)
   }
-  all_flows <- unlist(node_flows)
-  n_move <- length(s$counter_names) - length(all_flows)
-  all_flows <- c(all_flows, numeric(n_move)) # movement counters: phase 2 WP3
+  all_flows <- c(unlist(node_flows), moved$counters)
   names(all_flows) <- s$counter_names
   list(x = new_x, flows = all_flows)
+}
+
+# Movement of all nodes in a chain-binomial step (N4): after part 1 of every
+# node (adults after the chain moves: new_m, new_u, new_f of each node's
+# work), emigrants of each adult compartment in state order (node slowest;
+# M, U, F; genotype, mate genotype, sub-stage), then their destinations in
+# increasing node order and "lost" (sequential conditional binomials);
+# immigrants are added after all draws. Returns the updated work and the
+# movement counters (emigrants, immigrants, lost by class M, U, F for each
+# node), or the work unchanged without movement.
+.sg_cb_move_r <- function(work, day, s, dt, draw) {
+  mv <- s$movement
+  if (is.null(mv)) {
+    return(list(work = work, counters = numeric(0)))
+  }
+  n_node <- s$n_node
+  sh <- .sg_cb_move_shares(mv, day, s, dt)
+  blocks <- c("new_m", "new_u", "new_f")
+  emig <- immig <- lost <- matrix(0, 3L, n_node)
+  arriving <- lapply(work, function(w) lapply(blocks, function(b) w[[b]] * 0))
+  for (i in seq_len(n_node)) {
+    for (cl in 1:3) {
+      pe <- sh$emigrate[cl, i]
+      if (pe == 0) next
+      x <- work[[i]][[blocks[cl]]]
+      dest <- sh$dest[[i]]
+      prob <- c(sh$prob[[i]][cl, ], sh$lost[cl, i])
+      for (k in seq_along(x)) {
+        if (x[k] == 0) next
+        e <- draw$binom(x[k], pe)
+        if (e == 0) next
+        x[k] <- x[k] - e
+        emig[cl, i] <- emig[cl, i] + e
+        to <- draw$multinom(e, prob)
+        for (d in seq_along(dest)) {
+          j <- dest[d]
+          arriving[[j]][[cl]][k] <- arriving[[j]][[cl]][k] + to[d]
+          immig[cl, j] <- immig[cl, j] + to[d]
+        }
+        lost[cl, i] <- lost[cl, i] + to[length(to)]
+      }
+      work[[i]][[blocks[cl]]] <- x
+    }
+  }
+  for (i in seq_len(n_node)) {
+    for (cl in 1:3) work[[i]][[blocks[cl]]] <- work[[i]][[blocks[cl]]] + arriving[[i]][[cl]]
+  }
+  list(work = work, counters = as.vector(rbind(emig, immig, lost)))
+}
+
+# Daily movement shares of a chain-binomial step: for each class (rows male,
+# virgin, mated) and node, the probability of leaving within dt
+# (1 - exp(-lambda dt), lambda summed over the groups with their clock kappa),
+# the destinations (union of the groups' edges, increasing node order), the
+# probability of each destination and of being lost, the groups weighted by
+# their share w_G = lambda^G / lambda (N4).
+.sg_cb_move_shares <- function(mv, day, s, dt) {
+  n_node <- s$n_node
+  dx <- vapply(s$node_setups, function(ns) ns$forcing$dx[day], 0)
+  lam_g <- lapply(mv$groups, function(g) {
+    kappa <- if (g$clock == "calendar") rep(1, n_node) else pmin(mv$kappa_max, dx / mv$dx_ref)
+    sweep(g$rate, 2L, kappa, `*`) # [class, node]
+  })
+  lam <- Reduce(`+`, lam_g)
+  emigrate <- ifelse(lam > 0, -expm1(-lam * dt), 0)
+  dest <- vector("list", n_node)
+  prob <- vector("list", n_node)
+  lost <- matrix(0, 3L, n_node)
+  for (i in seq_len(n_node)) {
+    edges <- lapply(mv$groups, function(g) {
+      seq.int(g$row_ptr[i], length.out = g$row_ptr[i + 1L] - g$row_ptr[i])
+    })
+    dest[[i]] <- sort(unique(unlist(Map(function(g, e) g$col[e], mv$groups, edges))))
+    pr <- matrix(0, 3L, length(dest[[i]]))
+    for (k in seq_along(mv$groups)) {
+      g <- mv$groups[[k]]
+      for (cl in 1:3) {
+        if (lam[cl, i] == 0) next
+        w <- lam_g[[k]][cl, i] / lam[cl, i]
+        for (e in edges[[k]]) {
+          d <- match(g$col[e], dest[[i]])
+          pr[cl, d] <- pr[cl, d] + w * g$prob[cl, e]
+        }
+        lost[cl, i] <- lost[cl, i] + w * g$loss[cl, i]
+      }
+    }
+    prob[[i]] <- pr
+  }
+  list(emigrate = emigrate, dest = dest, prob = prob, lost = lost)
 }
 
 # Part 1 of a step of one node (S15, S17, H3, S18, S16): returns everything

@@ -102,6 +102,13 @@ fractions of flies, and the recorder of phase 1 for stochastic runs.
   genotype, mate and sub-stage; one step from one node on a ring 1 -> 2 -> 3
   leaves node 3 empty; statistics of emigrant counts and destination splits
   (binomial and multinomial means and variances).
+* *Done (2026-11-05):* `.sg_cb_move_r()` and `.sg_cb_move_shares()` in R,
+  `CbStepper::prepare_movement()` (once a day, with `prepare_day()`) and
+  `CbStepper::movement()` in C++; the union of the groups' edges per node
+  is built once in the constructor. C++ = R draw for draw in all 16
+  configurations and for two groups put together by hand (one layer per
+  model is accepted for now). Models without movement draw no extra random
+  numbers, so the WP1 baseline and the WP2 tests are unchanged.
 
 ### WP4. `simulate_cb()` for landscapes and multi-node outputs (M)
 

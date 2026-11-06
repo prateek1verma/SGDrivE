@@ -48,6 +48,84 @@ CbStepper::CbStepper(const ModelView& mv, double dt)
   buf_.assign(n_max + 1, 0.0);
   rest_.assign(n_max + 1, 0.0);
   ch_i_.resize(std::max(1, mv.n_I));
+  // movement (N4): destinations of each node, the union of the groups' edges
+  move_row_ptr_.assign(mv.n_node + 1, 0);
+  move_map_.assign(mv.group_col.size(), 0);
+  if (mv.n_groups > 0) {
+    std::vector<std::vector<int>> dest(mv.n_node);
+    for (int g = 0; g < mv.n_groups; ++g) {
+      const int* rp = mv.group_row_ptr.data() + static_cast<std::size_t>(g) * (mv.n_node + 1);
+      for (int i = 0; i < mv.n_node; ++i) {
+        for (int e = rp[i]; e < rp[i + 1]; ++e) {
+          dest[i].push_back(mv.group_col[mv.group_edge_start[g] + e]);
+        }
+      }
+    }
+    std::size_t max_deg = 0;
+    for (int i = 0; i < mv.n_node; ++i) {
+      std::sort(dest[i].begin(), dest[i].end());
+      dest[i].erase(std::unique(dest[i].begin(), dest[i].end()), dest[i].end());
+      move_row_ptr_[i + 1] = move_row_ptr_[i] + static_cast<int>(dest[i].size());
+      move_col_.insert(move_col_.end(), dest[i].begin(), dest[i].end());
+      max_deg = std::max(max_deg, dest[i].size());
+    }
+    for (int g = 0; g < mv.n_groups; ++g) {
+      const int* rp = mv.group_row_ptr.data() + static_cast<std::size_t>(g) * (mv.n_node + 1);
+      for (int i = 0; i < mv.n_node; ++i) {
+        for (int e = rp[i]; e < rp[i + 1]; ++e) {
+          const int ge = mv.group_edge_start[g] + e;
+          const auto it = std::lower_bound(dest[i].begin(), dest[i].end(), mv.group_col[ge]);
+          move_map_[ge] = move_row_ptr_[i] + static_cast<int>(it - dest[i].begin());
+        }
+      }
+    }
+    move_pe_.assign(static_cast<std::size_t>(3) * mv.n_node, 0.0);
+    move_lost_.assign(static_cast<std::size_t>(3) * mv.n_node, 0.0);
+    move_prob_.assign(static_cast<std::size_t>(3) * move_col_.size(), 0.0);
+    move_p_.assign(max_deg + 1, 0.0);
+    move_buf_.assign(max_deg + 1, 0.0);
+    move_rest_.assign(max_deg + 1, 0.0);
+    imm_.assign(mv.n_states, 0.0);
+  }
+}
+
+// Daily movement shares (N3, N4): for each node and class the probability of
+// leaving within dt, 1 - exp(-lambda dt) with lambda = sum over groups of
+// kappa delta, and the destination and loss probabilities with the groups
+// weighted by w_G = lambda^G / lambda (as .sg_cb_move_shares() in R).
+void CbStepper::prepare_movement(int day) {
+  const ModelView& v = mv_;
+  if (v.n_groups == 0) return;
+  std::fill(move_prob_.begin(), move_prob_.end(), 0.0);
+  std::fill(move_lost_.begin(), move_lost_.end(), 0.0);
+  for (int i = 0; i < v.n_node; ++i) {
+    const double dx = v.dx[static_cast<std::size_t>(v.forcing_index[i]) * v.n_days + day - 1];
+    double lam[3] = {0.0, 0.0, 0.0};
+    for (int g = 0; g < v.n_groups; ++g) {
+      const double kappa = v.group_clock[g] == 1 ? 1.0 : std::min(v.kappa_max, dx / v.dx_ref);
+      for (int s = 0; s < 3; ++s) {
+        lam[s] += kappa * v.group_rate[(static_cast<std::size_t>(g) * v.n_node + i) * 3 + s];
+      }
+    }
+    for (int s = 0; s < 3; ++s) {
+      move_pe_[static_cast<std::size_t>(i) * 3 + s] = lam[s] > 0.0 ? -std::expm1(-lam[s] * dt_) : 0.0;
+    }
+    for (int g = 0; g < v.n_groups; ++g) {
+      const double kappa = v.group_clock[g] == 1 ? 1.0 : std::min(v.kappa_max, dx / v.dx_ref);
+      const int* rp = v.group_row_ptr.data() + static_cast<std::size_t>(g) * (v.n_node + 1);
+      for (int s = 0; s < 3; ++s) {
+        if (lam[s] == 0.0) continue;
+        const std::size_t gi = (static_cast<std::size_t>(g) * v.n_node + i) * 3 + s;
+        const double w = kappa * v.group_rate[gi] / lam[s];
+        for (int e = rp[i]; e < rp[i + 1]; ++e) {
+          const int ge = v.group_edge_start[g] + e;
+          move_prob_[static_cast<std::size_t>(move_map_[ge]) * 3 + s] +=
+              w * v.group_prob[static_cast<std::size_t>(ge) * 3 + s];
+        }
+        move_lost_[static_cast<std::size_t>(i) * 3 + s] += w * v.group_loss[gi];
+      }
+    }
+  }
 }
 
 // Death and destination probabilities, and the arrival distribution, of one
@@ -117,6 +195,7 @@ void CbStepper::prepare_day(int day) {
     }
   }
   kernel_.set_node(0);
+  prepare_movement(day);
   if (v.host_model) {  // infestation chain: treatment in the role of the hazard
     for (int j = 0; j < v.n_I; ++j) q_[j] = v.host_advance;
     prepare(ch_i_, adv_i_, q_.data(), v.n_I, v.n_I, v.host_treatment);
