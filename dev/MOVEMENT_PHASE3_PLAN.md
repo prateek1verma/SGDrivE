@@ -260,6 +260,18 @@ landscape: a transect from south Texas north.
   the difference matters, a specified fix for movement of emerged adults
   follows as its own change; D-032 phase 2 findings).
 * Figures in `inst/scenarios/scenario21_figures/` (heat maps, fronts).
+* *Done (2026-11-06):* `inst/scenarios/21_texas_transect.R` (about 20 s)
+  and `22_texas_transect_sensitivity.R` (about 2 min; it sources 21).
+  Cells take the station of the nearest county centroid (15 stations for
+  18 cells); the source node has Brownsville weather; every node starts on
+  1 January 1961 (1961 as burn-in). Results (`scenario21_figures/`, D-032
+  phase 3 findings): the 1961-62 freeze empties every cell north of about
+  400 km; in 1962 the front climbs back about one cell every three weeks to
+  550-600 km by 1 August, about 30 km per generation, against 80-160
+  observed; the clock barely matters; D x 10 gives 45 km per generation;
+  dt = 0.05 and 0.1 give the same front (no change to the step order
+  needed); without the extinction rule every cell keeps fractions of a fly
+  and the "front" is back at the north end by August.
 
 ### WP9. Documentation and release checks (S)
 

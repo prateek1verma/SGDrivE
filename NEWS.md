@@ -23,6 +23,12 @@ Plan: `dev/MOVEMENT_PHASE3_PLAN.md`.
   `simulate_ode()` recommends `rtol = 1e-6, atol = 1e-6` for large
   landscapes (about twice as fast, node populations within about 1e-7);
   the defaults are unchanged.
+* Scenarios 21 and 22: a south-north transect through Texas with 1961-1962
+  station weather, local diffusion at the field rate, both solvers, the
+  three movement clocks, a larger diffusion coefficient, two time steps and
+  the ODE without the node extinction rule. Local diffusion moves the front
+  about 30 km per generation, against 80-160 km observed: long-distance
+  movement is needed (phase 4).
 * `sg_spread()` measures spread through a landscape: per node the first
   and last output day with flies (at least `extinction_threshold`, 1 by
   default) and the days occupied; over time the number of occupied nodes

@@ -1,0 +1,6 @@
+"variant","dt","ode_front_winter_min_km","cb_front_winter_min_km","ode_front_1962_08_01_km","cb_front_1962_08_01_km","cb_front_speed_km_per_generation","cb_front_speed_sd"
+"capped clock (default)",0.1,400,380,550,560,29.1978061660323,5.08115922347192
+"calendar clock",0.1,400,385,550,560,28.2881828720514,4.35580890499615
+"uncapped clock",0.1,400,380,550,585,29.7347345285104,6.7799873117384
+"D x 10",0.1,400,380,700,680,45.1257497190316,5.86269228376655
+"capped clock, dt = 0.05",0.05,400,370,550,550,30.4964851746549,4.31506474947866
