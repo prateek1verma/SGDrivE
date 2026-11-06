@@ -79,6 +79,12 @@ fractions of flies, and the recorder of phase 1 for stochastic runs.
 * Tests: one node bitwise equal to the WP1 baseline; C++ = R draw for draw
   on 3 nodes without movement (static and hosts, Mendelian and homing); in
   the deterministic map each node equals its own one-node model.
+* *Done (2026-11-05):* the R step is split into `.sg_cb_part1()` and
+  `.sg_cb_part3()` per node; the C++ stepper has `SeriesChains` per forcing
+  series and a `NodeWork` area per node; the day loop's extinction checks
+  span all nodes. One-node runs are identical draw for draw to the WP1
+  baseline; one-node `simulate_cb()` is not slower (about 15-20% faster in
+  an A/B run, both versions compiled alike).
 
 ### WP3. The movement step N4 (M)
 

@@ -127,6 +127,9 @@
 # the prepared chains (S16) of eggs, pupae and adults; larvae are prepared in
 # each step because their hazard depends on crowding.
 .sg_cb_day_r <- function(day, s, dt) {
+  if (!is.null(s$node_setups)) { # several nodes (D-032): the chains of each node
+    return(list(day = day, nodes = lapply(s$node_setups, function(ns) .sg_cb_day_r(day, ns, dt))))
+  }
   f <- s$forcing
   p <- s$p
   dx <- f$dx[day]
@@ -157,8 +160,38 @@
 
 # One step of length dt from state x (S15-S19). `info` is .sg_cb_day_r() of
 # the step's day, `draw` is .sg_cb_draws(). Returns the new state and the
-# flows of the step (counter order of .sg_counter_names()).
+# flows of the step (counter order of .sg_model_counter_names()).
+#
+# With several nodes (D-032, MODEL_SPEC section 10) a step has three parts:
+# part 1 (aggregates, eggs, hosts, mating, chain moves) of each node in index
+# order, movement of all nodes (N4), then part 3 (emergence, arrivals) of
+# each node in index order. With one node: part 1, then part 3.
 .sg_cb_step_r <- function(x, info, s, dt, draw) {
+  if (is.null(s$node_setups)) {
+    return(.sg_cb_part3(.sg_cb_part1(x, info, s, dt, draw)))
+  }
+  n_s <- s$n_states_node
+  at <- function(i) (i - 1L) * n_s + seq_len(n_s)
+  work <- lapply(seq_len(s$n_node), function(i) {
+    .sg_cb_part1(x[at(i)], info$nodes[[i]], s$node_setups[[i]], dt, draw)
+  })
+  new_x <- numeric(length(x))
+  node_flows <- vector("list", s$n_node)
+  for (i in seq_len(s$n_node)) {
+    r <- .sg_cb_part3(work[[i]])
+    new_x[at(i)] <- r$x
+    node_flows[[i]] <- unname(r$flows)
+  }
+  all_flows <- unlist(node_flows)
+  n_move <- length(s$counter_names) - length(all_flows)
+  all_flows <- c(all_flows, numeric(n_move)) # movement counters: phase 2 WP3
+  names(all_flows) <- s$counter_names
+  list(x = new_x, flows = all_flows)
+}
+
+# Part 1 of a step of one node (S15, S17, H3, S18, S16): returns everything
+# part 3 needs (its local variables).
+.sg_cb_part1 <- function(x, info, s, dt, draw) {
   p <- s$p
   n_g <- s$n_g
   n_a <- s$n_A
@@ -247,7 +280,10 @@
     wounded <- draw$binom(h_s, 1 - exp(-h$wounding * dt))
     new_hi <- mi$x
     new_hi[1L] <- new_hi[1L] + infested
-    host_flows <- c(wounded, healed, infested, mi$out, mi$deaths, n_fertile - infested)
+    # used in part 3
+    host_flows <- c( # nolint: object_usage_linter.
+      wounded, healed, infested, mi$out, mi$deaths, n_fertile - infested
+    )
   }
 
   # ---- mating (S18), before ageing ------------------------------------------
@@ -289,12 +325,21 @@
   fem_mat <- matrix(fem, n_a) # columns: (mate, genotype), mate fastest
   mf <- block_moves(fem_mat, function(j) info$ch_f[[(j - 1L) %/% n_g + 1L]])
 
-  new_e <- as_mat(me$x, s$n_E)
-  new_l <- as_mat(ml$x, s$n_L)
-  new_p <- as_mat(mp$x, s$n_P)
-  new_m <- as_mat(mm$x, n_a)
-  new_u <- as_mat(mu_$x, n_a)
-  new_f <- array(mf$x, c(n_a, n_g, n_g))
+  new_e <- as_mat(me$x, s$n_E) # nolint: object_usage_linter. (part 3)
+  new_l <- as_mat(ml$x, s$n_L) # nolint: object_usage_linter. (part 3)
+  new_p <- as_mat(mp$x, s$n_P) # nolint: object_usage_linter. (part 3)
+  new_m <- as_mat(mm$x, n_a) # nolint: object_usage_linter. (part 3)
+  new_u <- as_mat(mu_$x, n_a) # nolint: object_usage_linter. (part 3)
+  new_f <- array(mf$x, c(n_a, n_g, n_g)) # nolint: object_usage_linter. (part 3)
+  as.list(environment())
+}
+
+# Part 3 of a step of one node (S19, arrivals) from the result of part 1:
+# the node's new state and flows. The variables of part 1 are restored into
+# this function's environment, which the linter cannot see.
+# nolint start: object_usage_linter.
+.sg_cb_part3 <- function(work) {
+  list2env(work, environment())
 
   # ---- emergence (S19): sex, then survival ------------------------------------
   em_m <- numeric(n_g)
@@ -400,6 +445,7 @@
   names(flows) <- s$counter_names
   list(x = out, flows = flows)
 }
+# nolint end
 
 # Inputs of a chain-binomial run, shared by the R and C++ drivers so that
 # both consume random numbers identically: steps per day, initial state and
