@@ -423,12 +423,49 @@
   as.list(environment())
 }
 
-# Part 3 of a step of one node (S19, arrivals) from the result of part 1:
-# the node's new state and flows. The variables of part 1 are restored into
-# this function's environment, which the linter cannot see.
-# nolint start: object_usage_linter.
+# Part 3 of a step of one node (S19, arrivals) from the result of part 1
+# (`work`, the variables of .sg_cb_part1()): the node's new state and flows.
+# The variables part 3 uses are taken from `work` by name (exact matching;
+# the host variables are NULL without the host model).
 .sg_cb_part3 <- function(work) {
-  list2env(work, environment())
+  s <- work[["s"]]
+  draw <- work[["draw"]]
+  dt <- work[["dt"]]
+  info <- work[["info"]]
+  p <- work[["p"]]
+  a <- work[["a"]]
+  n_g <- work[["n_g"]]
+  nu_i <- work[["nu_i"]]
+  mate_ok <- work[["mate_ok"]]
+  factor <- work[["factor"]]
+  batches <- work[["batches"]]
+  n_batches <- work[["n_batches"]]
+  n_fertile <- work[["n_fertile"]]
+  expected_fertile <- work[["expected_fertile"]]
+  eggs <- work[["eggs"]]
+  matings <- work[["matings"]]
+  ch_l <- work[["ch_l"]]
+  me <- work[["me"]]
+  ml <- work[["ml"]]
+  mp <- work[["mp"]]
+  mm <- work[["mm"]]
+  mu_ <- work[["mu_"]]
+  mf <- work[["mf"]]
+  new_e <- work[["new_e"]]
+  new_l <- work[["new_l"]]
+  new_p <- work[["new_p"]]
+  new_m <- work[["new_m"]]
+  new_u <- work[["new_u"]]
+  new_f <- work[["new_f"]]
+  h <- work[["h"]]
+  h_s <- work[["h_s"]]
+  h_w <- work[["h_w"]]
+  wounded <- work[["wounded"]]
+  healed <- work[["healed"]]
+  infested <- work[["infested"]]
+  mi <- work[["mi"]]
+  new_hi <- work[["new_hi"]]
+  host_flows <- work[["host_flows"]]
 
   # ---- emergence (S19): sex, then survival ------------------------------------
   em_m <- numeric(n_g)
@@ -534,7 +571,6 @@
   names(flows) <- s$counter_names
   list(x = out, flows = flows)
 }
-# nolint end
 
 # Inputs of a chain-binomial run, shared by the R and C++ drivers so that
 # both consume random numbers identically: steps per day, initial state and
