@@ -232,7 +232,11 @@ probabilities on a degree-day or calendar clock (design:
 [`dev/MOVEMENT_DESIGN.md`](dev/MOVEMENT_DESIGN.md), equations:
 MODEL_SPEC section 8a). The ODE solver, initial states, summaries, an
 optional node extinction rule and a recorder that keeps only chosen
-quantities work with both solvers.
+quantities work with both solvers. Movement can be built from a diffusion coefficient on any network
+(`sg_movement_diffusion()`) or from daily transition probabilities,
+`check_movement()` translates rates back into lifetime dispersal, and
+`sg_spread()` gives arrival days and the front; scenario 21 runs a
+transect through Texas with 1961-1962 weather.
 
 ``` r
 land <- sg_landscape(

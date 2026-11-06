@@ -775,7 +775,31 @@ Phase 2 findings (implemented 2026-11-05, WP1–WP6):
   (`src/recorder.h`); `keep` defaults to `NULL` and stays a shortcut;
   `meta$keep` is replaced by `meta$record`.
 
-Phase 3 findings (dev/MOVEMENT_PHASE3_PLAN.md; WP7-WP8, 2026-11-06):
+Phase 3 findings (dev/MOVEMENT_PHASE3_PLAN.md; WP1-WP9, 2026-11-06):
+* Constructors and checks (WP1-WP3): `sg_movement_diffusion()` (finite
+  volumes on any network, matrices or an edge table, closed or open edges),
+  `sg_movement_from_prob()` (as MGDrivE2's `movement_prob2rate()`, rows below
+  1 become losses), `sg_rate_from_fraction()`, `sg_rate_from_lifetime()` and
+  `check_movement()`. The lifetime leave probability and lifespan are exact
+  recursions over the adult chain; they reproduce the design note table of
+  5.3. The implied D of `check_movement()` equals the constructor's D at
+  interior nodes (half at closed ends, where only moves within the
+  landscape count).
+* Recorder (WP4): `every` is an argument of `sg_record()`, not of
+  `sg_counter()` as the design note sketched: one period per run keeps
+  `counter_sums` a single matrix and lets the `"cases"` set (the counters
+  `sg_cases()` reads, every node) use it. Weeks are 7-day blocks from the
+  first day, as `sg_cases(period = "week")`.
+* Decision 13 (WP5, user, 2026-11-05): totals plus all counters are the
+  default output of both solvers; totals keep mated females summed over
+  their mates, so `fertile_equivalent` and grouping by mate need
+  `record = "state"`. `sg_alleles()` records allele copies for runs without
+  totals. Changing the default exposed tests that read `sim$state` and
+  passed vacuously when it was `NULL` (`max()` of nothing is `-Inf`); the
+  suite now runs without warnings.
+* Spread (WP6): `sg_spread()` counts a node as occupied from
+  `extinction_threshold` flies of any stage; the front uses the nodes' `x`
+  coordinates, now kept in the simulation's node information.
 * Both solvers grow linearly with the nodes (bench/m6_multinode_scaling.R):
   a 254-node SIT year takes about 36 s with the ODE (target about 30 s;
   about 24.5 ns per state and evaluation in a run, 14 ns for the rate

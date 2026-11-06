@@ -5,7 +5,9 @@ made by the user on 2026-11-02 and 2026-11-04. Phase 1 (landscape, one
 layer, ODE, recorder) implemented 2026-11-05 (dev/MOVEMENT_PHASE1_PLAN.md;
 findings in D-032); phase 2 (chain-binomial movement and recorder)
 implemented 2026-11-05 (dev/MOVEMENT_PHASE2_PLAN.md; findings in D-032);
-phases 3–4 open. Equations in MODEL_SPEC section 8a (N1 movement terms, N2
+phase 3 (constructors, diagnostics, outputs, transect) implemented
+2026-11-06 (dev/MOVEMENT_PHASE3_PLAN.md; findings in D-032); phase 4
+open. Equations in MODEL_SPEC section 8a (N1 movement terms, N2
 losses, N3 clock, N4 chain-binomial step, N5 node extinction rule);
 decision D-032 (DECISIONS.md), which also records the choices made in
 writing the specification. Biology from the sources in section 2,
@@ -454,8 +456,9 @@ Interface (sketch):
 rec <- sg_record(
   sg_quantity("adults", stage = c("M", "U", "F"), by = "node"),
   sg_quantity("wild_F", stage = "F", genotype = "WW", node = study_nodes),
-  sg_counter("cases", by = "node", every = "week"),
-  sg_alleles("A", by = "node")
+  sg_counter("cases", counter = "fertile_batches", by = "node"),
+  sg_alleles("A", by = "node"),
+  every = "week" # counter sums by week (one period per run)
 )
 sim <- simulate_ode(model, record = rec, output_every = 1)
 ```
@@ -724,7 +727,7 @@ chain. Recorder
 (7.1) for the chain-binomial solver, per replicate, with the memory
 estimate from the recorder's size.
 
-### Phase 3. Constructors, diagnostics, outputs, first transect
+### Phase 3. Constructors, diagnostics, outputs, first transect (done 2026-11-06)
 * `bench/m6_multinode_scaling.R` and the targets of 8a.4 (on regular
   grids of 1–254 nodes, built with `sg_movement_diffusion()`); the
   tolerance study of 8a item 7; profiling for the deferred items of 8a.2

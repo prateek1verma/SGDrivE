@@ -1,7 +1,8 @@
 # Phase 3 implementation plan: constructors, diagnostics, outputs, first transect
 
 Status: **accepted**, 2026-11-05 (choices of section 4 confirmed by the user
-the same day); not implemented. Implements phase 3 of dev/MOVEMENT_DESIGN.md (section
+the same day); implemented 2026-11-06 (WP1-WP9; findings in D-032; WP10
+optional, not done). Implements phase 3 of dev/MOVEMENT_DESIGN.md (section
 9) with the interface of sections 6 and 7 and the tests of section 8.
 Phases 1 (ODE, recorder) and 2 (chain-binomial movement, recorder) are in
 dev/MOVEMENT_PHASE1_PLAN.md and dev/MOVEMENT_PHASE2_PLAN.md; findings in
@@ -278,6 +279,11 @@ landscape: a transect from south Texas north.
 * Help pages and examples for the new functions; `_pkgdown.yml`
   reference; NEWS; D-032 phase 3 findings; design note and roadmap status;
   `R CMD check` 0/0/0; sanitizers; full matrix on the pull requests.
+* *Done (2026-11-06):* D-032 phase 3 findings (WP1-WP9), design note and
+  roadmap status, NEWS ordered by topic, README landscape section, every
+  help topic in `_pkgdown.yml`. `R CMD check --as-cran` with tests: 0
+  errors, 0 warnings; the two notes are local (new submission, pandoc not
+  installed). Sanitizers: no errors.
 
 ### Optional WP10. Cross-check against MGDrivE2 (M)
 
