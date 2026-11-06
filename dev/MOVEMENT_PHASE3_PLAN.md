@@ -204,6 +204,11 @@ landscape: a transect from south Texas north.
 * Tests: metrics against direct calculations on small runs (both
   solvers); a front moving through a chain at a known order of arrival;
   plot data shapes (`sg_plot_data()`), as the existing plot tests do.
+* *Done (2026-11-06):* `R/spread.R`: `sg_spread(sim, threshold, nodes,
+  position, quantity)` with a print method; the simulation's node
+  information now carries `x`, `y` and `extinction_threshold`. Plots
+  `"nodes"` (viridis heat map, a panel per replicate, the first replicate
+  by default) and `"front"` in `R/plots.R`. Tests in `test-spread.R`.
 
 ### WP7. Benchmarks, tolerance study, profiles (M)
 

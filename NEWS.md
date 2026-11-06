@@ -17,6 +17,13 @@ Plan: `dev/MOVEMENT_PHASE3_PLAN.md`.
 * `sg_alleles()` records allele copies (one quantity per allele, optionally
   by node); `sg_allele_freq()` reads them when a run kept neither states
   nor totals.
+* `sg_spread()` measures spread through a landscape: per node the first
+  and last output day with flies (at least `extinction_threshold`, 1 by
+  default) and the days occupied; over time the number of occupied nodes
+  and the front (the farthest occupied node by its `x` coordinate or a
+  given position); per replicate for stochastic runs. New plots:
+  `plot(sim, "nodes")` (heat map of individuals by node and day) and
+  `plot(sim, "front")`.
 * `sg_movement_diffusion()` builds a movement layer for local diffusion on
   any network from a diffusion coefficient D (km^2 per day, one value or
   one per class) and the nodes' areas, shared border lengths and centroid

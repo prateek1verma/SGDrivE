@@ -493,13 +493,24 @@ sg_hosts <- function(sim, per = c("node", "km2"), nodes = NULL) {
     area = model$area, H = model$params$wound_density, genotypes = cb$genotypes,
     wild_type = cb$wild_type, laying = as.logical(laying), viability = cb$egg_total,
     hosts = if (is.null(h)) NULL else list(n = h$n, classes = h$classes),
-    # nodes (D-032): id, role, area, wounds per node (static model)
+    # nodes (D-032): id, role, area, wounds per node (static model) and the
+    # coordinates x, y (km; NA when not given)
     nodes = data.frame(
       id = ids,
       role = if (is.null(model$landscape)) "study" else model$landscape$nodes$role,
-      area = model$area, wounds = model$counts$H, stringsAsFactors = FALSE
-    )
+      area = model$area, wounds = model$counts$H,
+      x = .sg_node_coordinate(model, "x"), y = .sg_node_coordinate(model, "y"),
+      stringsAsFactors = FALSE
+    ),
+    extinction_threshold = model$params$extinction_threshold
   )
+}
+
+# Node coordinate `xy` ("x" or "y") of a model's landscape, NA when absent.
+.sg_node_coordinate <- function(model, xy) {
+  nd <- model$landscape$nodes
+  n <- length(.sg_node_ids(model))
+  if (is.null(nd) || is.null(nd[[xy]])) rep(NA_real_, n) else as.numeric(nd[[xy]])
 }
 
 # Nodes of a simulation chosen for a summary (D-032): ids or numbers, by
