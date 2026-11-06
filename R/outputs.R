@@ -244,6 +244,10 @@ sg_females <- function(sim, per = c("node", "km2"), nodes = NULL) {
 #'   fertile batches laid on uninfested wounds, counted once per host they
 #'   infest; fertile batches on hosts already infested are
 #'   `superinfestations`.
+#'
+#'   The counters come from the run's daily counters or, when those were not
+#'   kept, from the counter sums of the `"cases"` set of [sg_record()]
+#'   (daily, or by the same period as `period`).
 #' @return A data frame with columns `period` (first day), `days`,
 #'   `replicate` (stochastic runs only), `cases` (per km^2 or node), `events`
 #'   (all oviposition events, also those with no viable egg),
@@ -277,11 +281,10 @@ sg_cases <- function(sim, period = c("day", "week", "month", "year"), per = c("k
       "model's own host density."
     )
   }
-  k <- .sg_need_counters(sim, "sg_cases()")
   sel <- .sg_sim_nodes(sim, nodes)
-  if (!sel$multi && !"fertile_batches" %in% dimnames(k)[[2L]]) {
-    .sg_stop("This simulation was made by an older version of ScrewDrivE; run it again.")
-  }
+  # daily counters, or the counter sums of the "cases" set (phase 3 WP4)
+  src <- .sg_cases_source(sim, if (is.null(hosts)) "fertile_batches" else "infestations", period)
+  k <- src$k
   column <- function(name) {
     if (sel$multi) { # the counter summed over the chosen nodes (D-032)
       kc <- .sg_columns(k, paste0(name, "@", sel$ids))
@@ -291,26 +294,32 @@ sg_cases <- function(sim, period = c("day", "week", "month", "year"), per = c("k
     v <- if (length(dim(k)) == 3L) k[, name, ] else k[, name]
     matrix(v, nrow = dim(k)[1L])
   }
-  # counters are daily even when states are recorded less often (output_every)
-  dates <- sim$date[1L] + seq_len(dim(k)[1L])
-  key <- switch(EXPR = period,
-    day = format(dates),
-    week = format(dates[1L] + 7L * ((seq_along(dates) - 1L) %/% 7L)),
-    month = format(dates, "%Y-%m-01"),
-    year = format(dates, "%Y-01-01")
-  )
+  # rows: days (counters are daily even when states are recorded less often),
+  # or periods of the counter sums when they match `period`
+  dates <- src$dates
+  key <- if (src$grouped) {
+    format(dates)
+  } else {
+    switch(EXPR = period,
+      day = format(dates),
+      week = format(dates[1L] + 7L * ((seq_along(dates) - 1L) %/% 7L)),
+      month = format(dates, "%Y-%m-01"),
+      year = format(dates, "%Y-01-01")
+    )
+  }
   groups <- unique(key)
   agg <- outer(key, groups, `==`) * 1
   cases <- t(agg) %*% column(if (is.null(hosts)) "fertile_batches" else "infestations")
   events <- t(agg) %*% column("egg_batches")
-  days <- colSums(agg)
+  days <- as.vector(t(agg) %*% src$days)
   wounds <- if (sel$multi) sum(sel$all$wounds[sel$pos]) else info$H * info$area # wounds per node
   n_hosts <- if (is.null(hosts)) NA_real_ else sum(hosts$n[sel$pos])
   if (!is.null(hosts)) {
     superinf <- t(agg) %*% column("superinfestations")
     # wounded hosts on the recorded days of each period, averaged
     h <- sg_hosts(sim, nodes = nodes)
-    out_key <- key[match(h$date, dates)]
+    row <- findInterval(h$date, dates) # the row (day or period) of each recorded day
+    out_key <- ifelse(row > 0L, key[pmax(row, 1L)], NA_character_)
     reps <- if (is.null(h$replicate)) rep(1L, nrow(h)) else h$replicate
     wounded <- vapply(seq_len(ncol(cases)), function(r) {
       vapply(groups, function(g) {
@@ -330,7 +339,7 @@ sg_cases <- function(sim, period = c("day", "week", "month", "year"), per = c("k
       NA_real_
     }
     d <- data.frame(
-      period = as.Date(dates[match(groups, key)]), days = as.integer(days),
+      period = as.Date(dates[match(groups, key)]), days = as.integer(round(days)),
       cases = cases[, r] * scale, events = events[, r] * scale, wound_fraction = wf
     )
     if (!is.null(hosts)) {
@@ -347,6 +356,41 @@ sg_cases <- function(sim, period = c("day", "week", "month", "year"), per = c("k
 }
 
 # ---- internal ------------------------------------------------------------------
+
+# The counters sg_cases() reads: the daily counters, or the counter sums of
+# the "cases" set (sg_record("cases"), phase 3 WP4) when the full counters
+# were not kept. Returns k [row, column(, replicate)], the first day `dates`
+# and length `days` of each row, and whether the rows already are the
+# periods of `period` (`grouped`).
+.sg_cases_source <- function(sim, cases_counter, period) {
+  if (!is.null(sim$counters)) {
+    k <- sim$counters
+    if (!any(sub("@.*$", "", dimnames(k)[[2L]]) == cases_counter)) {
+      .sg_stop("This simulation was made by an older version of ScrewDrivE; run it again.")
+    }
+    n <- dim(k)[1L]
+    return(list(k = k, dates = sim$date[1L] + seq_len(n), days = rep(1, n), grouped = FALSE))
+  }
+  k <- sim$counter_sums
+  has <- !is.null(k) && any(sub("@.*$", "", dimnames(k)[[2L]]) == cases_counter)
+  if (!has) {
+    .sg_stop(
+      "sg_cases() needs all daily counters or the counter sums of the \"cases\" set; ",
+      "add \"counters\" to sg_record() (or \"cases\", which keeps far less)."
+    )
+  }
+  every <- sim$meta$record$every
+  if (is.null(every)) every <- "day"
+  per <- sim$counter_periods
+  if (every != "day" && every != period) {
+    .sg_stop(
+      "The counter sums were recorded by ", every, "; sg_cases(period = \"", period,
+      "\") needs ", if (period == "day") "daily sums" else paste("daily sums or sums by", period),
+      " (sg_record(..., every = \"", period, "\"))."
+    )
+  }
+  list(k = k, dates = per$period, days = per$days, grouped = every != "day")
+}
 
 # Output information stored in a simulation's metadata (D-026).
 #' Hosts of the host-wound model

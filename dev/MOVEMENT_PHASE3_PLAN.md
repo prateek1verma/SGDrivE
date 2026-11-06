@@ -148,6 +148,16 @@ landscape: a transect from south Texas north.
   for both solvers and every replicate (ODE to round-off, chain-binomial
   exactly); partial last periods; `sg_cases()` from the set equals
   `sg_cases()` from full counters; memory estimates count period rows.
+* *Done (2026-11-06):* `every` is an argument of `sg_record()`, not of
+  `sg_counter()`: a run has one period for all its counter sums (and the
+  `"cases"` set), so `sim$counter_sums` stays one matrix (array for
+  `simulate_cb()`) with `sim$counter_periods`. `Recorder::add_sums()` in
+  `src/recorder.h` adds a day into its period's row (`c_period` from R);
+  the ODE driver adds C++ chunks and the R paths (deSolve backend, stiff
+  fallback days) into period rows, so a period may span them. The
+  `"cases"` set names its sums like the counters (`fertile_batches@a`) and
+  covers every node; `sg_cases()` reads it through `.sg_cases_source()`.
+  Tests in `test-recorder-periods.R`.
 
 ### WP5. Allele quantities and summaries reading recorded quantities (M)
 

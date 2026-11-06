@@ -27,6 +27,14 @@ Plan: `dev/MOVEMENT_PHASE3_PLAN.md`.
   movement rate over the forcing to the rate check, and warns when flies
   almost surely leave their node in a lifetime (rates on the wrong scale
   for the grid?) or when movement within one chain-binomial step is large.
+* Counter sums by period: `sg_record(..., every = "week")` (or `"month"`,
+  `"year"`; default `"day"`) adds the counter sums up by period during the
+  run, in C++ for both solvers, and stores one row per period
+  (`sim$counter_periods` gives each period's first day and length). A new
+  built-in set `"cases"` records the counters `sg_cases()` needs for every
+  node, so `sg_cases()` works without full counters (from daily sums or
+  sums by the same period): weekly cases per county over decades take a few
+  megabytes.
 
 ## Several nodes and adult movement, phase 2: chain-binomial solver (D-032)
 

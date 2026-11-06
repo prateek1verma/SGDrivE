@@ -93,8 +93,10 @@
 #'       with several nodes per node ("@id"), and with movement the
 #'       emigrants, immigrants and flies lost of each class and node. `NULL`
 #'       when only counter sums are recorded.}
-#'     \item{`counter_sums`}{With `sg_counter()` terms: array day x sum x
-#'       replicate.}
+#'     \item{`counter_sums`, `counter_periods`}{With `sg_counter()` terms or
+#'       the `"cases"` set: array period x sum x replicate (one row per period
+#'       of `sg_record(every = )`, daily by default), and the periods' first
+#'       days and lengths.}
 #'     \item{`final_state`}{The state at the end of each replicate, matrix
 #'       state x replicate.}
 #'     \item{`releases`}{Array of individuals released, day x block x
@@ -175,7 +177,8 @@ simulate_cb <- function(model, init = NULL, n_rep = 1L, dt = 0.1, output_every =
   rec_days <- seq_len(n_days) %in% out_days
   view <- .sg_model_view(model)
   cnames <- attr(view, "counter_names")
-  rec <- .sg_recorder(if (!is.null(keep)) keep else if (is.null(record)) "state" else record,
+  rec <- .sg_recorder(
+    if (!is.null(keep)) keep else if (is.null(record)) "state" else record,
     model, cnames
   )
   n <- model$n_states
@@ -184,8 +187,10 @@ simulate_cb <- function(model, init = NULL, n_rep = 1L, dt = 0.1, output_every =
 
   n_rel <- length(.sg_release_columns(model)) # 4 release columns per node
   width_out <- (if (rec$state) n else 0) + n_x
-  width_day <- (if (rec$counters) length(cnames) else 0) + n_sums + n_rel
-  bytes <- 8 * n_rep * ((length(out_days) + 1) * width_out + n_days * width_day + n)
+  width_day <- (if (rec$counters) length(cnames) else 0) + n_rel
+  n_periods <- nrow(rec$counter_periods)
+  per_rep <- (length(out_days) + 1) * width_out + n_days * width_day + n_periods * n_sums + n
+  bytes <- 8 * n_rep * per_rep
   if (bytes > max_memory) {
     .sg_stop(sprintf(
       "The results would take about %.3g GB (limit `max_memory` = %.3g GB). %s",
@@ -201,8 +206,9 @@ simulate_cb <- function(model, init = NULL, n_rep = 1L, dt = 0.1, output_every =
   one <- function(r) {
     .sg_with_stream(rng$streams[[r]], {
       inp <- .sg_cb_inputs(model, x0, dt, stochastic = TRUE, n_days = n_days)
-      res <- sg_cb_run_cpp(view, inp$x, as.numeric(inp$rel$count), dt, TRUE, n_days, rec_days,
-        rec[c("state", "counters", "wx", "wc")]
+      res <- sg_cb_run_cpp(
+        view, inp$x, as.numeric(inp$rel$count), dt, TRUE, n_days, rec_days,
+        rec[c("state", "counters", "wx", "wc", "c_period")]
       )
     })
     list(
@@ -240,7 +246,10 @@ simulate_cb <- function(model, init = NULL, n_rep = 1L, dt = 0.1, output_every =
     if (any(!is_total)) out$recorded <- all_x[, !is_total, , drop = FALSE]
   }
   if (rec$counters) out$counters <- stack("counters", cnames)
-  if (n_sums > 0L) out$counter_sums <- stack("counter_sums", rec$names_c)
+  if (n_sums > 0L) {
+    out$counter_sums <- stack("counter_sums", rec$names_c)
+    out$counter_periods <- rec$counter_periods
+  }
   out$final_state <- matrix(vapply(reps, `[[`, numeric(n), "final_state"), n, n_rep,
     dimnames = list(sg_state_names(model), rep_names)
   )
@@ -252,7 +261,7 @@ simulate_cb <- function(model, init = NULL, n_rep = 1L, dt = 0.1, output_every =
     backend = "cpp", dt = dt, n_rep = n_rep,
     record = list(
       sets = rec$record$sets, quantities = setdiff(rec$names_x, dimnames(out$totals)[[2L]]),
-      counter_sums = rec$names_c
+      counter_sums = rec$names_c, every = rec$every
     ),
     output_every = as.integer(output_every), seed = rng$seed,
     streams = do.call(cbind, rng$streams), parallel = parallel, run_time = run_time,

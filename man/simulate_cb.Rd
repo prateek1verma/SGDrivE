@@ -75,8 +75,10 @@ quantity x replicate.}
 with several nodes per node ("@id"), and with movement the
 emigrants, immigrants and flies lost of each class and node. \code{NULL}
 when only counter sums are recorded.}
-\item{\code{counter_sums}}{With \code{sg_counter()} terms: array day x sum x
-replicate.}
+\item{\code{counter_sums}, \code{counter_periods}}{With \code{sg_counter()} terms or
+the \code{"cases"} set: array period x sum x replicate (one row per period
+of \code{sg_record(every = )}, daily by default), and the periods' first
+days and lengths.}
 \item{\code{final_state}}{The state at the end of each replicate, matrix
 state x replicate.}
 \item{\code{releases}}{Array of individuals released, day x block x

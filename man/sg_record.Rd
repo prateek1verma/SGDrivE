@@ -7,7 +7,7 @@
 \alias{sg_counter}
 \title{What a simulation stores}
 \usage{
-sg_record(...)
+sg_record(..., every = c("day", "week", "month", "year"))
 
 sg_quantity(
   name,
@@ -27,9 +27,17 @@ sg_counter(name, counter, node = NULL, by = character(0))
 }
 \arguments{
 \item{...}{Any of the built-in sets \code{"state"} (full states on output days),
-\code{"totals"} (totals by stage and genotype, and host blocks, for each node)
-and \code{"counters"} (all daily counters), and objects from \code{sg_quantity()},
+\code{"totals"} (totals by stage and genotype, and host blocks, for each node),
+\code{"counters"} (all daily counters) and \code{"cases"} (the counter sums
+\code{\link[=sg_cases]{sg_cases()}} needs, for every node), and objects from \code{sg_quantity()},
 \code{sg_quantity_weights()} and \code{sg_counter()}.}
+
+\item{every}{Period of the counter sums (\code{sg_counter()} terms and the
+\code{"cases"} set): \code{"day"} (default), \code{"week"} (7-day blocks from the first
+simulated day, as \code{sg_cases(period = "week")}), \code{"month"} or \code{"year"}
+(calendar months and years). The sums are added up by period during the
+run, so only one row per period is stored. Full counters
+(\code{"counters"}) stay daily.}
 
 \item{name}{Name of the quantity or counter sum (no \code{"["}, \code{"]"} or \code{"@"}).}
 
@@ -86,9 +94,16 @@ extra last dimension for the replicates (\code{keep = "totals"} is a
 shortcut for \code{record = "totals"}).
 \item Quantities are stored in \code{sim$recorded} (one row per output day, day 0
 included), totals in \code{sim$totals}, states in \code{sim$state}.
-\item With \code{sg_counter()} terms only those counter sums are kept (in
-\code{sim$counter_sums}, one row per day) unless \code{"counters"} is also given;
-without them all counters are kept in \code{sim$counters}.
+\item With \code{sg_counter()} terms or the \code{"cases"} set only those counter sums
+are kept (in \code{sim$counter_sums}, one row per period of \code{every}, with the
+periods' first days and lengths in \code{sim$counter_periods}) unless
+\code{"counters"} is also given; without them all counters are kept in
+\code{sim$counters}.
+\item The \code{"cases"} set records, for every node, the counters \code{sg_cases()}
+reads (\code{fertile_batches} and \code{egg_batches}; with the host-wound model
+\code{infestations}, \code{egg_batches} and \code{superinfestations}), named like the
+counters, so \code{sg_cases()} works without full counters: weekly county
+cases over decades take a few megabytes.
 \item \code{sim$final_state} (the state at the end of the run; for \code{simulate_cb()}
 a matrix state x replicate) is always kept, so a run can be continued
 from it.

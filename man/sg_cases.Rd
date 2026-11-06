@@ -59,6 +59,10 @@ With the host-wound model cases come from the \code{infestations} counter:
 fertile batches laid on uninfested wounds, counted once per host they
 infest; fertile batches on hosts already infested are
 \code{superinfestations}.
+
+The counters come from the run's daily counters or, when those were not
+kept, from the counter sums of the \code{"cases"} set of \code{\link[=sg_record]{sg_record()}}
+(daily, or by the same period as \code{period}).
 }
 \examples{
 if (requireNamespace("MGDrivE", quietly = TRUE)) {

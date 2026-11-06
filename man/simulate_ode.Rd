@@ -82,7 +82,10 @@ when not recorded.}
 genotype, and the recorded quantities (rows: output days).}
 \item{\code{counters}}{Matrix of daily flow totals (rows: days 1 to n);
 \code{NULL} when only counter sums are recorded.}
-\item{\code{counter_sums}}{With \code{sg_counter()} terms: daily counter sums.}
+\item{\code{counter_sums}, \code{counter_periods}}{With \code{sg_counter()} terms or
+the \code{"cases"} set: counter sums, one row per period of
+\code{sg_record(every = )} (daily by default), and the periods' first days
+and lengths.}
 \item{\code{final_state}}{The state at the end of the run (named), to
 continue from.}
 \item{\code{releases}}{Matrix of individuals released per day and block.}

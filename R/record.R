@@ -9,9 +9,16 @@
 #' only what is needed.
 #'
 #' @param ... Any of the built-in sets `"state"` (full states on output days),
-#'   `"totals"` (totals by stage and genotype, and host blocks, for each node)
-#'   and `"counters"` (all daily counters), and objects from `sg_quantity()`,
+#'   `"totals"` (totals by stage and genotype, and host blocks, for each node),
+#'   `"counters"` (all daily counters) and `"cases"` (the counter sums
+#'   [sg_cases()] needs, for every node), and objects from `sg_quantity()`,
 #'   `sg_quantity_weights()` and `sg_counter()`.
+#' @param every Period of the counter sums (`sg_counter()` terms and the
+#'   `"cases"` set): `"day"` (default), `"week"` (7-day blocks from the first
+#'   simulated day, as `sg_cases(period = "week")`), `"month"` or `"year"`
+#'   (calendar months and years). The sums are added up by period during the
+#'   run, so only one row per period is stored. Full counters
+#'   (`"counters"`) stay daily.
 #'
 #' @details
 #' * `simulate_ode(record = "state")` (the default) keeps full states and all
@@ -21,9 +28,16 @@
 #'   shortcut for `record = "totals"`).
 #' * Quantities are stored in `sim$recorded` (one row per output day, day 0
 #'   included), totals in `sim$totals`, states in `sim$state`.
-#' * With `sg_counter()` terms only those counter sums are kept (in
-#'   `sim$counter_sums`, one row per day) unless `"counters"` is also given;
-#'   without them all counters are kept in `sim$counters`.
+#' * With `sg_counter()` terms or the `"cases"` set only those counter sums
+#'   are kept (in `sim$counter_sums`, one row per period of `every`, with the
+#'   periods' first days and lengths in `sim$counter_periods`) unless
+#'   `"counters"` is also given; without them all counters are kept in
+#'   `sim$counters`.
+#' * The `"cases"` set records, for every node, the counters `sg_cases()`
+#'   reads (`fertile_batches` and `egg_batches`; with the host-wound model
+#'   `infestations`, `egg_batches` and `superinfestations`), named like the
+#'   counters, so `sg_cases()` works without full counters: weekly county
+#'   cases over decades take a few megabytes.
 #' * `sim$final_state` (the state at the end of the run; for `simulate_cb()`
 #'   a matrix state x replicate) is always kept, so a run can be continued
 #'   from it.
@@ -65,7 +79,8 @@
 #'   )
 #'   tail(sim3$recorded)
 #' }
-sg_record <- function(...) {
+sg_record <- function(..., every = c("day", "week", "month", "year")) {
+  every <- .sg_match_choice(every, c("day", "week", "month", "year"), "every")
   parts <- list(...)
   sets <- character(0)
   terms <- list()
@@ -84,7 +99,7 @@ sg_record <- function(...) {
       terms[[length(terms) + 1L]] <- x
     } else {
       .sg_stop(
-        "sg_record() takes \"state\", \"totals\", \"counters\" and objects from ",
+        "sg_record() takes \"state\", \"totals\", \"counters\", \"cases\" and objects from ",
         "sg_quantity(), sg_quantity_weights() and sg_counter()."
       )
     }
@@ -92,12 +107,18 @@ sg_record <- function(...) {
   if (length(sets) == 0L && length(terms) == 0L) {
     .sg_stop("sg_record() needs at least one set or quantity.")
   }
-  structure(list(sets = sets, terms = terms), class = "sg_record")
+  structure(list(sets = sets, terms = terms, every = every), class = "sg_record")
 }
 
 #' @export
 print.sg_record <- function(x, ...) {
-  cat("<sg_record>", if (length(x$sets)) paste0("sets: ", paste(x$sets, collapse = ", ")), "\n")
+  cat(
+    "<sg_record>",
+    paste0(
+      if (length(x$sets)) paste0("sets: ", paste(x$sets, collapse = ", ")),
+      if (!identical(x$every, "day") && !is.null(x$every)) paste0("; counter sums by ", x$every)
+    ), "\n"
+  )
   for (t in x$terms) {
     kind <- switch(class(t)[1L],
       sg_quantity = "quantity",
@@ -215,7 +236,7 @@ sg_counter <- function(name, counter, node = NULL, by = character(0)) {
 
 # ---- internal ------------------------------------------------------------------
 
-.sg_record_sets <- c("state", "totals", "counters")
+.sg_record_sets <- c("state", "totals", "counters", "cases")
 
 .sg_check_record_name <- function(name) {
   ok <- is.character(name) && length(name) == 1L && !is.na(name) && nzchar(name) &&
@@ -263,6 +284,17 @@ sg_counter <- function(name, counter, node = NULL, by = character(0)) {
     .sg_stop("`record` must be \"state\", \"totals\" or an sg_record() object.")
   }
   sums <- Filter(function(t) inherits(t, "sg_counter"), record$terms)
+  if ("cases" %in% record$sets) { # the counters sg_cases() reads, every node
+    cases <- if (is.null(model$hosts)) {
+      c("fertile_batches", "egg_batches")
+    } else {
+      c("infestations", "egg_batches", "superinfestations")
+    }
+    all_nodes <- seq_along(.sg_node_ids(model))
+    sums <- c(sums, lapply(cases, function(cn) {
+      sg_counter(cn, counter = cn, node = all_nodes, by = "node")
+    }))
+  }
   quantities <- Filter(function(t) !inherits(t, "sg_counter"), record$terms)
   rows_x <- list()
   if ("totals" %in% record$sets) {
@@ -282,12 +314,16 @@ sg_counter <- function(name, counter, node = NULL, by = character(0)) {
   names_c <- vapply(rows_c, `[[`, "", "name")
   dup <- c(names_x[duplicated(names_x)], names_c[duplicated(names_c)])
   if (length(dup) > 0L) .sg_stop("Recorded names must be distinct; repeated: ", dup[1L], ".")
+  every <- if (is.null(record$every)) "day" else record$every
+  per <- .sg_counter_periods(model$forcing$dates, every)
   list(
     state = "state" %in% record$sets,
     counters = "counters" %in% record$sets || length(sums) == 0L,
     n_totals = n_totals,
     names_x = names_x, names_c = names_c,
     wx = .sg_rows_csr(rows_x), wc = .sg_rows_csr(rows_c),
+    every = every, c_period = as.integer(per$index - 1L),
+    counter_periods = per$periods,
     record = record
   )
 }
@@ -298,6 +334,26 @@ sg_counter <- function(name, counter, node = NULL, by = character(0)) {
     return(.sg_node_numbers(model, node))
   }
   which(model$landscape$nodes$role == "study")
+}
+
+# Periods of counter sums over the days of a run with these dates: the
+# 1-based period of each day and a data frame of each period's first day
+# (`period`) and number of days (`days`). Weeks are 7-day blocks from the
+# first day (as sg_cases(period = "week")); months and years are calendar
+# periods.
+.sg_counter_periods <- function(dates, every) {
+  key <- switch(EXPR = every,
+    day = seq_along(dates),
+    week = (seq_along(dates) - 1L) %/% 7L,
+    month = format(dates, "%Y-%m"),
+    year = format(dates, "%Y")
+  )
+  index <- match(key, unique(key))
+  first <- !duplicated(index)
+  list(
+    index = index,
+    periods = data.frame(period = dates[first], days = as.integer(tabulate(index)))
+  )
 }
 
 # CSR form (0-based columns) of rows given as list(name, index, weight).
