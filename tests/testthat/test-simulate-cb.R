@@ -115,6 +115,6 @@ test_that("invalid arguments give informative errors", {
   expect_error(simulate_cb(mod, seed = 1.5), "single whole number")
   expect_error(simulate_cb(mod, parallel = NA), "TRUE or FALSE")
   expect_error(simulate_cb(mod, max_memory = 0), "positive number")
-  expect_error(simulate_cb(mod, n_rep = 1000, max_memory = 1e6), "keep = \"totals\"")
+  expect_error(simulate_cb(mod, n_rep = 1000, max_memory = 1e6), "record = \"totals\"")
   expect_error(simulate_cb(mod, init = numeric(3)), "length")
 })

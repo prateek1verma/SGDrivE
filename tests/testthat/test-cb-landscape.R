@@ -174,7 +174,7 @@ test_that("the memory estimate counts every node", {
   m <- cbl_model(days = 15)
   n_rel <- 12L # 4 release blocks x 3 nodes
   n_c <- length(attr(.sg_model_view(m), "counter_names"))
-  bytes <- 8 * 2 * (16 * m$n_states + 15 * (n_c + n_rel))
+  bytes <- 8 * 2 * (16 * m$n_states + 15 * (n_c + n_rel) + m$n_states) # and the final state
   expect_no_error(simulate_cb(m, cbl_init(m), n_rep = 2, seed = 1, max_memory = bytes))
   expect_error(
     simulate_cb(m, cbl_init(m), n_rep = 2, seed = 1, max_memory = bytes - 1),

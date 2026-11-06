@@ -146,6 +146,16 @@ fractions of flies, and the recorder of phase 1 for stochastic runs.
 * Tests: with the same seed, recorded sums equal the sums of a full-state
   run per replicate (recording uses no random numbers); totals equal the
   former `keep = "totals"`; counter sums; final states; memory limit.
+* *Done (2026-11-05):* `Csr`, `read_csr()`, `Recorder` and `as_matrix()`
+  are in `src/recorder.h`, used by `sg_ode_run_cpp()` and
+  `sg_cb_run_cpp()` (new `recorder` argument; the result also has the final
+  state `x`). `simulate_cb()` builds the recorder with `.sg_recorder()` as
+  `simulate_ode()` does; day 0 of `recorded` is W_x x0 in R. `keep`
+  defaults to `NULL`; `meta$keep` is replaced by `meta$record` (as for the
+  ODE). `print()` works without states, totals or counters (nodes with
+  flies from the final states) and shows recorded quantities and counter
+  sums (means over replicates). Summaries of a run without states or
+  totals stop with a hint.
 
 ### WP6. Performance, validation and documentation (M)
 

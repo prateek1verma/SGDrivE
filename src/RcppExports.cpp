@@ -36,8 +36,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // sg_cb_run_cpp
-Rcpp::List sg_cb_run_cpp(const Rcpp::List& view, const Rcpp::NumericVector& x0, const Rcpp::NumericVector& rel_count, double dt, bool stochastic, int n_days, const Rcpp::LogicalVector& record);
-RcppExport SEXP _ScrewDrivE_sg_cb_run_cpp(SEXP viewSEXP, SEXP x0SEXP, SEXP rel_countSEXP, SEXP dtSEXP, SEXP stochasticSEXP, SEXP n_daysSEXP, SEXP recordSEXP) {
+Rcpp::List sg_cb_run_cpp(const Rcpp::List& view, const Rcpp::NumericVector& x0, const Rcpp::NumericVector& rel_count, double dt, bool stochastic, int n_days, const Rcpp::LogicalVector& record, SEXP recorder);
+RcppExport SEXP _ScrewDrivE_sg_cb_run_cpp(SEXP viewSEXP, SEXP x0SEXP, SEXP rel_countSEXP, SEXP dtSEXP, SEXP stochasticSEXP, SEXP n_daysSEXP, SEXP recordSEXP, SEXP recorderSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -48,7 +48,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< bool >::type stochastic(stochasticSEXP);
     Rcpp::traits::input_parameter< int >::type n_days(n_daysSEXP);
     Rcpp::traits::input_parameter< const Rcpp::LogicalVector& >::type record(recordSEXP);
-    rcpp_result_gen = Rcpp::wrap(sg_cb_run_cpp(view, x0, rel_count, dt, stochastic, n_days, record));
+    Rcpp::traits::input_parameter< SEXP >::type recorder(recorderSEXP);
+    rcpp_result_gen = Rcpp::wrap(sg_cb_run_cpp(view, x0, rel_count, dt, stochastic, n_days, record, recorder));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -215,7 +216,7 @@ END_RCPP
 static const R_CallMethodDef CallEntries[] = {
     {"_ScrewDrivE_sg_backend_info_cpp", (DL_FUNC) &_ScrewDrivE_sg_backend_info_cpp, 0},
     {"_ScrewDrivE_sg_cb_step_cpp", (DL_FUNC) &_ScrewDrivE_sg_cb_step_cpp, 5},
-    {"_ScrewDrivE_sg_cb_run_cpp", (DL_FUNC) &_ScrewDrivE_sg_cb_run_cpp, 7},
+    {"_ScrewDrivE_sg_cb_run_cpp", (DL_FUNC) &_ScrewDrivE_sg_cb_run_cpp, 8},
     {"_ScrewDrivE_sg_cb_step_rep_cpp", (DL_FUNC) &_ScrewDrivE_sg_cb_step_rep_cpp, 5},
     {"_ScrewDrivE_sg_chain_advance_cpp", (DL_FUNC) &_ScrewDrivE_sg_chain_advance_cpp, 5},
     {"_ScrewDrivE_sg_dopri5_test_cpp", (DL_FUNC) &_ScrewDrivE_sg_dopri5_test_cpp, 9},

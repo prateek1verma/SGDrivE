@@ -21,10 +21,10 @@
 // infestations_ended counter. The removed flies by stage and node are
 // returned as extra counters after the integrated ones.
 //
-// Recorder (phase 1 WP9; optional): on output days, weighted sums
-// y = W_x x of the state are stored (and the full state only if asked for);
-// every day, weighted sums W_c c of the counters (and the full counters only
-// if asked for). W_x and W_c come from R in CSR form (R/record.R).
+// Recorder (phase 1 WP9; optional; recorder.h): on output days, weighted
+// sums y = W_x x of the state are stored (and the full state only if asked
+// for); every day, weighted sums W_c c of the counters (and the full counters
+// only if asked for). W_x and W_c come from R in CSR form (R/record.R).
 
 #include <Rcpp.h>
 
@@ -34,6 +34,7 @@
 #include "dopri5.h"
 #include "model_view.h"
 #include "rates.h"
+#include "recorder.h"
 
 namespace screwdrive {
 
@@ -52,61 +53,6 @@ struct KernelHandle {
 }  // namespace screwdrive
 
 namespace {
-
-// A sparse matrix in compressed sparse row form: row r has the entries
-// row_ptr[r] .. row_ptr[r + 1] - 1 of col (0-based columns) and w.
-struct Csr {
-  std::vector<int> row_ptr, col;
-  std::vector<double> w;
-  int rows() const { return static_cast<int>(row_ptr.size()) - 1; }
-  // append the rows of W v to out
-  void multiply_append(const double* v, std::vector<double>& out) const {
-    for (int r = 0; r < rows(); ++r) {
-      double s = 0.0;
-      for (int k = row_ptr[r]; k < row_ptr[r + 1]; ++k) s += w[k] * v[col[k]];
-      out.push_back(s);
-    }
-  }
-};
-
-Csr read_csr(const Rcpp::List& rec, const char* name, int n_cols) {
-  const Rcpp::List m = rec[name];
-  Csr out;
-  out.row_ptr = Rcpp::as<std::vector<int>>(m["row_ptr"]);
-  out.col = Rcpp::as<std::vector<int>>(m["col"]);
-  out.w = Rcpp::as<std::vector<double>>(m["w"]);
-  if (out.row_ptr.empty() || out.row_ptr[0] != 0 ||
-      out.row_ptr.back() != static_cast<int>(out.col.size()) || out.w.size() != out.col.size()) {
-    Rcpp::stop("recorder: %s is not a valid CSR matrix", name);
-  }
-  for (std::size_t r = 1; r < out.row_ptr.size(); ++r) {
-    if (out.row_ptr[r] < out.row_ptr[r - 1]) Rcpp::stop("recorder: %s row pointers decrease", name);
-  }
-  for (std::size_t k = 0; k < out.col.size(); ++k) {
-    if (out.col[k] < 0 || out.col[k] >= n_cols || !std::isfinite(out.w[k])) {
-      Rcpp::stop("recorder: %s has a column or weight out of range", name);
-    }
-  }
-  return out;
-}
-
-// What a run stores (phase 1 WP9): full states, weighted state sums W_x,
-// full counters, weighted counter sums W_c. Without a recorder: full states
-// and counters, as before.
-struct Recorder {
-  bool state = true, counters = true;
-  Csr wx, wc;
-  Recorder(SEXP rec, int n_states, int n_counters) {
-    wx.row_ptr = {0};
-    wc.row_ptr = {0};
-    if (Rf_isNull(rec)) return;
-    const Rcpp::List r(rec);
-    state = Rcpp::as<bool>(r["state"]);
-    counters = Rcpp::as<bool>(r["counters"]);
-    wx = read_csr(r, "wx", n_states);
-    wc = read_csr(r, "wc", n_counters);
-  }
-};
 
 // (N5) Apply the node extinction rule to state x at the end of a day; add the
 // removed flies (6 per node: E, L, P, M, U, F) to removed and the infested
@@ -219,7 +165,7 @@ Rcpp::List sg_ode_run_cpp(SEXP ptr, const Rcpp::NumericVector& x0, int day_from,
   }
   const int n_removed = extinction ? 6 * mv.n_node : 0;
   std::vector<double> removed(n_removed);
-  const Recorder rec(recorder, n, nc + n_removed);
+  const screwdrive::Recorder rec(recorder, n, nc + n_removed);
   std::vector<double> counter_row(static_cast<std::size_t>(nc) + n_removed);
   if (x0.size() != n) Rcpp::stop("initial state has the wrong length");
   if (record.size() != mv.n_days) Rcpp::stop("`record` must have one value per day");
@@ -304,14 +250,7 @@ Rcpp::List sg_ode_run_cpp(SEXP ptr, const Rcpp::NumericVector& x0, int day_from,
 
   const int n_done = static_cast<int>(st_steps.size());
   const int n_rec = static_cast<int>(st_days.size());
-  // row-major growable storage to a column-major R matrix
-  auto as_matrix = [](const std::vector<double>& v, int rows, int cols) {
-    Rcpp::NumericMatrix m(rows, cols);
-    for (int r = 0; r < rows; ++r) {
-      for (int c = 0; c < cols; ++c) m(r, c) = v[static_cast<std::size_t>(r) * cols + c];
-    }
-    return m;
-  };
+  using screwdrive::as_matrix;
   const int nc_all = nc + n_removed;
   Rcpp::NumericMatrix states = as_matrix(st_states, n_rec, rec.state ? n : 0);
   Rcpp::NumericMatrix counters = as_matrix(st_counters, n_done, rec.counters ? nc_all : 0);

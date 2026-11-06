@@ -69,8 +69,9 @@ of \code{sim$counters}, without the \code{"@"} node suffix).}
 An object of class \code{sg_record}.
 }
 \description{
-\code{sg_record()} says which results \code{\link[=simulate_ode]{simulate_ode()}} keeps (phase 1 WP9 of the
-multi-node work, D-032, design note section 7.1): full states, totals,
+\code{sg_record()} says which results \code{\link[=simulate_ode]{simulate_ode()}} and \code{\link[=simulate_cb]{simulate_cb()}}
+keep (phases 1 and 2 of the multi-node work, D-032, design note section
+7.1): full states, totals,
 chosen weighted sums of states (\code{sg_quantity()}, \code{sg_quantity_weights()}),
 all daily counters, or chosen sums of counters (\code{sg_counter()}). The sums
 are computed in C++ during the run, so a long run of many nodes stores
@@ -80,13 +81,17 @@ only what is needed.
 \itemize{
 \item \code{simulate_ode(record = "state")} (the default) keeps full states and all
 counters, as before; \code{record = "totals"} keeps totals and all counters.
+\code{simulate_cb(record = )} works the same way for each replicate, with an
+extra last dimension for the replicates (\code{keep = "totals"} is a
+shortcut for \code{record = "totals"}).
 \item Quantities are stored in \code{sim$recorded} (one row per output day, day 0
 included), totals in \code{sim$totals}, states in \code{sim$state}.
 \item With \code{sg_counter()} terms only those counter sums are kept (in
 \code{sim$counter_sums}, one row per day) unless \code{"counters"} is also given;
 without them all counters are kept in \code{sim$counters}.
-\item \code{sim$final_state} (the state at the end of the run) is always kept, so a
-run can be continued from it.
+\item \code{sim$final_state} (the state at the end of the run; for \code{simulate_cb()}
+a matrix state x replicate) is always kept, so a run can be continued
+from it.
 \item Summaries such as \code{\link[=sg_totals]{sg_totals()}} need \code{"state"} or \code{"totals"}; \code{\link[=sg_cases]{sg_cases()}}
 and \code{\link[=sg_flow_balance]{sg_flow_balance()}} need \code{"counters"}. They say so when it is missing.
 }
@@ -125,5 +130,5 @@ if (requireNamespace("MGDrivE", quietly = TRUE)) {
 }
 }
 \seealso{
-\code{\link[=simulate_ode]{simulate_ode()}}
+\code{\link[=simulate_ode]{simulate_ode()}}, \code{\link[=simulate_cb]{simulate_cb()}}
 }

@@ -497,8 +497,13 @@ sg_hosts <- function(sim, per = c("node", "km2"), nodes = NULL) {
     list(array = a, level = level)
   } else if (!is.null(sim$state)) {
     list(array = sim$state, level = "state")
-  } else {
+  } else if (!is.null(sim$totals)) {
     list(array = sim$totals, level = "totals")
+  } else {
+    .sg_stop(
+      "This summary needs the states or totals of the run; simulate with ",
+      "record = \"totals\" or \"state\" (or add \"totals\" to sg_record())."
+    )
   }
   sel <- .sg_sim_nodes(sim, nodes, default)
   if (!sel$multi) {

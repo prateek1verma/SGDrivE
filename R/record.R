@@ -1,7 +1,8 @@
 #' What a simulation stores
 #'
-#' `sg_record()` says which results [simulate_ode()] keeps (phase 1 WP9 of the
-#' multi-node work, D-032, design note section 7.1): full states, totals,
+#' `sg_record()` says which results [simulate_ode()] and [simulate_cb()]
+#' keep (phases 1 and 2 of the multi-node work, D-032, design note section
+#' 7.1): full states, totals,
 #' chosen weighted sums of states (`sg_quantity()`, `sg_quantity_weights()`),
 #' all daily counters, or chosen sums of counters (`sg_counter()`). The sums
 #' are computed in C++ during the run, so a long run of many nodes stores
@@ -15,18 +16,22 @@
 #' @details
 #' * `simulate_ode(record = "state")` (the default) keeps full states and all
 #'   counters, as before; `record = "totals"` keeps totals and all counters.
+#'   `simulate_cb(record = )` works the same way for each replicate, with an
+#'   extra last dimension for the replicates (`keep = "totals"` is a
+#'   shortcut for `record = "totals"`).
 #' * Quantities are stored in `sim$recorded` (one row per output day, day 0
 #'   included), totals in `sim$totals`, states in `sim$state`.
 #' * With `sg_counter()` terms only those counter sums are kept (in
 #'   `sim$counter_sums`, one row per day) unless `"counters"` is also given;
 #'   without them all counters are kept in `sim$counters`.
-#' * `sim$final_state` (the state at the end of the run) is always kept, so a
-#'   run can be continued from it.
+#' * `sim$final_state` (the state at the end of the run; for `simulate_cb()`
+#'   a matrix state x replicate) is always kept, so a run can be continued
+#'   from it.
 #' * Summaries such as [sg_totals()] need `"state"` or `"totals"`; [sg_cases()]
 #'   and [sg_flow_balance()] need `"counters"`. They say so when it is missing.
 #'
 #' @return An object of class `sg_record`.
-#' @seealso [simulate_ode()]
+#' @seealso [simulate_ode()], [simulate_cb()]
 #' @export
 #' @examples
 #' rec <- sg_record(

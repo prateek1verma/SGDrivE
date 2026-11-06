@@ -10,10 +10,11 @@ simulate_cb(
   n_rep = 1L,
   dt = 0.1,
   output_every = 1L,
-  keep = c("state", "totals"),
+  keep = NULL,
   seed = NULL,
   parallel = FALSE,
-  max_memory = 1e+09
+  max_memory = 1e+09,
+  record = NULL
 )
 }
 \arguments{
@@ -33,8 +34,10 @@ steps. Default 0.1 day (D-022).}
 \item{output_every}{Record the state every this many days (and always on
 the last day). Counters are always daily.}
 
-\item{keep}{\code{"state"} (every compartment) or \code{"totals"} (totals by block
-and genotype, much smaller for long runs or many replicates).}
+\item{keep}{A shortcut for \code{record}: \code{"state"} (every compartment) or
+\code{"totals"} (totals by block and genotype, much smaller for long runs or
+many replicates), each with all counters. Give \code{keep} or \code{record}, not
+both.}
 
 \item{seed}{A whole number: the seed of the replicates' random-number
 streams. \code{NULL} (default) draws one from R's current random-number
@@ -47,7 +50,15 @@ reproducible.}
 are the same as with \code{FALSE}.}
 
 \item{max_memory}{Largest allowed size of the results in bytes (default
-1e9). Use \code{keep = "totals"} or a larger \code{output_every} for big runs.}
+1e9), for all replicates. Use \code{record = "totals"}, an \code{\link[=sg_record]{sg_record()}}
+object or a larger \code{output_every} for big runs.}
+
+\item{record}{What each replicate stores, as in \code{\link[=simulate_ode]{simulate_ode()}}:
+\code{"state"} (default: full states on output days and all daily counters),
+\code{"totals"} (totals by stage and genotype per node, and all counters), or
+an \code{\link[=sg_record]{sg_record()}} object with chosen quantities and counter sums,
+computed in C++ during the run. Recording uses no random numbers, so
+the replicates are the same whatever is recorded.}
 }
 \value{
 An object of class \code{sg_sim_cb}, a list with:
@@ -55,12 +66,19 @@ An object of class \code{sg_sim_cb}, a list with:
 \item{\code{day}, \code{date}}{Output days (0 = initial state) and dates.}
 \item{\code{state} or \code{totals}}{Array of counts per node with dimensions
 output day x state x replicate, or output day x (block and genotype)
-x replicate with \code{keep = "totals"} (mated females summed over
+x replicate with \code{record = "totals"} (mated females summed over
 mates). With several nodes the columns of all nodes, named with an
-"@id" suffix.}
+"@id" suffix. \code{NULL} when not recorded.}
+\item{\code{recorded}}{With \code{\link[=sg_record]{sg_record()}} quantities: array output day x
+quantity x replicate.}
 \item{\code{counters}}{Array of daily flows, day x counter x replicate;
 with several nodes per node ("@id"), and with movement the
-emigrants, immigrants and flies lost of each class and node.}
+emigrants, immigrants and flies lost of each class and node. \code{NULL}
+when only counter sums are recorded.}
+\item{\code{counter_sums}}{With \code{sg_counter()} terms: array day x sum x
+replicate.}
+\item{\code{final_state}}{The state at the end of each replicate, matrix
+state x replicate.}
 \item{\code{releases}}{Array of individuals released, day x block x
 replicate (blocks E, P, M, U; with several nodes per block and node,
 "M@north").}
@@ -139,6 +157,14 @@ if (requireNamespace("MGDrivE", quietly = TRUE)) {
   sim3 <- simulate_cb(mod3, x0, n_rep = 3, seed = 1, output_every = 10)
   sim3
   head(sg_totals(sim3, by = "stage", nodes = "c"))
+
+  # record only adults per node and daily cases, per replicate
+  rec <- sg_record(
+    sg_quantity("adults", stage = "adults", by = "node"),
+    sg_counter("cases", counter = "fertile_batches")
+  )
+  small <- simulate_cb(mod3, x0, n_rep = 3, seed = 1, record = rec)
+  small$recorded[31, , ] # day 30: adults per node (rows) and replicate
 }
 }
 \seealso{

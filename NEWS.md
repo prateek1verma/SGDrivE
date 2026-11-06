@@ -14,6 +14,14 @@ before, draw for draw.
   (`"M@north"`); `extinct_day` and `wild_extinct_day` refer to the whole
   landscape; `print()` shows the study nodes' totals, the nodes with flies
   and the movers.
+* `simulate_cb(record =)` keeps chosen results of each replicate, with the
+  meaning of `simulate_ode(record =)` (`"state"`, `"totals"` or an
+  `sg_record()` object; computed in C++ during the run, no random numbers):
+  `sim$recorded` [time, quantity, replicate], `sim$counter_sums` [day, sum,
+  replicate]; `sim$final_state` [state, replicate] is always kept. `keep`
+  stays as a shortcut (`keep = "totals"` is `record = "totals"`); giving
+  both is an error. `max_memory` counts what is recorded. The C++ recorder
+  is shared by both solvers (`src/recorder.h`).
 * Summaries of stochastic runs (`sg_totals()`, `sg_females()`,
   `sg_allele_freq()`, `sg_cases()`, `sg_hosts()`, `sg_flow_balance()`,
   plots) work per node, with `nodes` as for `simulate_ode()`.
