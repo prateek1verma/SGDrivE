@@ -38,7 +38,12 @@ method, \code{"radau"}, \code{"bdf"}, \code{"ode45"} and others, e.g. to check t
 results do not depend on the solver. Default: \code{"dopri5"} for the C++
 backend, \code{"lsoda"} for the R backend.}
 
-\item{rtol, atol}{Relative and absolute error tolerances of the integrator.}
+\item{rtol, atol}{Relative and absolute error tolerances of the integrator
+(\code{atol} in individuals per state). The defaults (1e-8, 1e-10) are
+tight. For large landscapes \verb{rtol = 1e-6, atol = 1e-6} about halves the
+run time and keeps every node's population within about 1e-7 of its
+largest value, also in nearly empty nodes (100-node benchmark,
+\code{bench/m6_tolerance.R}).}
 
 \item{output_every}{Record the state every this many days (and always on
 the last day). Counters and diagnostics are always daily.}

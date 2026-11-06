@@ -1,0 +1,8 @@
+"profile","case","value","unit","per_state_ns","date"
+"ode_rate_evaluation","distinct, movement",163.589997100644,"us",13.8635590763257,"2026-11-06"
+"ode_rate_evaluation","shared, movement",162.729003932327,"us",13.790593553587,"2026-11-06"
+"ode_rate_evaluation","distinct, no movement",112.545007141307,"us",9.53771246960229,"2026-11-06"
+"cb_replicate_year","distinct, crowding off",9.267,"s",NA,"2026-11-06"
+"cb_replicate_year","distinct, crowding on",12.359,"s",NA,"2026-11-06"
+"cb_replicate_year","shared, crowding off",5.697,"s",NA,"2026-11-06"
+"cb_replicate_year","shared, crowding on",9.447,"s",NA,"2026-11-06"

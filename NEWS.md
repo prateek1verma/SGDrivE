@@ -17,6 +17,12 @@ Plan: `dev/MOVEMENT_PHASE3_PLAN.md`.
 * `sg_alleles()` records allele copies (one quantity per allele, optionally
   by node); `sg_allele_freq()` reads them when a run kept neither states
   nor totals.
+* Benchmarks on grids of up to 254 nodes (`bench/m6_*.R`): both solvers
+  grow linearly with the nodes; a 254-node SIT year takes about 36 s with
+  the ODE and 23 s per chain-binomial replicate. The help of
+  `simulate_ode()` recommends `rtol = 1e-6, atol = 1e-6` for large
+  landscapes (about twice as fast, node populations within about 1e-7);
+  the defaults are unchanged.
 * `sg_spread()` measures spread through a landscape: per node the first
   and last output day with flies (at least `extinction_threshold`, 1 by
   default) and the days occupied; over time the number of occupied nodes

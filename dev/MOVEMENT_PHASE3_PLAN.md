@@ -228,6 +228,17 @@ landscape: a transect from south Texas north.
   chain-binomial larval chain under crowding (D-032 phase 2 findings).
   Optimise only what the profile shows, keeping the draw-for-draw match and
   the baselines.
+* *Done (2026-11-06):* `bench/m6_grid.R` (shared grid setup),
+  `bench/m6_multinode_scaling.R`, `bench/m6_tolerance.R`,
+  `bench/m6_profiles.R`; results in `bench/README.md`. Linear growth in both
+  solvers; 254-node SIT ODE year 36 s (target about 30 s); chain-binomial
+  target set at about 23 s per replicate-year for 254 nodes. Sharing the
+  ODE's daily preparation would save nothing (not done). The movement pass
+  is about 30% of an ODE evaluation; `__restrict` on its loops gave no gain
+  above run-to-run noise (not kept). rtol = 1e-6 halves ODE run time with
+  errors near 1e-7; the defaults stay (user, 2026-11-06) and the help of
+  `simulate_ode()` recommends `rtol = 1e-6, atol = 1e-6` for large
+  landscapes.
 
 ### WP8. First landscape: the south Texas transect (L)
 
