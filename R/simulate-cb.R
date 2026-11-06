@@ -58,19 +58,35 @@
 #' population falls below one individual in most winters. Use a larger
 #' `area` in [sg_model()] for populations that persist.
 #'
+#' **Several nodes** (a model with a `landscape`, D-032). Each step runs the
+#' processes above for each node in turn, then adult movement between the
+#' nodes (model specification N4), then emergence and arrivals of each node:
+#' the adults of each compartment leave a node with probability
+#' 1 - exp(-lambda dt) and are spread over its destinations (or lost from
+#' the landscape through open edges) with multinomial draws, keeping their
+#' genotype, mate and age; a fly moves at most once per step. Nodes without
+#' flies are recolonised only by movement or releases. Extinction refers to
+#' the whole landscape: `extinct_day` is the first day ending with no
+#' individuals in any node. The node extinction rule of [simulate_ode()] is
+#' not needed, as counts are whole numbers.
+#'
 #' @return An object of class `sg_sim_cb`, a list with:
 #'   \describe{
 #'     \item{`day`, `date`}{Output days (0 = initial state) and dates.}
 #'     \item{`state` or `totals`}{Array of counts per node with dimensions
 #'       output day x state x replicate, or output day x (block and genotype)
 #'       x replicate with `keep = "totals"` (mated females summed over
-#'       mates).}
-#'     \item{`counters`}{Array of daily flows, day x counter x replicate.}
+#'       mates). With several nodes the columns of all nodes, named with an
+#'       "@id" suffix.}
+#'     \item{`counters`}{Array of daily flows, day x counter x replicate;
+#'       with several nodes per node ("@id"), and with movement the
+#'       emigrants, immigrants and flies lost of each class and node.}
 #'     \item{`releases`}{Array of individuals released, day x block x
-#'       replicate.}
+#'       replicate (blocks E, P, M, U; with several nodes per block and node,
+#'       "M@north").}
 #'     \item{`extinct_day`, `wild_extinct_day`}{First day ending with no
 #'       individuals, and with no individuals of the wild type, per
-#'       replicate.}
+#'       replicate (in the whole landscape).}
 #'     \item{`meta`}{Settings, the seed and each replicate's stream, run
 #'       time, model hash, package version, initial state (before rounding).}
 #'   }
@@ -85,6 +101,18 @@
 #'     n_rep = 5, seed = 1
 #'   )
 #'   sim
+#'
+#'   # three nodes in a row; flies start in the first and spread
+#'   land <- sg_landscape(data.frame(id = c("a", "b", "c"), area = 200), wx)
+#'   chain <- sg_movement_layer(
+#'     list(male = 0.1, virgin = 0.2, mated = 0.15),
+#'     rbind(c(0, 1, 0), c(0.5, 0, 0.5), c(0, 1, 0))
+#'   )
+#'   mod3 <- sg_model(p, sg_cube(MGDrivE::cubeMendelian()), landscape = land, movement = chain)
+#'   x0 <- sg_init(mod3, values = c(E = 50, L = 50, P = 50, M = 20, U = 5, F = 20), nodes = "a")
+#'   sim3 <- simulate_cb(mod3, x0, n_rep = 3, seed = 1, output_every = 10)
+#'   sim3
+#'   head(sg_totals(sim3, by = "stage", nodes = "c"))
 #' }
 simulate_cb <- function(model, init = NULL, n_rep = 1L, dt = 0.1, output_every = 1L,
                         keep = c("state", "totals"), seed = NULL, parallel = FALSE,
@@ -98,7 +126,6 @@ simulate_cb <- function(model, init = NULL, n_rep = 1L, dt = 0.1, output_every =
   if (!whole(n_rep, 1)) .sg_stop("`n_rep` must be a whole number >= 1.")
   if (!whole(output_every, 1)) .sg_stop("`output_every` must be a whole number >= 1 (days).")
   keep <- .sg_match_choice(keep, c("state", "totals"), "keep")
-  .sg_one_node_only(model, "simulate_cb()", "planned for the next version step; use simulate_ode()")
   if (!is.null(seed) && !whole(seed, -.Machine$integer.max)) {
     .sg_stop("`seed` must be NULL or a single whole number.")
   }
@@ -124,7 +151,8 @@ simulate_cb <- function(model, init = NULL, n_rep = 1L, dt = 0.1, output_every =
   agg <- if (keep == "totals") .sg_totals_matrix(model) else NULL
   width <- if (keep == "state") model$n_states else ncol(agg)
 
-  bytes <- 8 * n_rep * ((length(out_days) + 1) * width + n_days * (length(cnames) + 4))
+  n_rel <- ncol(.sg_release_matrix(model)) # 4 release columns per node
+  bytes <- 8 * n_rep * ((length(out_days) + 1) * width + n_days * (length(cnames) + n_rel))
   if (bytes > max_memory) {
     .sg_stop(sprintf(
       "The results would take about %.3g GB (limit `max_memory` = %.3g GB). %s",
@@ -167,7 +195,7 @@ simulate_cb <- function(model, init = NULL, n_rep = 1L, dt = 0.1, output_every =
   out <- list(day = c(0L, out_days), date = c(dates[1L] - 1, dates[out_days]))
   out[[keep]] <- stack("state", cols)
   out$counters <- stack("counters", cnames)
-  out$releases <- stack("releases", c("E", "P", "M", "U"))
+  out$releases <- stack("releases", colnames(reps[[1L]]$releases))
   out$extinct_day <- stats::setNames(vapply(reps, `[[`, 0L, "extinct_day"), rep_names)
   out$wild_extinct_day <- stats::setNames(vapply(reps, `[[`, 0L, "wild_extinct_day"), rep_names)
   p <- model$params
@@ -195,7 +223,10 @@ print.sg_sim_cb <- function(x, ...) {
   last <- tot[dim(tot)[1L], , , drop = FALSE]
   dim(last) <- dim(tot)[2:3]
   fmt <- function(v) format(v, digits = 4L, big.mark = ",")
-  cat("  final totals, mean [min, max] over replicates:\n")
+  multi <- .sg_sim_nodes(x)$multi
+  cat("  final totals", if (multi) " (study nodes)", ", mean [min, max] over replicates:\n",
+    sep = ""
+  )
   for (b in seq_len(nrow(last))) {
     cat(sprintf(
       "    %s %s [%s, %s]\n", dimnames(tot)[[2L]][b], fmt(mean(last[b, ])),
@@ -223,12 +254,14 @@ print.sg_sim_cb <- function(x, ...) {
   }
   ext_line("extinct", x$extinct_day)
   ext_line("wild type eliminated", x$wild_extinct_day)
-  egg_cols <- grepl("^eggs_laid", dimnames(x$counters)[[2L]])
-  eggs <- apply(x$counters[, egg_cols, , drop = FALSE], 3L, sum)
+  cn <- dimnames(x$counters)[[2L]]
+  per_rep <- function(pattern) apply(x$counters[, grepl(pattern, cn), , drop = FALSE], 3L, sum)
   cat(sprintf(
-    "  eggs laid %s and released %s per replicate (mean)\n",
-    fmt(mean(eggs)), fmt(mean(apply(x$releases, 3L, sum)))
+    "  eggs laid %s and released %s per replicate (mean%s)\n",
+    fmt(mean(per_rep("^eggs_laid"))), fmt(mean(apply(x$releases, 3L, sum))),
+    if (multi) ", all nodes" else ""
   ))
+  if (multi) .sg_print_cb_nodes(x, per_rep, fmt)
   cat(sprintf("  seed %s; run time %.2f s\n", format(m$seed), m$run_time))
   invisible(x)
 }
@@ -260,9 +293,34 @@ print.sg_sim_cb <- function(x, ...) {
   agg
 }
 
-# Totals by block [output day, block, replicate] of an sg_sim_cb object.
+# print() line for the nodes of an sg_sim_cb object (D-032): nodes with
+# flies at the end, and with movement the movers and the flies lost from the
+# landscape per replicate.
+.sg_print_cb_nodes <- function(x, per_rep, fmt) {
+  a <- .sg_sim_array(x, default = "all")
+  fly <- !.sg_is_host_name(dimnames(a$array)[[2L]])
+  last <- a$array[dim(a$array)[1L], fly, , drop = FALSE]
+  node <- factor(a$node[fly], levels = unique(a$node))
+  occupied <- apply(last, 3L, function(v) sum(tapply(v, node, sum) > 0))
+  moving <- any(grepl("^emigrants_", dimnames(x$counters)[[2L]]))
+  cat(sprintf(
+    "  nodes: %d, with flies at the end %s [%s, %s]%s\n", nlevels(node), fmt(mean(occupied)),
+    fmt(min(occupied)), fmt(max(occupied)),
+    if (moving) {
+      sprintf(
+        "; movers %s, lost from the landscape %s per replicate (mean)",
+        fmt(mean(per_rep("^emigrants_"))), fmt(mean(per_rep("^lost_")))
+      )
+    } else {
+      ""
+    }
+  ))
+}
+
+# Totals by block [output day, block, replicate] of an sg_sim_cb object
+# (with several nodes, of the study nodes).
 .sg_cb_block_totals <- function(sim) {
-  a <- if (!is.null(sim$state)) sim$state else sim$totals
+  a <- .sg_sim_array(sim)$array
   block <- substr(dimnames(a)[[2L]], 1L, 1L)
   blocks <- c("E", "L", "P", "M", "U", "F")
   out <- vapply(blocks, function(b) {

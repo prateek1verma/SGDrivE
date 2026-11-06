@@ -56,13 +56,17 @@ An object of class \code{sg_sim_cb}, a list with:
 \item{\code{state} or \code{totals}}{Array of counts per node with dimensions
 output day x state x replicate, or output day x (block and genotype)
 x replicate with \code{keep = "totals"} (mated females summed over
-mates).}
-\item{\code{counters}}{Array of daily flows, day x counter x replicate.}
+mates). With several nodes the columns of all nodes, named with an
+"@id" suffix.}
+\item{\code{counters}}{Array of daily flows, day x counter x replicate;
+with several nodes per node ("@id"), and with movement the
+emigrants, immigrants and flies lost of each class and node.}
 \item{\code{releases}}{Array of individuals released, day x block x
-replicate.}
+replicate (blocks E, P, M, U; with several nodes per block and node,
+"M@north").}
 \item{\code{extinct_day}, \code{wild_extinct_day}}{First day ending with no
 individuals, and with no individuals of the wild type, per
-replicate.}
+replicate (in the whole landscape).}
 \item{\code{meta}}{Settings, the seed and each replicate's stream, run
 time, model hash, package version, initial state (before rounding).}
 }
@@ -101,6 +105,18 @@ insect technique (\code{NA} if none; also when the population returns later).
 area matters: with the defaults (1 km^2, \code{wound_density} = 5 wounds per km^2) a McAllen
 population falls below one individual in most winters. Use a larger
 \code{area} in \code{\link[=sg_model]{sg_model()}} for populations that persist.
+
+\strong{Several nodes} (a model with a \code{landscape}, D-032). Each step runs the
+processes above for each node in turn, then adult movement between the
+nodes (model specification N4), then emergence and arrivals of each node:
+the adults of each compartment leave a node with probability
+1 - exp(-lambda dt) and are spread over its destinations (or lost from
+the landscape through open edges) with multinomial draws, keeping their
+genotype, mate and age; a fly moves at most once per step. Nodes without
+flies are recolonised only by movement or releases. Extinction refers to
+the whole landscape: \code{extinct_day} is the first day ending with no
+individuals in any node. The node extinction rule of \code{\link[=simulate_ode]{simulate_ode()}} is
+not needed, as counts are whole numbers.
 }
 \examples{
 if (requireNamespace("MGDrivE", quietly = TRUE)) {
@@ -111,6 +127,18 @@ if (requireNamespace("MGDrivE", quietly = TRUE)) {
     n_rep = 5, seed = 1
   )
   sim
+
+  # three nodes in a row; flies start in the first and spread
+  land <- sg_landscape(data.frame(id = c("a", "b", "c"), area = 200), wx)
+  chain <- sg_movement_layer(
+    list(male = 0.1, virgin = 0.2, mated = 0.15),
+    rbind(c(0, 1, 0), c(0.5, 0, 0.5), c(0, 1, 0))
+  )
+  mod3 <- sg_model(p, sg_cube(MGDrivE::cubeMendelian()), landscape = land, movement = chain)
+  x0 <- sg_init(mod3, values = c(E = 50, L = 50, P = 50, M = 20, U = 5, F = 20), nodes = "a")
+  sim3 <- simulate_cb(mod3, x0, n_rep = 3, seed = 1, output_every = 10)
+  sim3
+  head(sg_totals(sim3, by = "stage", nodes = "c"))
 }
 }
 \seealso{

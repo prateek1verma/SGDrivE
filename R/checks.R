@@ -86,9 +86,9 @@ sg_flow_balance <- function(sim) {
   r_node <- .sg_name_node(colnames(sim$releases))
   rows <- lapply(sel$ids, function(id) {
     a <- a_all$array[, a_all$node == id, , drop = FALSE]
-    k <- sim$counters[, k_node == id, drop = FALSE]
-    colnames(k) <- sub("@.*$", "", colnames(k))
-    rel <- sim$releases[, r_node == id, drop = FALSE]
+    k <- .sg_columns(sim$counters, k_node == id)
+    dimnames(k)[[2L]] <- sub("@.*$", "", dimnames(k)[[2L]])
+    rel <- .sg_columns(sim$releases, r_node == id)
     d <- .sg_flow_balance_unit(sim, a, k, rel)
     cbind(d[1L], node = id, d[-1L])
   })

@@ -122,6 +122,15 @@ fractions of flies, and the recorder of phase 1 for stochastic runs.
 * Tests: summaries against direct sums of states and counters per
   replicate; flow balance per node with residual exactly 0; parallel
   replicates; print.
+* *Done (2026-11-05):* the guard is gone; `.sg_cb_inputs()` stores releases
+  per block and node (the columns of `.sg_release_matrix()`); the memory
+  estimate counts the release columns of every node; `print()` shows the
+  study nodes' totals (as `simulate_ode()`), the nodes with flies at the
+  end and the movers and lost flies; `as.data.frame()` lists all nodes by
+  node (as for the ODE). `sg_cases()` and `sg_flow_balance()` select node
+  columns of [day, counter, replicate] arrays (`.sg_columns()`); the other
+  summaries already worked per node. Early stop and extinction days were
+  landscape-wide since WP2. Help, example and NEWS updated.
 
 ### WP5. Recorder for `simulate_cb()` (M)
 
