@@ -1,5 +1,5 @@
-// Chain-binomial step of the ScrewDrivE v0.1 model (D-022, D-024; model
-// specification S15-S19).
+// Chain-binomial step of the ScrewDrivE model (D-022, D-024; model
+// specification S15-S19; several nodes: section 10 and N4, D-032).
 //
 // A block-by-block translation of the R reference step .sg_cb_step_r()
 // (R/cb-reference.R). The random draws are made with R's own generators
@@ -108,15 +108,39 @@ struct PreparedChain {
   }
 };
 
+// The day's prepared chains of one forcing series (shared by the nodes on
+// that series, D-032): day rates, eggs, larvae without crowding, pupae, and
+// the adult chains of each genotype.
+struct SeriesChains {
+  DayRates r;
+  PreparedChain e, l, p;
+  std::vector<PreparedChain> m, f;  // [n_g]
+};
+
+// What part 1 of a node's step hands to part 3 (MODEL_SPEC section 10).
+struct NodeWork {
+  Aggregates agg;   // aggregates at the start of the step (S15)
+  PreparedChain l;  // larval chain with crowding, prepared this step
+  bool crowd = false, empty = false;
+  std::vector<double> eggs, out_e, out_l, out_p, em_m, em_f, matings, host_i;
+  double dth[6] = {0, 0, 0, 0, 0, 0};  // deaths E, L, P, M, U, F
+  double sen_m = 0, sen_u = 0, sen_f = 0;
+  double n_batches = 0, n_fertile = 0, expected_fertile = 0;
+  double h_s = 0, h_w = 0, infested = 0, healed = 0, ended = 0, treated = 0, wounded = 0;
+};
+
 class CbStepper {
  public:
   CbStepper(const ModelView& mv, double dt);
 
-  // Forcing-dependent chains of simulation day `day` (1-based).
+  // Forcing-dependent chains of simulation day `day` (1-based), once per
+  // distinct forcing series.
   void prepare_day(int day);
 
   // Advance state x (length n_states) by one step in place; flows (length
-  // n_counters, order of .sg_counter_names()) receive the step's flows.
+  // n_counters, order of .sg_model_counter_names()) receive the step's flows.
+  // With several nodes: part 1 of every node, movement, part 3 of every node
+  // (MODEL_SPEC section 10).
   template <class D>
   void step(double* x, double* flows, D& draws);
 
@@ -124,17 +148,24 @@ class CbStepper {
   const ModelView& mv_;
   double dt_;
   RateKernel kernel_;
-  DayRates r_;
   int day_ = 0;
   ChainAdvance adv_e_, adv_l_, adv_p_, adv_a_, adv_i_;
-  PreparedChain ch_e_, ch_l_, ch_p_, ch_i_;  // ch_i_: infestation chain (D-030)
-  std::vector<PreparedChain> ch_m_, ch_f_;
+  std::vector<SeriesChains> series_;  // [n_series]
+  PreparedChain ch_i_;                // infestation chain (D-030), the same everywhere
+  std::vector<NodeWork> work_;        // [n_node]
   // work arrays
-  std::vector<double> q_, p_, pbar_;           // chain preparation
-  std::vector<double> cur_, nx_;               // state at step start (after mating), new state
-  std::vector<double> eggs_, out_e_, out_l_, out_p_, em_m_, em_f_, matings_, ym_;
-  std::vector<double> buf_, rest_;             // multinomial output and work
-  std::vector<double> host_i_;                 // [n_I]: infestation chain after moves
+  std::vector<double> q_, p_, pbar_;  // chain preparation
+  std::vector<double> cur_, nx_;      // state at step start (after mating), new state
+  std::vector<double> ym_;
+  std::vector<double> buf_, rest_;    // multinomial output and work
+  // movement (N4): destinations of each node, the union of the groups' edges
+  // in increasing node order (CSR), and the union position of every group
+  // edge; per day the probability of leaving [3, n_node], the destination
+  // probabilities [3, union edges] and the probability of being lost
+  // [3, n_node]; immigrants of the step; one row's probabilities
+  std::vector<int> move_row_ptr_, move_col_, move_map_;
+  std::vector<double> move_pe_, move_prob_, move_lost_, imm_;
+  std::vector<double> move_p_, move_buf_, move_rest_;
 
   void prepare(PreparedChain& ch, ChainAdvance& adv, const double* q, int n, int last,
                double mu);
@@ -143,6 +174,13 @@ class CbStepper {
             double* deaths);
   template <class D>
   void place(double n, const PreparedChain& ch, double* nx, D& draws, double* deaths);
+  template <class D>
+  void part1(int node, D& draws);
+  template <class D>
+  void part3(int node, double* flows, D& draws);
+  void prepare_movement(int day);
+  template <class D>
+  void movement(double* move_counters, D& draws);
 };
 
 // ---- template members --------------------------------------------------------
@@ -178,88 +216,163 @@ void CbStepper::place(double n, const PreparedChain& ch, double* nx, D& draws,
 template <class D>
 void CbStepper::step(double* x, double* flows, D& draws) {
   const ModelView& v = mv_;
-  const int ng = v.n_g, nE = v.n_E, nL = v.n_L, nP = v.n_P, nA = v.n_A;
-  const double dt = dt_;
-
-  // ---- aggregates (S15): from the state at the start of the step ----------
-  kernel_.aggregate(r_, x);
-  const Aggregates& a = kernel_.agg();
   std::copy(x, x + v.n_states, cur_.begin());
   std::fill(nx_.begin(), nx_.end(), 0.0);
-  double* egg = cur_.data() + v.offsets[kE];
-  double* lar = cur_.data() + v.offsets[kL];
-  double* pup = cur_.data() + v.offsets[kP];
-  double* mal = cur_.data() + v.offsets[kM];
-  double* unm = cur_.data() + v.offsets[kU];
-  double* fem = cur_.data() + v.offsets[kF];
-  double* n_e = nx_.data() + v.offsets[kE];
-  double* n_l = nx_.data() + v.offsets[kL];
-  double* n_p = nx_.data() + v.offsets[kP];
-  double* n_m = nx_.data() + v.offsets[kM];
-  double* n_u = nx_.data() + v.offsets[kU];
-  double* n_f = nx_.data() + v.offsets[kF];
+  for (int i = 0; i < v.n_node; ++i) part1(i, draws);
+  if (v.n_groups > 0) movement(flows + static_cast<std::size_t>(v.n_node) * v.n_counters_node, draws);
+  for (int i = 0; i < v.n_node; ++i) {
+    part3(i, flows + static_cast<std::size_t>(i) * v.n_counters_node, draws);
+  }
+  std::copy(nx_.begin(), nx_.end(), x);
+}
+
+// (N4) Movement of all nodes, between part 1 and part 3: the adults after
+// the chain moves (in nx_) leave with the day's probability, compartment by
+// compartment in state order (node slowest; M, U, F; genotype, mate genotype,
+// sub-stage); emigrants are split over the destinations in increasing node
+// order and "lost" (sequential conditional binomials); immigrants are added
+// after all draws, so no fly moves twice in a step. Counters: emigrants,
+// immigrants and lost by class for each node (9 per node).
+template <class D>
+void CbStepper::movement(double* mc, D& draws) {
+  const ModelView& v = mv_;
+  const int ng = v.n_g, nA = v.n_A;
+  const int block_off[3] = {v.offsets[kM], v.offsets[kU], v.offsets[kF]};
+  const int block_len[3] = {ng * nA, ng * nA, ng * ng * nA};
+  std::fill(mc, mc + ModelView::kMoveCounters * v.n_node, 0.0);
+  std::fill(imm_.begin(), imm_.end(), 0.0);
+  for (int i = 0; i < v.n_node; ++i) {
+    const std::size_t base = static_cast<std::size_t>(i) * v.node_stride;
+    const int e0 = move_row_ptr_[i], deg = move_row_ptr_[i + 1] - move_row_ptr_[i];
+    for (int s = 0; s < 3; ++s) {
+      const double pe = move_pe_[static_cast<std::size_t>(i) * 3 + s];
+      if (pe == 0.0) continue;
+      for (int d = 0; d < deg; ++d) move_p_[d] = move_prob_[static_cast<std::size_t>(e0 + d) * 3 + s];
+      move_p_[deg] = move_lost_[static_cast<std::size_t>(i) * 3 + s];
+      double* x = nx_.data() + base + block_off[s];
+      for (int k = 0; k < block_len[s]; ++k) {
+        if (x[k] == 0.0) continue;
+        const double e = draws.binom(x[k], pe);
+        if (e == 0.0) continue;
+        x[k] -= e;
+        mc[i * ModelView::kMoveCounters + s] += e;  // emigrants
+        draws.multinom(e, move_p_.data(), deg + 1, move_buf_.data(), move_rest_.data());
+        for (int d = 0; d < deg; ++d) {
+          const int j = move_col_[e0 + d];
+          imm_[static_cast<std::size_t>(j) * v.node_stride + block_off[s] + k] += move_buf_[d];
+          mc[j * ModelView::kMoveCounters + 3 + s] += move_buf_[d];  // immigrants
+        }
+        mc[i * ModelView::kMoveCounters + 6 + s] += move_buf_[deg];  // lost
+      }
+    }
+  }
+  for (std::size_t q = 0; q < nx_.size(); ++q) nx_[q] += imm_[q];
+}
+
+// Part 1 of node i's step: aggregates (S15), eggs (S17), hosts (H3), mating
+// (S18) and chain moves (S16), from the node's counts at the start of the
+// step. A node without flies skips its fly draws (draws of zero individuals
+// use no random numbers, so the result is the same).
+template <class D>
+void CbStepper::part1(int node, D& draws) {
+  const ModelView& v = mv_;
+  const int ng = v.n_g, nE = v.n_E, nL = v.n_L, nP = v.n_P, nA = v.n_A;
+  const double dt = dt_;
+  const std::size_t base = static_cast<std::size_t>(node) * v.node_stride;
+  const SeriesChains& sc = series_[v.forcing_index[node]];
+  const DayRates& r = sc.r;
+  NodeWork& w = work_[node];
+
+  // ---- aggregates (S15): from the state at the start of the step ----------
+  kernel_.set_node(node);
+  kernel_.aggregate(r, cur_.data() + base);
+  w.agg = kernel_.agg();
+  const Aggregates& a = w.agg;
+  double* egg = cur_.data() + base + v.offsets[kE];
+  double* lar = cur_.data() + base + v.offsets[kL];
+  double* pup = cur_.data() + base + v.offsets[kP];
+  double* mal = cur_.data() + base + v.offsets[kM];
+  double* unm = cur_.data() + base + v.offsets[kU];
+  double* fem = cur_.data() + base + v.offsets[kF];
+  double* n_e = nx_.data() + base + v.offsets[kE];
+  double* n_l = nx_.data() + base + v.offsets[kL];
+  double* n_p = nx_.data() + base + v.offsets[kP];
+  double* n_m = nx_.data() + base + v.offsets[kM];
+  double* n_u = nx_.data() + base + v.offsets[kU];
+  double* n_f = nx_.data() + base + v.offsets[kF];
+  const int n_fly = v.offsets[kF] + ng * ng * nA;  // fly states come first in a node
+  w.empty = std::all_of(egg, egg + n_fly, [](double z) { return z == 0.0; });
+
+  std::fill(w.eggs.begin(), w.eggs.end(), 0.0);
+  std::fill(w.out_e.begin(), w.out_e.end(), 0.0);
+  std::fill(w.out_l.begin(), w.out_l.end(), 0.0);
+  std::fill(w.out_p.begin(), w.out_p.end(), 0.0);
+  std::fill(w.matings.begin(), w.matings.end(), 0.0);
+  std::fill(w.dth, w.dth + 6, 0.0);
+  w.sen_m = w.sen_u = w.sen_f = 0.0;
+  w.n_batches = w.n_fertile = w.expected_fertile = 0.0;
 
   // ---- eggs (S17): oviposition events, those with at least one viable egg
   // (fertile, the case proxy; D-026) and their viable eggs, or single eggs --
   const bool batches = v.oviposition_batches;
-  const double factor = r_.batch_factor, clutch = r_.clutch;
-  std::fill(eggs_.begin(), eggs_.end(), 0.0);
-  double n_batches = 0.0, n_fertile = 0.0, expected_fertile = 0.0;
+  const double factor = r.batch_factor, clutch = r.clutch;
   const int n_cross = ng * ng;
-  for (int g = 0; g < ng; ++g) {
-    for (int m = 0; m < ng; ++m) {
-      const int pair = g * ng + m;
-      const double tot = kernel_.pair_egg_total()[pair];
-      // females lay batches (and search) in proportion to s_g; viable eggs
-      // per egg of a batch without s_g (D-031)
-      const double w_search = kernel_.pair_search()[pair] * a.w_lay[pair];
-      const double viab = kernel_.pair_batch_viability()[pair];
-      const double share = -std::expm1(-clutch * viab);
-      double n_eggs;
-      if (batches) {
-        const double nb = draws.pois(a.psi * factor * w_search * dt);
-        n_batches += nb;
-        if (nb == 0.0 || share <= 0.0) continue;
-        const double nf = draws.binom(nb, share);
-        n_fertile += nf;
-        if (nf == 0.0) continue;
-        n_eggs = draws.ztp_sum(nf, clutch * viab);
-      } else {
-        expected_fertile += w_search * share;
-        if (tot <= 0.0) continue;
-        n_eggs = draws.pois(v.R * r_.phi_ov * a.psi * a.w_lay[pair] * tot * dt);
+  if (!w.empty) {
+    for (int g = 0; g < ng; ++g) {
+      for (int m = 0; m < ng; ++m) {
+        const int pair = g * ng + m;
+        const double tot = kernel_.pair_egg_total()[pair];
+        // females lay batches (and search) in proportion to s_g; viable eggs
+        // per egg of a batch without s_g (D-031)
+        const double w_search = kernel_.pair_search()[pair] * a.w_lay[pair];
+        const double viab = kernel_.pair_batch_viability()[pair];
+        const double share = -std::expm1(-clutch * viab);
+        double n_eggs;
+        if (batches) {
+          const double nb = draws.pois(a.psi * factor * w_search * dt);
+          w.n_batches += nb;
+          if (nb == 0.0 || share <= 0.0) continue;
+          const double nf = draws.binom(nb, share);
+          w.n_fertile += nf;
+          if (nf == 0.0) continue;
+          n_eggs = draws.ztp_sum(nf, clutch * viab);
+        } else {
+          w.expected_fertile += w_search * share;
+          if (tot <= 0.0) continue;
+          n_eggs = draws.pois(v.R * r.phi_ov * a.psi * a.w_lay[pair] * tot * dt);
+        }
+        for (int k = 0; k < ng; ++k) {
+          ym_[k] = v.egg_tensor[static_cast<std::size_t>(k) * n_cross + pair] / tot;
+        }
+        draws.multinom(n_eggs, ym_.data(), ng, buf_.data(), rest_.data());
+        for (int k = 0; k < ng; ++k) w.eggs[k] += buf_[k];
       }
-      for (int k = 0; k < ng; ++k) {
-        ym_[k] = v.egg_tensor[static_cast<std::size_t>(k) * n_cross + pair] / tot;
-      }
-      draws.multinom(n_eggs, ym_.data(), ng, buf_.data(), rest_.data());
-      for (int k = 0; k < ng; ++k) eggs_[k] += buf_[k];
     }
   }
 
   // ---- hosts (H3, D-030): fertile batches on uninfested wounds infest the
   // distinct hosts they hit (cases); the rest are superinfestations; then
   // healing, the infestation chain (end or treatment) and wounding -------------
-  double h_s = 0.0, h_w = 0.0, infested = 0.0, healed = 0.0, ended = 0.0, treated = 0.0;
-  double wounded = 0.0;
+  w.h_s = w.h_w = w.infested = w.healed = w.ended = w.treated = w.wounded = 0.0;
   if (v.host_model) {
     if (!batches) {  // single eggs: fertile oviposition events drawn for the hosts
-      n_fertile = draws.pois(a.psi * factor * expected_fertile * dt);
+      w.n_fertile = draws.pois(a.psi * factor * w.expected_fertile * dt);
     }
-    h_s = cur_[v.host_offsets[0]];
-    h_w = cur_[v.host_offsets[1]];
+    w.h_s = cur_[base + v.host_offsets[0]];
+    w.h_w = cur_[base + v.host_offsets[1]];
     const double sites = a.sites;
     const double n_on_w =
-        (sites > 0.0 && n_fertile > 0.0) ? draws.binom(n_fertile, h_w / sites) : 0.0;
-    infested = draws.occupancy(n_on_w, h_w);
-    healed = draws.binom(h_w - infested, 1.0 - std::exp(-v.host_healing * dt));
-    std::fill(host_i_.begin(), host_i_.end(), 0.0);
-    move(cur_.data() + v.host_offsets[2], host_i_.data(), ch_i_, draws, &ended, &treated);
-    wounded = draws.binom(h_s, 1.0 - std::exp(-v.host_wounding * dt));
+        (sites > 0.0 && w.n_fertile > 0.0) ? draws.binom(w.n_fertile, w.h_w / sites) : 0.0;
+    w.infested = draws.occupancy(n_on_w, w.h_w);
+    w.healed = draws.binom(w.h_w - w.infested, 1.0 - std::exp(-v.host_healing * dt));
+    std::fill(w.host_i.begin(), w.host_i.end(), 0.0);
+    move(cur_.data() + base + v.host_offsets[2], w.host_i.data(), ch_i_, draws, &w.ended,
+         &w.treated);
+    w.wounded = draws.binom(w.h_s, 1.0 - std::exp(-v.host_wounding * dt));
   }
+  if (w.empty) return;
 
   // ---- mating (S18), before ageing ------------------------------------------
-  std::fill(matings_.begin(), matings_.end(), 0.0);
   const double nu_g = v.nu * a.g_find;
   for (int g = 0; g < ng; ++g) {
     if (!a.mate_ok[g]) continue;
@@ -272,130 +385,157 @@ void CbStepper::step(double* x, double* flows, D& draws) {
       unm[g * nA + s] -= y;
       for (int m = 0; m < ng; ++m) {
         fem[(g * ng + m) * nA + s] += buf_[m];
-        matings_[g * ng + m] += buf_[m];
+        w.matings[g * ng + m] += buf_[m];
       }
     }
   }
 
   // ---- chain moves (S16), block by block in state order ------------------------
   // the larval hazard depends on crowding
-  if ((v.larval_per_wound && v.H > 0) || v.larval_per_infested_host) {
-    for (int s = 0; s < nL; ++s) q_[s] = r_.q_l;
-    prepare(ch_l_, adv_l_, q_.data(), nL, nL, a.mu_l);
+  w.crowd = (v.larval_per_wound && v.node_H[node] > 0) || v.larval_per_infested_host;
+  if (w.crowd) {
+    for (int s = 0; s < nL; ++s) q_[s] = r.q_l;
+    prepare(w.l, adv_l_, q_.data(), nL, nL, a.mu_l);
   }
-  double dth[6] = {0, 0, 0, 0, 0, 0};  // deaths E, L, P, M, U, F
-  double sen_m = 0.0, sen_u = 0.0, sen_f = 0.0;
+  const PreparedChain& ch_l = w.crowd ? w.l : sc.l;
   for (int g = 0; g < ng; ++g) {
-    out_e_[g] = 0.0;
-    move(egg + g * nE, n_e + g * nE, ch_e_, draws, &out_e_[g], &dth[0]);
-  }
-  for (int g = 0; g < ng; ++g) {
-    out_l_[g] = 0.0;
-    move(lar + g * nL, n_l + g * nL, ch_l_, draws, &out_l_[g], &dth[1]);
+    move(egg + g * nE, n_e + g * nE, sc.e, draws, &w.out_e[g], &w.dth[0]);
   }
   for (int g = 0; g < ng; ++g) {
-    out_p_[g] = 0.0;
-    move(pup + g * nP, n_p + g * nP, ch_p_, draws, &out_p_[g], &dth[2]);
+    move(lar + g * nL, n_l + g * nL, ch_l, draws, &w.out_l[g], &w.dth[1]);
   }
-  for (int g = 0; g < ng; ++g) move(mal + g * nA, n_m + g * nA, ch_m_[g], draws, &sen_m, &dth[3]);
-  for (int g = 0; g < ng; ++g) move(unm + g * nA, n_u + g * nA, ch_f_[g], draws, &sen_u, &dth[4]);
+  for (int g = 0; g < ng; ++g) {
+    move(pup + g * nP, n_p + g * nP, sc.p, draws, &w.out_p[g], &w.dth[2]);
+  }
+  for (int g = 0; g < ng; ++g) {
+    move(mal + g * nA, n_m + g * nA, sc.m[g], draws, &w.sen_m, &w.dth[3]);
+  }
+  for (int g = 0; g < ng; ++g) {
+    move(unm + g * nA, n_u + g * nA, sc.f[g], draws, &w.sen_u, &w.dth[4]);
+  }
   for (int g = 0; g < ng; ++g) {
     for (int m = 0; m < ng; ++m) {
       const int off = (g * ng + m) * nA;
-      move(fem + off, n_f + off, ch_f_[g], draws, &sen_f, &dth[5]);
+      move(fem + off, n_f + off, sc.f[g], draws, &w.sen_f, &w.dth[5]);
     }
   }
+}
+
+// Part 3 of node i's step: emergence (S19), arrivals, and the node's flows
+// (written to `flows`, the node's block of counters) and host states.
+template <class D>
+void CbStepper::part3(int node, double* flows, D& draws) {
+  const ModelView& v = mv_;
+  const int ng = v.n_g, nE = v.n_E, nL = v.n_L, nP = v.n_P, nA = v.n_A;
+  const double dt = dt_;
+  const std::size_t base = static_cast<std::size_t>(node) * v.node_stride;
+  const SeriesChains& sc = series_[v.forcing_index[node]];
+  const DayRates& r = sc.r;
+  NodeWork& w = work_[node];
+  const Aggregates& a = w.agg;
+  double* n_e = nx_.data() + base + v.offsets[kE];
+  double* n_l = nx_.data() + base + v.offsets[kL];
+  double* n_p = nx_.data() + base + v.offsets[kP];
+  double* n_m = nx_.data() + base + v.offsets[kM];
+  double* n_u = nx_.data() + base + v.offsets[kU];
+  double* n_f = nx_.data() + base + v.offsets[kF];
+  const PreparedChain& ch_l = w.crowd ? w.l : sc.l;
+  const bool batches = v.oviposition_batches;
+  const double factor = r.batch_factor;
+  const double nu_g = v.nu * a.g_find;
 
   // ---- emergence (S19): sex, then survival ------------------------------------
   double sum_em_m = 0.0, sum_em_f = 0.0, sum_z = 0.0;
-  for (int g = 0; g < ng; ++g) {
-    const double z = out_p_[g];
-    const double zf = draws.binom(z, v.phi[g]);
-    em_f_[g] = draws.binom(zf, v.xiF[g]);
-    em_m_[g] = draws.binom(z - zf, v.xiM[g]);
-    sum_z += z;
-    sum_em_m += em_m_[g];
-    sum_em_f += em_f_[g];
-  }
+  std::fill(w.em_m.begin(), w.em_m.end(), 0.0);
+  std::fill(w.em_f.begin(), w.em_f.end(), 0.0);
+  if (!w.empty) {
+    for (int g = 0; g < ng; ++g) {
+      const double z = w.out_p[g];
+      const double zf = draws.binom(z, v.phi[g]);
+      w.em_f[g] = draws.binom(zf, v.xiF[g]);
+      w.em_m[g] = draws.binom(z - zf, v.xiM[g]);
+      sum_z += z;
+      sum_em_m += w.em_m[g];
+      sum_em_f += w.em_f[g];
+    }
 
-  // ---- arrivals (S16), in state order -----------------------------------------
-  for (int k = 0; k < ng; ++k) place(eggs_[k], ch_e_, n_e + k * nE, draws, &dth[0]);
-  for (int g = 0; g < ng; ++g) place(out_e_[g], ch_l_, n_l + g * nL, draws, &dth[1]);
-  for (int g = 0; g < ng; ++g) place(out_l_[g], ch_p_, n_p + g * nP, draws, &dth[2]);
-  for (int g = 0; g < ng; ++g) place(em_m_[g], ch_m_[g], n_m + g * nA, draws, &dth[3]);
-  // emerged females (S18, S19): death, then mating (at emergence with
-  // "instant", otherwise for the rest of the step), then placement
-  const double x_arr = (v.mating_instant ? nu_g : v.nu * v.receptive[0] * a.g_find) * dt;
-  const double p_arr_mate = x_arr > 0.0 ? 1.0 + std::expm1(-x_arr) / x_arr : 0.0;
-  for (int g = 0; g < ng; ++g) {
-    const PreparedChain& ch = ch_f_[g];
-    std::fill(ym_.begin(), ym_.end(), 0.0);
-    double unmated = 0.0;
-    if (em_f_[g] > 0.0) {
-      const bool mated_now = v.mating_instant && a.mate_ok[g];
-      const double d = draws.binom(em_f_[g], ch.arr_die);
-      dth[mated_now ? 5 : 4] += d;
-      const double surv = em_f_[g] - d;
-      double y = 0.0;
-      if (mated_now) {
-        y = surv;
-      } else if (!v.mating_instant && a.mate_ok[g]) {
-        y = draws.binom(surv, p_arr_mate);
+    // ---- arrivals (S16), in state order ---------------------------------------
+    for (int k = 0; k < ng; ++k) place(w.eggs[k], sc.e, n_e + k * nE, draws, &w.dth[0]);
+    for (int g = 0; g < ng; ++g) place(w.out_e[g], ch_l, n_l + g * nL, draws, &w.dth[1]);
+    for (int g = 0; g < ng; ++g) place(w.out_l[g], sc.p, n_p + g * nP, draws, &w.dth[2]);
+    for (int g = 0; g < ng; ++g) place(w.em_m[g], sc.m[g], n_m + g * nA, draws, &w.dth[3]);
+    // emerged females (S18, S19): death, then mating (at emergence with
+    // "instant", otherwise for the rest of the step), then placement
+    const double x_arr = (v.mating_instant ? nu_g : v.nu * v.receptive[0] * a.g_find) * dt;
+    const double p_arr_mate = x_arr > 0.0 ? 1.0 + std::expm1(-x_arr) / x_arr : 0.0;
+    for (int g = 0; g < ng; ++g) {
+      const PreparedChain& ch = sc.f[g];
+      std::fill(ym_.begin(), ym_.end(), 0.0);
+      double unmated = 0.0;
+      if (w.em_f[g] > 0.0) {
+        const bool mated_now = v.mating_instant && a.mate_ok[g];
+        const double d = draws.binom(w.em_f[g], ch.arr_die);
+        w.dth[mated_now ? 5 : 4] += d;
+        const double surv = w.em_f[g] - d;
+        double y = 0.0;
+        if (mated_now) {
+          y = surv;
+        } else if (!v.mating_instant && a.mate_ok[g]) {
+          y = draws.binom(surv, p_arr_mate);
+        }
+        if (y > 0.0) {
+          draws.multinom(y, a.pi.data() + static_cast<std::size_t>(g) * ng, ng, ym_.data(),
+                         rest_.data());
+        }
+        unmated = surv - y;
+        for (int m = 0; m < ng; ++m) w.matings[g * ng + m] += ym_[m];
       }
-      if (y > 0.0) {
-        draws.multinom(y, a.pi.data() + static_cast<std::size_t>(g) * ng, ng, ym_.data(),
-                       rest_.data());
+      if (unmated > 0.0) {
+        draws.multinom(unmated, ch.arr.data(), nA, buf_.data(), rest_.data());
+        for (int s = 0; s < nA; ++s) n_u[g * nA + s] += buf_[s];
       }
-      unmated = surv - y;
-      for (int m = 0; m < ng; ++m) matings_[g * ng + m] += ym_[m];
-    }
-    if (unmated > 0.0) {
-      draws.multinom(unmated, ch.arr.data(), nA, buf_.data(), rest_.data());
-      for (int s = 0; s < nA; ++s) n_u[g * nA + s] += buf_[s];
-    }
-    for (int m = 0; m < ng; ++m) {
-      if (ym_[m] > 0.0) {
-        draws.multinom(ym_[m], ch.arr.data(), nA, buf_.data(), rest_.data());
-        for (int s = 0; s < nA; ++s) n_f[(g * ng + m) * nA + s] += buf_[s];
+      for (int m = 0; m < ng; ++m) {
+        if (ym_[m] > 0.0) {
+          draws.multinom(ym_[m], ch.arr.data(), nA, buf_.data(), rest_.data());
+          for (int s = 0; s < nA; ++s) n_f[(g * ng + m) * nA + s] += buf_[s];
+        }
       }
     }
   }
 
   // ---- flows (order of .sg_counter_names()) -----------------------------------
   int c = 0;
-  for (int k = 0; k < ng; ++k) flows[c++] = eggs_[k];
-  flows[c++] = batches ? n_batches : a.psi * a.sum_search * factor * dt;  // egg_batches
-  flows[c++] = (batches || v.host_model) ? n_fertile
-                                          : a.psi * factor * expected_fertile * dt;  // fertile_batches
+  for (int k = 0; k < ng; ++k) flows[c++] = w.eggs[k];
+  flows[c++] = batches ? w.n_batches : a.psi * a.sum_search * factor * dt;  // egg_batches
+  flows[c++] = (batches || v.host_model) ? w.n_fertile
+                                          : a.psi * factor * w.expected_fertile * dt;  // fertile
   double sum_out_e = 0.0, sum_out_l = 0.0;
   for (int g = 0; g < ng; ++g) {
-    sum_out_e += out_e_[g];
-    sum_out_l += out_l_[g];
+    sum_out_e += w.out_e[g];
+    sum_out_l += w.out_l[g];
   }
   flows[c++] = sum_out_e;  // larvae_in
   flows[c++] = sum_out_l;  // pupae_in
   flows[c++] = sum_em_m;
   flows[c++] = sum_em_f;
   flows[c++] = sum_z - sum_em_m - sum_em_f;  // emergence_deaths
-  for (int i = 0; i < ng * ng; ++i) flows[c++] = matings_[i];
-  for (int b = 0; b < 6; ++b) flows[c++] = dth[b];
-  flows[c++] = sen_m;
-  flows[c++] = sen_u;
-  flows[c++] = sen_f;
+  for (int i = 0; i < ng * ng; ++i) flows[c++] = w.matings[i];
+  for (int b = 0; b < 6; ++b) flows[c++] = w.dth[b];
+  flows[c++] = w.sen_m;
+  flows[c++] = w.sen_u;
+  flows[c++] = w.sen_f;
   if (v.host_model) {  // host flows and new host states (D-030)
-    flows[c++] = wounded;
-    flows[c++] = healed;
-    flows[c++] = infested;
-    flows[c++] = ended;
-    flows[c++] = treated;
-    flows[c++] = n_fertile - infested;  // superinfestations
-    nx_[v.host_offsets[0]] = h_s - wounded + healed + ended + treated;
-    nx_[v.host_offsets[1]] = h_w - infested - healed + wounded;
-    for (int j = 0; j < v.n_I; ++j) nx_[v.host_offsets[2] + j] = host_i_[j];
-    nx_[v.host_offsets[2]] += infested;
+    flows[c++] = w.wounded;
+    flows[c++] = w.healed;
+    flows[c++] = w.infested;
+    flows[c++] = w.ended;
+    flows[c++] = w.treated;
+    flows[c++] = w.n_fertile - w.infested;  // superinfestations
+    nx_[base + v.host_offsets[0]] = w.h_s - w.wounded + w.healed + w.ended + w.treated;
+    nx_[base + v.host_offsets[1]] = w.h_w - w.infested - w.healed + w.wounded;
+    for (int j = 0; j < v.n_I; ++j) nx_[base + v.host_offsets[2] + j] = w.host_i[j];
+    nx_[base + v.host_offsets[2]] += w.infested;
   }
-
-  std::copy(nx_.begin(), nx_.end(), x);
 }
 
 }  // namespace screwdrive

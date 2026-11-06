@@ -127,6 +127,9 @@
 # the prepared chains (S16) of eggs, pupae and adults; larvae are prepared in
 # each step because their hazard depends on crowding.
 .sg_cb_day_r <- function(day, s, dt) {
+  if (!is.null(s$node_setups)) { # several nodes (D-032): the chains of each node
+    return(list(day = day, nodes = lapply(s$node_setups, function(ns) .sg_cb_day_r(day, ns, dt))))
+  }
   f <- s$forcing
   p <- s$p
   dx <- f$dx[day]
@@ -157,8 +160,127 @@
 
 # One step of length dt from state x (S15-S19). `info` is .sg_cb_day_r() of
 # the step's day, `draw` is .sg_cb_draws(). Returns the new state and the
-# flows of the step (counter order of .sg_counter_names()).
+# flows of the step (counter order of .sg_model_counter_names()).
+#
+# With several nodes (D-032, MODEL_SPEC section 10) a step has three parts:
+# part 1 (aggregates, eggs, hosts, mating, chain moves) of each node in index
+# order, movement of all nodes (N4), then part 3 (emergence, arrivals) of
+# each node in index order. With one node: part 1, then part 3.
 .sg_cb_step_r <- function(x, info, s, dt, draw) {
+  if (is.null(s$node_setups)) {
+    return(.sg_cb_part3(.sg_cb_part1(x, info, s, dt, draw)))
+  }
+  n_s <- s$n_states_node
+  at <- function(i) (i - 1L) * n_s + seq_len(n_s)
+  work <- lapply(seq_len(s$n_node), function(i) {
+    .sg_cb_part1(x[at(i)], info$nodes[[i]], s$node_setups[[i]], dt, draw)
+  })
+  moved <- .sg_cb_move_r(work, info$day, s, dt, draw)
+  work <- moved$work
+  new_x <- numeric(length(x))
+  node_flows <- vector("list", s$n_node)
+  for (i in seq_len(s$n_node)) {
+    r <- .sg_cb_part3(work[[i]])
+    new_x[at(i)] <- r$x
+    node_flows[[i]] <- unname(r$flows)
+  }
+  all_flows <- c(unlist(node_flows), moved$counters)
+  names(all_flows) <- s$counter_names
+  list(x = new_x, flows = all_flows)
+}
+
+# Movement of all nodes in a chain-binomial step (N4): after part 1 of every
+# node (adults after the chain moves: new_m, new_u, new_f of each node's
+# work), emigrants of each adult compartment in state order (node slowest;
+# M, U, F; genotype, mate genotype, sub-stage), then their destinations in
+# increasing node order and "lost" (sequential conditional binomials);
+# immigrants are added after all draws. Returns the updated work and the
+# movement counters (emigrants, immigrants, lost by class M, U, F for each
+# node), or the work unchanged without movement.
+.sg_cb_move_r <- function(work, day, s, dt, draw) {
+  mv <- s$movement
+  if (is.null(mv)) {
+    return(list(work = work, counters = numeric(0)))
+  }
+  n_node <- s$n_node
+  sh <- .sg_cb_move_shares(mv, day, s, dt)
+  blocks <- c("new_m", "new_u", "new_f")
+  emig <- immig <- lost <- matrix(0, 3L, n_node)
+  arriving <- lapply(work, function(w) lapply(blocks, function(b) w[[b]] * 0))
+  for (i in seq_len(n_node)) {
+    for (cl in 1:3) {
+      pe <- sh$emigrate[cl, i]
+      if (pe == 0) next
+      x <- work[[i]][[blocks[cl]]]
+      dest <- sh$dest[[i]]
+      prob <- c(sh$prob[[i]][cl, ], sh$lost[cl, i])
+      for (k in seq_along(x)) {
+        if (x[k] == 0) next
+        e <- draw$binom(x[k], pe)
+        if (e == 0) next
+        x[k] <- x[k] - e
+        emig[cl, i] <- emig[cl, i] + e
+        to <- draw$multinom(e, prob)
+        for (d in seq_along(dest)) {
+          j <- dest[d]
+          arriving[[j]][[cl]][k] <- arriving[[j]][[cl]][k] + to[d]
+          immig[cl, j] <- immig[cl, j] + to[d]
+        }
+        lost[cl, i] <- lost[cl, i] + to[length(to)]
+      }
+      work[[i]][[blocks[cl]]] <- x
+    }
+  }
+  for (i in seq_len(n_node)) {
+    for (cl in 1:3) work[[i]][[blocks[cl]]] <- work[[i]][[blocks[cl]]] + arriving[[i]][[cl]]
+  }
+  list(work = work, counters = as.vector(rbind(emig, immig, lost)))
+}
+
+# Daily movement shares of a chain-binomial step: for each class (rows male,
+# virgin, mated) and node, the probability of leaving within dt
+# (1 - exp(-lambda dt), lambda summed over the groups with their clock kappa),
+# the destinations (union of the groups' edges, increasing node order), the
+# probability of each destination and of being lost, the groups weighted by
+# their share w_G = lambda^G / lambda (N4).
+.sg_cb_move_shares <- function(mv, day, s, dt) {
+  n_node <- s$n_node
+  dx <- vapply(s$node_setups, function(ns) ns$forcing$dx[day], 0)
+  lam_g <- lapply(mv$groups, function(g) {
+    kappa <- if (g$clock == "calendar") rep(1, n_node) else pmin(mv$kappa_max, dx / mv$dx_ref)
+    sweep(g$rate, 2L, kappa, `*`) # [class, node]
+  })
+  lam <- Reduce(`+`, lam_g)
+  emigrate <- ifelse(lam > 0, -expm1(-lam * dt), 0)
+  dest <- vector("list", n_node)
+  prob <- vector("list", n_node)
+  lost <- matrix(0, 3L, n_node)
+  for (i in seq_len(n_node)) {
+    edges <- lapply(mv$groups, function(g) {
+      seq.int(g$row_ptr[i], length.out = g$row_ptr[i + 1L] - g$row_ptr[i])
+    })
+    dest[[i]] <- sort(unique(unlist(Map(function(g, e) g$col[e], mv$groups, edges))))
+    pr <- matrix(0, 3L, length(dest[[i]]))
+    for (k in seq_along(mv$groups)) {
+      g <- mv$groups[[k]]
+      for (cl in 1:3) {
+        if (lam[cl, i] == 0) next
+        w <- lam_g[[k]][cl, i] / lam[cl, i]
+        for (e in edges[[k]]) {
+          d <- match(g$col[e], dest[[i]])
+          pr[cl, d] <- pr[cl, d] + w * g$prob[cl, e]
+        }
+        lost[cl, i] <- lost[cl, i] + w * g$loss[cl, i]
+      }
+    }
+    prob[[i]] <- pr
+  }
+  list(emigrate = emigrate, dest = dest, prob = prob, lost = lost)
+}
+
+# Part 1 of a step of one node (S15, S17, H3, S18, S16): returns everything
+# part 3 needs (its local variables).
+.sg_cb_part1 <- function(x, info, s, dt, draw) {
   p <- s$p
   n_g <- s$n_g
   n_a <- s$n_A
@@ -247,7 +369,10 @@
     wounded <- draw$binom(h_s, 1 - exp(-h$wounding * dt))
     new_hi <- mi$x
     new_hi[1L] <- new_hi[1L] + infested
-    host_flows <- c(wounded, healed, infested, mi$out, mi$deaths, n_fertile - infested)
+    # used in part 3
+    host_flows <- c( # nolint: object_usage_linter.
+      wounded, healed, infested, mi$out, mi$deaths, n_fertile - infested
+    )
   }
 
   # ---- mating (S18), before ageing ------------------------------------------
@@ -289,12 +414,58 @@
   fem_mat <- matrix(fem, n_a) # columns: (mate, genotype), mate fastest
   mf <- block_moves(fem_mat, function(j) info$ch_f[[(j - 1L) %/% n_g + 1L]])
 
-  new_e <- as_mat(me$x, s$n_E)
-  new_l <- as_mat(ml$x, s$n_L)
-  new_p <- as_mat(mp$x, s$n_P)
-  new_m <- as_mat(mm$x, n_a)
-  new_u <- as_mat(mu_$x, n_a)
-  new_f <- array(mf$x, c(n_a, n_g, n_g))
+  new_e <- as_mat(me$x, s$n_E) # nolint: object_usage_linter. (part 3)
+  new_l <- as_mat(ml$x, s$n_L) # nolint: object_usage_linter. (part 3)
+  new_p <- as_mat(mp$x, s$n_P) # nolint: object_usage_linter. (part 3)
+  new_m <- as_mat(mm$x, n_a) # nolint: object_usage_linter. (part 3)
+  new_u <- as_mat(mu_$x, n_a) # nolint: object_usage_linter. (part 3)
+  new_f <- array(mf$x, c(n_a, n_g, n_g)) # nolint: object_usage_linter. (part 3)
+  as.list(environment())
+}
+
+# Part 3 of a step of one node (S19, arrivals) from the result of part 1
+# (`work`, the variables of .sg_cb_part1()): the node's new state and flows.
+# The variables part 3 uses are taken from `work` by name (exact matching;
+# the host variables are NULL without the host model).
+.sg_cb_part3 <- function(work) {
+  s <- work[["s"]]
+  draw <- work[["draw"]]
+  dt <- work[["dt"]]
+  info <- work[["info"]]
+  p <- work[["p"]]
+  a <- work[["a"]]
+  n_g <- work[["n_g"]]
+  nu_i <- work[["nu_i"]]
+  mate_ok <- work[["mate_ok"]]
+  factor <- work[["factor"]]
+  batches <- work[["batches"]]
+  n_batches <- work[["n_batches"]]
+  n_fertile <- work[["n_fertile"]]
+  expected_fertile <- work[["expected_fertile"]]
+  eggs <- work[["eggs"]]
+  matings <- work[["matings"]]
+  ch_l <- work[["ch_l"]]
+  me <- work[["me"]]
+  ml <- work[["ml"]]
+  mp <- work[["mp"]]
+  mm <- work[["mm"]]
+  mu_ <- work[["mu_"]]
+  mf <- work[["mf"]]
+  new_e <- work[["new_e"]]
+  new_l <- work[["new_l"]]
+  new_p <- work[["new_p"]]
+  new_m <- work[["new_m"]]
+  new_u <- work[["new_u"]]
+  new_f <- work[["new_f"]]
+  h <- work[["h"]]
+  h_s <- work[["h_s"]]
+  h_w <- work[["h_w"]]
+  wounded <- work[["wounded"]]
+  healed <- work[["healed"]]
+  infested <- work[["infested"]]
+  mi <- work[["mi"]]
+  new_hi <- work[["new_hi"]]
+  host_flows <- work[["host_flows"]]
 
   # ---- emergence (S19): sex, then survival ------------------------------------
   em_m <- numeric(n_g)

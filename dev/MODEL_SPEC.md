@@ -354,8 +354,9 @@ lost. Movement changes the network total of each compartment only through
 the losses; with closed edges emigrants and immigrants sum to the same
 network total.
 
-**(N4) Chain-binomial movement step.** After the chain moves (S16) and
-before emergence (S19) and arrivals. For each adult compartment in state
+**(N4) Chain-binomial movement step.** After the chain moves (S16) of all
+nodes and before the emergence (S19) and arrivals of any node (the three
+parts of a step in section 10). For each adult compartment in state
 order (node slowest; within a node M, U, F, then genotype, mate genotype,
 sub-stage), with X its count after S16, λ_{s,i} = Σ_G λ^G_{s,i} and
 w_G = λ^G_{s,i} / λ_{s,i}:
@@ -555,6 +556,16 @@ use the counts at the start of the step except that mating moves females
 before the chain moves. Multinomials are sequential conditional binomials in
 category order. The R reference step and the C++ step follow this order, so
 they use the same random numbers.
+
+With several nodes (D-032) a step has three parts: (1) for each node in
+index order, aggregates (S15), eggs (S17), hosts (H3), mating (S18) and
+chain moves (S16) of that node, in the order above; (2) movement (N4) of all
+nodes; (3) for each node in index order, emergence (S19) and arrivals of
+that node. Each node's aggregates use its counts at the start of the step;
+movement does not change them within the step. With one node and no
+movement the order is the one above. Draws of zero individuals use no random
+numbers, so a node without flies may skip its fly draws without changing the
+result.
 
 **Deterministic map.** Replacing every draw by its expectation gives a
 deterministic map, the exact conditional mean of one step. As dt → 0 it

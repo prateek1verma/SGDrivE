@@ -729,6 +729,19 @@ Findings during implementation of phase 1 (ODE; PRs #14, #15 and PR C,
   means the study nodes; totals are rows of the same weight matrix. The
   recorder saves memory, not run time (integration dominates).
 
+Phase 2 (chain-binomial movement; dev/MOVEMENT_PHASE2_PLAN.md, choices
+confirmed by the user on 2026-11-05): with several nodes a chain-binomial
+step has three parts, (1) aggregates, eggs, hosts, mating and chain moves of
+each node in index order, (2) movement of all nodes (N4), (3) emergence and
+arrivals of each node in index order (MODEL_SPEC section 10), so movement
+comes after the chain moves and before emergence and arrivals as N4 states.
+Prepared chains are shared by the nodes on the same forcing series;
+extinction days stay landscape-wide; `simulate_cb()` gains `record` with
+the meaning of the ODE (`keep` stays as a shortcut). A single-node
+chain-binomial baseline saved before any phase 2 change
+(`data-raw/make_cb_baseline.R`) guards one-node results: draw for draw on
+the machine that made it, the deterministic map elsewhere.
+
 ---
 
 ## Open questions

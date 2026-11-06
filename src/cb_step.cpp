@@ -16,27 +16,116 @@ CbStepper::CbStepper(const ModelView& mv, double dt)
       adv_p_(mv.n_P),
       adv_a_(mv.n_A),
       adv_i_(std::max(1, mv.n_I)),
-      ch_m_(mv.n_g),
-      ch_f_(mv.n_g) {
+      series_(mv.n_series),
+      work_(mv.n_node) {
   const int n_max = std::max({mv.n_E, mv.n_L, mv.n_P, mv.n_A, mv.n_g, mv.n_I});
-  ch_e_.resize(mv.n_E);
-  ch_l_.resize(mv.n_L);
-  ch_p_.resize(mv.n_P);
-  for (int g = 0; g < mv.n_g; ++g) {
-    ch_m_[g].resize(mv.n_A);
-    ch_f_[g].resize(mv.n_A);
+  for (SeriesChains& sc : series_) {
+    sc.e.resize(mv.n_E);
+    sc.l.resize(mv.n_L);
+    sc.p.resize(mv.n_P);
+    sc.m.resize(mv.n_g);
+    sc.f.resize(mv.n_g);
+    for (int g = 0; g < mv.n_g; ++g) {
+      sc.m[g].resize(mv.n_A);
+      sc.f[g].resize(mv.n_A);
+    }
+  }
+  for (NodeWork& w : work_) {
+    w.l.resize(mv.n_L);
+    for (auto* v : {&w.eggs, &w.out_e, &w.out_l, &w.out_p, &w.em_m, &w.em_f}) {
+      v->assign(mv.n_g, 0.0);
+    }
+    w.matings.assign(static_cast<std::size_t>(mv.n_g) * mv.n_g, 0.0);
+    w.host_i.assign(std::max(1, mv.n_I), 0.0);
+    w.agg = kernel_.agg();  // sizes the aggregate vectors once
   }
   q_.assign(n_max, 0.0);
   p_.assign(static_cast<std::size_t>(n_max) * (n_max + 1), 0.0);
   pbar_.assign(p_.size(), 0.0);
   cur_.assign(mv.n_states, 0.0);
   nx_.assign(mv.n_states, 0.0);
-  for (auto* w : {&eggs_, &out_e_, &out_l_, &out_p_, &em_m_, &em_f_, &ym_}) w->assign(mv.n_g, 0.0);
-  matings_.assign(static_cast<std::size_t>(mv.n_g) * mv.n_g, 0.0);
+  ym_.assign(mv.n_g, 0.0);
   buf_.assign(n_max + 1, 0.0);
   rest_.assign(n_max + 1, 0.0);
   ch_i_.resize(std::max(1, mv.n_I));
-  host_i_.assign(std::max(1, mv.n_I), 0.0);
+  // movement (N4): destinations of each node, the union of the groups' edges
+  move_row_ptr_.assign(mv.n_node + 1, 0);
+  move_map_.assign(mv.group_col.size(), 0);
+  if (mv.n_groups > 0) {
+    std::vector<std::vector<int>> dest(mv.n_node);
+    for (int g = 0; g < mv.n_groups; ++g) {
+      const int* rp = mv.group_row_ptr.data() + static_cast<std::size_t>(g) * (mv.n_node + 1);
+      for (int i = 0; i < mv.n_node; ++i) {
+        for (int e = rp[i]; e < rp[i + 1]; ++e) {
+          dest[i].push_back(mv.group_col[mv.group_edge_start[g] + e]);
+        }
+      }
+    }
+    std::size_t max_deg = 0;
+    for (int i = 0; i < mv.n_node; ++i) {
+      std::sort(dest[i].begin(), dest[i].end());
+      dest[i].erase(std::unique(dest[i].begin(), dest[i].end()), dest[i].end());
+      move_row_ptr_[i + 1] = move_row_ptr_[i] + static_cast<int>(dest[i].size());
+      move_col_.insert(move_col_.end(), dest[i].begin(), dest[i].end());
+      max_deg = std::max(max_deg, dest[i].size());
+    }
+    for (int g = 0; g < mv.n_groups; ++g) {
+      const int* rp = mv.group_row_ptr.data() + static_cast<std::size_t>(g) * (mv.n_node + 1);
+      for (int i = 0; i < mv.n_node; ++i) {
+        for (int e = rp[i]; e < rp[i + 1]; ++e) {
+          const int ge = mv.group_edge_start[g] + e;
+          const auto it = std::lower_bound(dest[i].begin(), dest[i].end(), mv.group_col[ge]);
+          move_map_[ge] = move_row_ptr_[i] + static_cast<int>(it - dest[i].begin());
+        }
+      }
+    }
+    move_pe_.assign(static_cast<std::size_t>(3) * mv.n_node, 0.0);
+    move_lost_.assign(static_cast<std::size_t>(3) * mv.n_node, 0.0);
+    move_prob_.assign(static_cast<std::size_t>(3) * move_col_.size(), 0.0);
+    move_p_.assign(max_deg + 1, 0.0);
+    move_buf_.assign(max_deg + 1, 0.0);
+    move_rest_.assign(max_deg + 1, 0.0);
+    imm_.assign(mv.n_states, 0.0);
+  }
+}
+
+// Daily movement shares (N3, N4): for each node and class the probability of
+// leaving within dt, 1 - exp(-lambda dt) with lambda = sum over groups of
+// kappa delta, and the destination and loss probabilities with the groups
+// weighted by w_G = lambda^G / lambda (as .sg_cb_move_shares() in R).
+void CbStepper::prepare_movement(int day) {
+  const ModelView& v = mv_;
+  if (v.n_groups == 0) return;
+  std::fill(move_prob_.begin(), move_prob_.end(), 0.0);
+  std::fill(move_lost_.begin(), move_lost_.end(), 0.0);
+  for (int i = 0; i < v.n_node; ++i) {
+    const double dx = v.dx[static_cast<std::size_t>(v.forcing_index[i]) * v.n_days + day - 1];
+    double lam[3] = {0.0, 0.0, 0.0};
+    for (int g = 0; g < v.n_groups; ++g) {
+      const double kappa = v.group_clock[g] == 1 ? 1.0 : std::min(v.kappa_max, dx / v.dx_ref);
+      for (int s = 0; s < 3; ++s) {
+        lam[s] += kappa * v.group_rate[(static_cast<std::size_t>(g) * v.n_node + i) * 3 + s];
+      }
+    }
+    for (int s = 0; s < 3; ++s) {
+      move_pe_[static_cast<std::size_t>(i) * 3 + s] = lam[s] > 0.0 ? -std::expm1(-lam[s] * dt_) : 0.0;
+    }
+    for (int g = 0; g < v.n_groups; ++g) {
+      const double kappa = v.group_clock[g] == 1 ? 1.0 : std::min(v.kappa_max, dx / v.dx_ref);
+      const int* rp = v.group_row_ptr.data() + static_cast<std::size_t>(g) * (v.n_node + 1);
+      for (int s = 0; s < 3; ++s) {
+        if (lam[s] == 0.0) continue;
+        const std::size_t gi = (static_cast<std::size_t>(g) * v.n_node + i) * 3 + s;
+        const double w = kappa * v.group_rate[gi] / lam[s];
+        for (int e = rp[i]; e < rp[i + 1]; ++e) {
+          const int ge = v.group_edge_start[g] + e;
+          move_prob_[static_cast<std::size_t>(move_map_[ge]) * 3 + s] +=
+              w * v.group_prob[static_cast<std::size_t>(ge) * 3 + s];
+        }
+        move_lost_[static_cast<std::size_t>(i) * 3 + s] += w * v.group_loss[gi];
+      }
+    }
+  }
 }
 
 // Death and destination probabilities, and the arrival distribution, of one
@@ -79,24 +168,34 @@ void CbStepper::prepare(PreparedChain& ch, ChainAdvance& adv, const double* q, i
 void CbStepper::prepare_day(int day) {
   const ModelView& v = mv_;
   day_ = day;
-  r_ = kernel_.day_rates(day);
-  for (int s = 0; s < v.n_E; ++s) q_[s] = r_.q_e;
-  prepare(ch_e_, adv_e_, q_.data(), v.n_E, v.n_E, r_.mu_e);
-  for (int s = 0; s < v.n_L; ++s) q_[s] = r_.q_l;
-  // larval hazard without crowding (redone per step with crowding); treated
-  // hosts lose their larvae (D-030)
-  const double mu_l = v.mu_L0 + (v.host_model ? v.host_treatment : 0.0);
-  prepare(ch_l_, adv_l_, q_.data(), v.n_L, v.n_L, mu_l);
-  for (int s = 0; s < v.n_P; ++s) q_[s] = r_.q_p;
-  prepare(ch_p_, adv_p_, q_.data(), v.n_P, v.n_P, r_.mu_p);
-  for (int g = 0; g < v.n_g; ++g) {
-    const double* iw_m = v.inv_w_m.data() + static_cast<std::size_t>(g) * v.n_A;
-    const double* iw_f = v.inv_w_f.data() + static_cast<std::size_t>(g) * v.n_A;
-    for (int s = 0; s < v.n_A; ++s) q_[s] = r_.dx * iw_m[s];
-    prepare(ch_m_[g], adv_a_, q_.data(), v.n_A, v.last_m[g], r_.mu_m);
-    for (int s = 0; s < v.n_A; ++s) q_[s] = r_.dx * iw_f[s];
-    prepare(ch_f_[g], adv_a_, q_.data(), v.n_A, v.last_f[g], r_.mu_f);
+  // the chains of each distinct forcing series, shared by its nodes (D-032)
+  for (int k = 0; k < v.n_series; ++k) {
+    int node = 0;
+    while (node < v.n_node - 1 && v.forcing_index[node] != k) ++node;
+    kernel_.set_node(node);
+    SeriesChains& sc = series_[k];
+    sc.r = kernel_.day_rates(day);
+    const DayRates& r = sc.r;
+    for (int s = 0; s < v.n_E; ++s) q_[s] = r.q_e;
+    prepare(sc.e, adv_e_, q_.data(), v.n_E, v.n_E, r.mu_e);
+    for (int s = 0; s < v.n_L; ++s) q_[s] = r.q_l;
+    // larval hazard without crowding (redone per node and step with crowding);
+    // treated hosts lose their larvae (D-030)
+    const double mu_l = v.mu_L0 + (v.host_model ? v.host_treatment : 0.0);
+    prepare(sc.l, adv_l_, q_.data(), v.n_L, v.n_L, mu_l);
+    for (int s = 0; s < v.n_P; ++s) q_[s] = r.q_p;
+    prepare(sc.p, adv_p_, q_.data(), v.n_P, v.n_P, r.mu_p);
+    for (int g = 0; g < v.n_g; ++g) {
+      const double* iw_m = v.inv_w_m.data() + static_cast<std::size_t>(g) * v.n_A;
+      const double* iw_f = v.inv_w_f.data() + static_cast<std::size_t>(g) * v.n_A;
+      for (int s = 0; s < v.n_A; ++s) q_[s] = r.dx * iw_m[s];
+      prepare(sc.m[g], adv_a_, q_.data(), v.n_A, v.last_m[g], r.mu_m);
+      for (int s = 0; s < v.n_A; ++s) q_[s] = r.dx * iw_f[s];
+      prepare(sc.f[g], adv_a_, q_.data(), v.n_A, v.last_f[g], r.mu_f);
+    }
   }
+  kernel_.set_node(0);
+  prepare_movement(day);
   if (v.host_model) {  // infestation chain: treatment in the role of the hazard
     for (int j = 0; j < v.n_I; ++j) q_[j] = v.host_advance;
     prepare(ch_i_, adv_i_, q_.data(), v.n_I, v.n_I, v.host_treatment);
@@ -147,7 +246,8 @@ Rcpp::List sg_cb_step_cpp(const Rcpp::List& view, int day, double dt,
   return Rcpp::List::create(Rcpp::Named("x") = y, Rcpp::Named("flows") = flows);
 }
 
-// Day loop of the chain-binomial solver for days 1..n_days.
+// Day loop of the chain-binomial solver for days 1..n_days. With several
+// nodes (D-032) extinction refers to the whole landscape.
 //   x0: initial state (whole numbers when stochastic);
 //   rel_count: release counts in the order of the model's release events
 //     (rounded in R when stochastic);
@@ -200,25 +300,37 @@ Rcpp::List sg_cb_run_cpp(const Rcpp::List& view, const Rcpp::NumericVector& x0,
   screwdrive::RandomDraws random_draws;
   screwdrive::ExpectedDraws expected_draws;
   int row = 0, extinct_day = 0, wild_extinct_day = 0, days_run = 0;
-  // individuals of the wild-type genotype(s): blocks E..U by genotype, F by
-  // the female's genotype
+  // individuals of the wild-type genotype(s) in all nodes: blocks E..U by
+  // genotype, F by the female's genotype
   auto wild_total = [&](const std::vector<double>& y) {
     double tot = 0.0;
     const int ng = mv.n_g;
     const int len[5] = {mv.n_E, mv.n_L, mv.n_P, mv.n_A, mv.n_A};
-    for (int b = 0; b < 5; ++b) {
+    for (int i = 0; i < mv.n_node; ++i) {
+      const double* yi = y.data() + static_cast<std::size_t>(i) * mv.node_stride;
+      for (int b = 0; b < 5; ++b) {
+        for (int g = 0; g < ng; ++g) {
+          if (!mv.wild[g]) continue;
+          const double* p = yi + mv.offsets[b] + g * len[b];
+          for (int s = 0; s < len[b]; ++s) tot += p[s];
+        }
+      }
       for (int g = 0; g < ng; ++g) {
         if (!mv.wild[g]) continue;
-        const double* p = y.data() + mv.offsets[b] + g * len[b];
-        for (int s = 0; s < len[b]; ++s) tot += p[s];
+        const double* p = yi + mv.offsets[screwdrive::kF] + g * ng * mv.n_A;
+        for (int s = 0; s < ng * mv.n_A; ++s) tot += p[s];
       }
     }
-    for (int g = 0; g < ng; ++g) {
-      if (!mv.wild[g]) continue;
-      const double* p = y.data() + mv.offsets[screwdrive::kF] + g * ng * mv.n_A;
-      for (int s = 0; s < ng * mv.n_A; ++s) tot += p[s];
-    }
     return tot;
+  };
+  // no fly in any node (the fly states come first in each node)
+  const int n_fly = mv.offsets[screwdrive::kF] + mv.n_g * mv.n_g * mv.n_A;
+  auto no_flies = [&](const std::vector<double>& y) {
+    for (int i = 0; i < mv.n_node; ++i) {
+      const double* yi = y.data() + static_cast<std::size_t>(i) * mv.node_stride;
+      if (!std::all_of(yi, yi + n_fly, [](double v) { return v == 0.0; })) return false;
+    }
+    return true;
   };
 
   for (int d = 1; d <= n_days; ++d) {
@@ -247,8 +359,7 @@ Rcpp::List sg_cb_run_cpp(const Rcpp::List& view, const Rcpp::NumericVector& x0,
       for (int i = 0; i < n; ++i) states(row, i) = x[i];
       state_days[row++] = d;
     }
-    const int n_fly = mv.host_model ? mv.host_offsets[0] : n;  // fly states come first
-    const bool empty = std::all_of(x.begin(), x.begin() + n_fly, [](double v) { return v == 0.0; });
+    const bool empty = no_flies(x);
     if (empty && extinct_day == 0) extinct_day = d;
     if (wild_extinct_day == 0 && (empty || wild_total(x) == 0.0)) wild_extinct_day = d;
     // nothing can happen any more (hosts still change in the host-wound model)
