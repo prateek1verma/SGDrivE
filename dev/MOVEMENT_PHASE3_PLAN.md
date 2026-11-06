@@ -123,6 +123,14 @@ landscape: a transect from south Texas north.
   the Matlock & Skoda rates give 16% and 10% daily leave probability;
   warnings appear for an implausible rate (a 1 km-scale rate on a 50 km
   grid) and for a large κδ dt.
+* *Done (2026-11-06):* `R/movement-check.R`: `check_movement(model,
+  temperatures, genotype)` with `.sg_movement_shares()` (the shares of the
+  chain-binomial step, for any kappa per group and node; tested against
+  `.sg_cb_move_shares()` with two groups) and `.sg_clock_kappa()`; the
+  implied D uses dimension 1 when all nodes lie on a line. In
+  `check_model()`: `movement$check`, lifetime leave and D ranges by class,
+  `nodes$max_move_rate` (kappa at the node's warmest day), the largest
+  step probability, and the two warnings. Tests in `test-movement-check.R`.
 
 ### WP4. Counter sums over periods and a built-in cases set (M)
 

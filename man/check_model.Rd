@@ -50,7 +50,15 @@ fastest rate, the R0 range and days with R0 > 1 and, with \code{scale}, the
 smallest wild population in the node from a burn-in and run of the whole
 landscape with movement. \code{movement} summarises the movement groups
 (largest leave rate by class at the reference temperature, nodes with open
-edges). Warnings are those of the nodes and of the model; with more than
+edges), the range over nodes of the lifetime leave probability and, with
+coordinates, of the implied diffusion coefficient by class
+(\code{\link[=check_movement]{check_movement()}}, kept in \code{movement$check}), and the largest chance of
+leaving a node within one chain-binomial step of length \code{dt}; \code{nodes}
+gains \code{max_move_rate}, the largest movement rate over the forcing (kappa
+at the node's warmest day times the leave rate), which also enters the
+largest-rate check. Warnings: lifetime leave probabilities above 0.99
+(rates on the wrong scale for the grid?) and movement rates times \code{dt}
+above 0.5. Warnings are those of the nodes and of the model; with more than
 one node a note recalls that ODE runs without \code{node_extinction} can show
 recolonisation by fractions of a fly.
 }

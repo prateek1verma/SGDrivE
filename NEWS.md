@@ -18,6 +18,15 @@ Plan: `dev/MOVEMENT_PHASE3_PLAN.md`.
   of males per day) and `sg_rate_from_lifetime()` a lifetime leave
   probability, inverted exactly for the model's adult chain at
   `movement_t_ref`.
+* `check_movement()` translates leave rates back into biology at
+  `movement_t_ref`: per node and class the daily and lifetime leave
+  probability, moves per lifetime, the share lost and, with node
+  coordinates, the path length per lifetime and the implied diffusion
+  coefficient; a table of lifetime movement against temperature for the
+  model's clock. `check_model()` includes it, adds each node's largest
+  movement rate over the forcing to the rate check, and warns when flies
+  almost surely leave their node in a lifetime (rates on the wrong scale
+  for the grid?) or when movement within one chain-binomial step is large.
 
 ## Several nodes and adult movement, phase 2: chain-binomial solver (D-032)
 
