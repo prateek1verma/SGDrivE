@@ -2,6 +2,7 @@
 // chains, and the R entry points (one step, and the day loop).
 
 #include "cb_step.h"
+#include "recorder.h"
 
 #include <limits>
 
@@ -260,13 +261,21 @@ Rcpp::List sg_cb_step_cpp(const Rcpp::List& view, int day, double dt,
 // daily counters, the first day ending with every fly compartment zero
 // (extinct_day, 0 if none), the first day ending with no individual of the
 // wild-type genotype(s) (wild_extinct_day; mated females by their own
-// genotype; 0 if none) and the number of days simulated.
+// genotype; 0 if none), the number of days simulated and the final state x.
+// `recorder` (NULL: full states and counters; recorder.h) is a list with
+// logical `state` and `counters` and CSR matrices `wx` [sums x states] and
+// `wc` [sums x counters]; the result then also has `recorded` (W_x x on
+// recorded days) and `counter_sums` (W_c c per day), and `states` or
+// `counters` with no columns when they are not kept (phase 2 WP5).
+// Recording uses no random numbers.
 // [[Rcpp::export]]
 Rcpp::List sg_cb_run_cpp(const Rcpp::List& view, const Rcpp::NumericVector& x0,
                          const Rcpp::NumericVector& rel_count, double dt, bool stochastic,
-                         int n_days, const Rcpp::LogicalVector& record) {
+                         int n_days, const Rcpp::LogicalVector& record,
+                         SEXP recorder = R_NilValue) {
   const screwdrive::ModelView mv(view);
   const int n = mv.n_states, nc = mv.n_counters;
+  const screwdrive::Recorder rec(recorder, n, nc);
   if (x0.size() != n) Rcpp::stop("initial state has the wrong length");
   if (n_days < 1 || n_days > mv.n_days) {
     Rcpp::stop("n_days must be between 1 and the forcing length");
@@ -292,10 +301,10 @@ Rcpp::List sg_cb_run_cpp(const Rcpp::List& view, const Rcpp::NumericVector& x0,
   int n_record = 0;
   for (int d = 0; d < n_days; ++d) n_record += record[d] ? 1 : 0;
 
-  Rcpp::NumericMatrix states(n_record, n);
   Rcpp::IntegerVector state_days(n_record);
-  Rcpp::NumericMatrix counters(n_days, nc);
-  std::vector<double> x(x0.begin(), x0.end()), flows(nc);
+  // results in growable row-major storage, copied once at the end
+  std::vector<double> st_states, st_counters, st_recorded, st_sums;
+  std::vector<double> x(x0.begin(), x0.end()), flows(nc), day_counters(nc);
   screwdrive::CbStepper stepper(mv, dt);
   screwdrive::RandomDraws random_draws;
   screwdrive::ExpectedDraws expected_draws;
@@ -337,26 +346,30 @@ Rcpp::List sg_cb_run_cpp(const Rcpp::List& view, const Rcpp::NumericVector& x0,
     Rcpp::checkUserInterrupt();
     for (int j : releases_by_day[d - 1]) x[mv.rel_index[j]] += rel_count[j];
     stepper.prepare_day(d);
+    std::fill(day_counters.begin(), day_counters.end(), 0.0);
     for (int k = 0; k < steps; ++k) {
       if (stochastic) {
         stepper.step(x.data(), flows.data(), random_draws);
       } else {
         stepper.step(x.data(), flows.data(), expected_draws);
       }
-      for (int c = 0; c < nc; ++c) counters(d - 1, c) += flows[c];
+      for (int c = 0; c < nc; ++c) day_counters[c] += flows[c];
     }
     days_run = d;
     bool valid = true;
     for (double v : x) valid = valid && std::isfinite(v) && !(stochastic && v < 0.0);
-    for (int c = 0; c < nc; ++c) valid = valid && std::isfinite(counters(d - 1, c));
+    for (double v : day_counters) valid = valid && std::isfinite(v);
     if (!valid) {
       Rcpp::stop(
           "chain-binomial run: a count or flow became non-finite or negative on day %d; check "
           "the parameters",
           d);
     }
+    if (rec.counters) st_counters.insert(st_counters.end(), day_counters.begin(), day_counters.end());
+    rec.wc.multiply_append(day_counters.data(), st_sums);
     if (record[d - 1]) {
-      for (int i = 0; i < n; ++i) states(row, i) = x[i];
+      if (rec.state) st_states.insert(st_states.end(), x.begin(), x.end());
+      rec.wx.multiply_append(x.data(), st_recorded);
       state_days[row++] = d;
     }
     const bool empty = no_flies(x);
@@ -365,15 +378,27 @@ Rcpp::List sg_cb_run_cpp(const Rcpp::List& view, const Rcpp::NumericVector& x0,
     // nothing can happen any more (hosts still change in the host-wound model)
     if (empty && d >= last_release_day && !mv.host_model) break;
   }
-  // days after an early stop stay zero; give them their rows
+  // days after an early stop stay zero (the state is zero); give them their
+  // rows
   for (int d = days_run + 1; d <= n_days; ++d) {
-    if (record[d - 1]) state_days[row++] = d;
+    if (rec.counters) st_counters.insert(st_counters.end(), nc, 0.0);
+    st_sums.insert(st_sums.end(), rec.wc.rows(), 0.0);
+    if (record[d - 1]) {
+      if (rec.state) st_states.insert(st_states.end(), n, 0.0);
+      st_recorded.insert(st_recorded.end(), rec.wx.rows(), 0.0);
+      state_days[row++] = d;
+    }
   }
-  return Rcpp::List::create(Rcpp::Named("states") = states, Rcpp::Named("state_days") = state_days,
-                            Rcpp::Named("counters") = counters,
-                            Rcpp::Named("extinct_day") = extinct_day,
-                            Rcpp::Named("wild_extinct_day") = wild_extinct_day,
-                            Rcpp::Named("days_run") = days_run);
+  using screwdrive::as_matrix;
+  return Rcpp::List::create(
+      Rcpp::Named("states") = as_matrix(st_states, n_record, rec.state ? n : 0),
+      Rcpp::Named("state_days") = state_days,
+      Rcpp::Named("counters") = as_matrix(st_counters, n_days, rec.counters ? nc : 0),
+      Rcpp::Named("recorded") = as_matrix(st_recorded, n_record, rec.wx.rows()),
+      Rcpp::Named("counter_sums") = as_matrix(st_sums, n_days, rec.wc.rows()),
+      Rcpp::Named("x") = Rcpp::NumericVector(x.begin(), x.end()),
+      Rcpp::Named("extinct_day") = extinct_day, Rcpp::Named("wild_extinct_day") = wild_extinct_day,
+      Rcpp::Named("days_run") = days_run);
 }
 
 // n_rep independent stochastic steps from the same state x (statistical tests

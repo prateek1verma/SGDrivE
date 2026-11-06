@@ -576,7 +576,8 @@
 # both consume random numbers identically: steps per day, initial state and
 # release counts (rounded without bias when stochastic: initial state, then
 # releases in event order) and the matrix of individuals released per day
-# and block.
+# and block (with several nodes per block and node, "M@north", as
+# .sg_release_matrix()).
 .sg_cb_inputs <- function(model, init, dt, stochastic, n_days) {
   dt_ok <- is.numeric(dt) && length(dt) == 1L && dt > 0
   steps <- if (dt_ok) round(1 / dt) else 0
@@ -590,10 +591,15 @@
     x <- .sg_cb_round(x)
     rel$count <- .sg_cb_round(rel$count)
   }
-  released <- matrix(0, n_days, 4L, dimnames = list(NULL, c("E", "P", "M", "U")))
-  rel_block <- substr(sg_state_names(model)[rel$index], 1L, 1L)
-  for (j in which(rel$day <= n_days)) {
-    released[rel$day[j], rel_block[j]] <- released[rel$day[j], rel_block[j]] + rel$count[j]
+  cols <- .sg_release_columns(model)
+  released <- matrix(0, n_days, length(cols), dimnames = list(NULL, cols))
+  if (nrow(rel) > 0L) { # state names only when needed (called per replicate)
+    nm <- sg_state_names(model)[rel$index]
+    rel_col <- substr(nm, 1L, 1L)
+    if (length(cols) > 4L) rel_col <- paste0(rel_col, "@", .sg_name_node(nm))
+    for (j in which(rel$day <= n_days)) {
+      released[rel$day[j], rel_col[j]] <- released[rel$day[j], rel_col[j]] + rel$count[j]
+    }
   }
   list(steps = steps, n_days = n_days, x = x, rel = rel, released = released)
 }

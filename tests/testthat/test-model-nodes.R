@@ -214,7 +214,7 @@ test_that("functions without multi-node support yet stop clearly", {
   cube <- sg_cube(sg_test_cube_mendelian())
   m <- sg_model(p, cube, landscape = nodes_landscape(p), movement = chain_layer())
   x0 <- numeric(m$n_states)
-  expect_error(simulate_cb(m, init = x0), "simulate_cb\\(\\) is not available")
+  # (simulate_cb() runs landscapes since phase 2 WP4, test-cb-landscape.R)
   expect_error(calibrate_population(m, 10), "calibrate_population\\(\\) is not available")
   # (sg_init() and sg_equilibria() handle several nodes since WP7 and
   # check_model() since WP8); a full state vector is accepted

@@ -23,7 +23,14 @@ sg_totals(
   nodes = NULL
 )
 
-\method{as.data.frame}{sg_sim_cb}(x, row.names = NULL, optional = FALSE, ..., per = "node")
+\method{as.data.frame}{sg_sim_cb}(
+  x,
+  row.names = NULL,
+  optional = FALSE,
+  ...,
+  per = "node",
+  nodes = NULL
+)
 }
 \arguments{
 \item{sim}{A simulation from \code{\link[=simulate_ode]{simulate_ode()}} or \code{\link[=simulate_cb]{simulate_cb()}}.}

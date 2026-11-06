@@ -1,5 +1,36 @@
 # ScrewDrivE 0.0.0.9000
 
+## Several nodes and adult movement, phase 2: chain-binomial solver (D-032)
+
+Plan: `dev/MOVEMENT_PHASE2_PLAN.md`. One-node runs give the same results as
+before, draw for draw.
+
+* `simulate_cb()` runs landscapes with adult movement in whole numbers of
+  flies (MODEL_SPEC N4): each step runs the processes of every node, then
+  movement (emigrants per adult compartment, multinomial destinations,
+  flies lost through open edges, no fly moving twice in a step), then
+  emergence and arrivals. Nodes share the prepared chains of their forcing
+  series, and empty nodes are skipped. Releases are stored per node
+  (`"M@north"`); `extinct_day` and `wild_extinct_day` refer to the whole
+  landscape; `print()` shows the study nodes' totals, the nodes with flies
+  and the movers.
+* `simulate_cb(record =)` keeps chosen results of each replicate, with the
+  meaning of `simulate_ode(record =)` (`"state"`, `"totals"` or an
+  `sg_record()` object; computed in C++ during the run, no random numbers):
+  `sim$recorded` [time, quantity, replicate], `sim$counter_sums` [day, sum,
+  replicate]; `sim$final_state` [state, replicate] is always kept. `keep`
+  stays as a shortcut (`keep = "totals"` is `record = "totals"`); giving
+  both is an error. `max_memory` counts what is recorded. The C++ recorder
+  is shared by both solvers (`src/recorder.h`).
+* Speed: one-node runs are as fast as before (within about 3%); run time
+  grows about linearly with the number of occupied nodes (about 0.04 s per
+  node and simulated year for a Mendelian model; `bench/phase2_cb_nodes.R`).
+  The deterministic map converges to the multi-node ODE as `dt` shrinks
+  (node totals within about 1% at `dt = 0.1`).
+* Summaries of stochastic runs (`sg_totals()`, `sg_females()`,
+  `sg_allele_freq()`, `sg_cases()`, `sg_hosts()`, `sg_flow_balance()`,
+  plots) work per node, with `nodes` as for `simulate_ode()`.
+
 ## Several nodes and adult movement, phase 1: ODE solver (D-032)
 
 Design: `dev/MOVEMENT_DESIGN.md`; equations: MODEL_SPEC section 8a (N1-N5);
@@ -43,7 +74,7 @@ as before.
 * Bug fix: with the host-wound model, equilibria below the oviposition
   threshold stopped with an error; they now give an empty state with a
   message.
-* Not yet for several nodes: `simulate_cb()` (next phase) and
+* Not yet for several nodes: `simulate_cb()` (phase 2, above) and
   `calibrate_population()`.
 
 ## Package renamed from SGDrivE to ScrewDrivE

@@ -91,9 +91,9 @@ as.data.frame.sg_sim <- function(x, row.names = NULL, optional = FALSE, ..., per
 #' @rdname sg_totals
 #' @export
 as.data.frame.sg_sim_cb <- function(x, row.names = NULL, optional = FALSE, ...,
-                                    per = "node") {
-  by <- c("stage", "sex", "genotype", if (!is.null(x$state)) "mate")
-  sg_totals(x, by = by, per = per)
+                                    per = "node", nodes = NULL) {
+  by <- c("stage", "sex", "genotype", if (!is.null(x$state)) "mate", "node")
+  .sg_totals(x, by, "all", per, nodes, default = "all")
 }
 # nolint end
 
@@ -284,8 +284,9 @@ sg_cases <- function(sim, period = c("day", "week", "month", "year"), per = c("k
   }
   column <- function(name) {
     if (sel$multi) { # the counter summed over the chosen nodes (D-032)
-      cols <- paste0(name, "@", sel$ids)
-      return(matrix(rowSums(k[, cols, drop = FALSE]), nrow = dim(k)[1L]))
+      kc <- .sg_columns(k, paste0(name, "@", sel$ids))
+      v <- if (length(dim(kc)) == 3L) apply(kc, c(1L, 3L), sum) else rowSums(kc)
+      return(matrix(v, nrow = dim(k)[1L]))
     }
     v <- if (length(dim(k)) == 3L) k[, name, ] else k[, name]
     matrix(v, nrow = dim(k)[1L])
@@ -452,6 +453,12 @@ sg_hosts <- function(sim, per = c("node", "km2"), nodes = NULL) {
   sim$counters
 }
 
+# Columns `cols` (names or a logical) of a matrix [time, column] or an
+# array [time, column, replicate], keeping the dimensions.
+.sg_columns <- function(a, cols) {
+  if (length(dim(a)) == 3L) a[, cols, , drop = FALSE] else a[, cols, drop = FALSE]
+}
+
 # Node id of each name with an "@id" suffix (NA without one).
 .sg_name_node <- function(nm) {
   ifelse(grepl("@", nm, fixed = TRUE), sub("^[^@]*@", "", nm), NA_character_)
@@ -490,8 +497,13 @@ sg_hosts <- function(sim, per = c("node", "km2"), nodes = NULL) {
     list(array = a, level = level)
   } else if (!is.null(sim$state)) {
     list(array = sim$state, level = "state")
-  } else {
+  } else if (!is.null(sim$totals)) {
     list(array = sim$totals, level = "totals")
+  } else {
+    .sg_stop(
+      "This summary needs the states or totals of the run; simulate with ",
+      "record = \"totals\" or \"state\" (or add \"totals\" to sg_record())."
+    )
   }
   sel <- .sg_sim_nodes(sim, nodes, default)
   if (!sel$multi) {

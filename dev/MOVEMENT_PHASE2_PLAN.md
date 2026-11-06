@@ -1,7 +1,7 @@
 # Phase 2 implementation plan: movement in the chain-binomial solver
 
 Status: **accepted**, 2026-11-05 (choices of section 4 confirmed by the user
-the same day); not implemented. Implements phase 2 of dev/MOVEMENT_DESIGN.md
+the same day); implemented 2026-11-05 (WP1–WP6; findings in D-032). Implements phase 2 of dev/MOVEMENT_DESIGN.md
 (section 9) against MODEL_SPEC section 8a (N4) and D-032. Phase 1 (ODE,
 recorder) is in dev/MOVEMENT_PHASE1_PLAN.md.
 
@@ -122,6 +122,15 @@ fractions of flies, and the recorder of phase 1 for stochastic runs.
 * Tests: summaries against direct sums of states and counters per
   replicate; flow balance per node with residual exactly 0; parallel
   replicates; print.
+* *Done (2026-11-05):* the guard is gone; `.sg_cb_inputs()` stores releases
+  per block and node (the columns of `.sg_release_matrix()`); the memory
+  estimate counts the release columns of every node; `print()` shows the
+  study nodes' totals (as `simulate_ode()`), the nodes with flies at the
+  end and the movers and lost flies; `as.data.frame()` lists all nodes by
+  node (as for the ODE). `sg_cases()` and `sg_flow_balance()` select node
+  columns of [day, counter, replicate] arrays (`.sg_columns()`); the other
+  summaries already worked per node. Early stop and extinction days were
+  landscape-wide since WP2. Help, example and NEWS updated.
 
 ### WP5. Recorder for `simulate_cb()` (M)
 
@@ -137,6 +146,16 @@ fractions of flies, and the recorder of phase 1 for stochastic runs.
 * Tests: with the same seed, recorded sums equal the sums of a full-state
   run per replicate (recording uses no random numbers); totals equal the
   former `keep = "totals"`; counter sums; final states; memory limit.
+* *Done (2026-11-05):* `Csr`, `read_csr()`, `Recorder` and `as_matrix()`
+  are in `src/recorder.h`, used by `sg_ode_run_cpp()` and
+  `sg_cb_run_cpp()` (new `recorder` argument; the result also has the final
+  state `x`). `simulate_cb()` builds the recorder with `.sg_recorder()` as
+  `simulate_ode()` does; day 0 of `recorded` is W_x x0 in R. `keep`
+  defaults to `NULL`; `meta$keep` is replaced by `meta$record` (as for the
+  ODE). `print()` works without states, totals or counters (nodes with
+  flies from the final states) and shows recorded quantities and counter
+  sums (means over replicates). Summaries of a run without states or
+  totals stop with a hint.
 
 ### WP6. Performance, validation and documentation (M)
 
@@ -150,6 +169,13 @@ fractions of flies, and the recorder of phase 1 for stochastic runs.
   nodes behind a barrier (no edges) stay empty.
 * Documentation: help of `simulate_cb()`, NEWS, D-032 findings, design note
   and roadmap status; `R CMD check` 0/0/0; sanitizers.
+* *Done (2026-11-05):* A/B one-node within 5% after removing a
+  per-replicate release-matrix build; `bench/phase2_cb_nodes.R` (1, 10, 50
+  nodes); larval-chain profile recorded, not optimised (D-032);
+  `test-cb-validation.R` (convergence to the ODE as dt -> 0 at first order,
+  replicate mean against the deterministic map, sink-node extinction and
+  recolonisation, barrier node); D-032 findings, design note, roadmap,
+  NEWS and bench README updated.
 
 ### Pull requests
 

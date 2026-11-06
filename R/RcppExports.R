@@ -9,8 +9,8 @@ sg_cb_step_cpp <- function(view, day, dt, x, stochastic) {
     .Call(`_ScrewDrivE_sg_cb_step_cpp`, view, day, dt, x, stochastic)
 }
 
-sg_cb_run_cpp <- function(view, x0, rel_count, dt, stochastic, n_days, record) {
-    .Call(`_ScrewDrivE_sg_cb_run_cpp`, view, x0, rel_count, dt, stochastic, n_days, record)
+sg_cb_run_cpp <- function(view, x0, rel_count, dt, stochastic, n_days, record, recorder = NULL) {
+    .Call(`_ScrewDrivE_sg_cb_run_cpp`, view, x0, rel_count, dt, stochastic, n_days, record, recorder)
 }
 
 sg_cb_step_rep_cpp <- function(view, day, dt, x, n_rep) {
