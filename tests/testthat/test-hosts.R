@@ -116,7 +116,7 @@ host_total <- function(sim, block) rowSums(sim$state[, host_cols(sim, block), dr
 run_r <- function(p, init = NULL, days = 120, area = 10, temp = 25) {
   m <- sg_model(p, cube3, sg_forcing(sg_constant_weather(temp, days = days), p), area = area)
   x0 <- if (is.null(init)) sg_init(m) else init(m)
-  list(model = m, sim = simulate_ode(m, init = x0, backend = "R"))
+  list(model = m, sim = simulate_ode(m, init = x0, backend = "R", record = "state"))
 }
 
 test_that("hosts are conserved and host counters account for every move", {
@@ -306,12 +306,12 @@ test_that("C++ and R backends give the same host-mode simulation", {
     p <- host_configs[[nm]]
     m <- sg_model(p, cube3, sg_forcing(sg_constant_weather(25, days = 120), p), area = 10)
     x0 <- sg_init(m)
-    s_r <- simulate_ode(m, x0, backend = "R", rtol = 1e-10, atol = 1e-12)
-    s_c <- simulate_ode(m, x0, rtol = 1e-10, atol = 1e-12)
+    s_r <- simulate_ode(m, x0, backend = "R", rtol = 1e-10, atol = 1e-12, record = "state")
+    s_c <- simulate_ode(m, x0, rtol = 1e-10, atol = 1e-12, record = "state")
     expect_lt(max(abs(s_c$state - s_r$state)) / max(s_r$state), 1e-8)
     expect_lt(max(abs(s_c$counters - s_r$counters)) / max(abs(s_r$counters)), 1e-8)
     # deSolve driven by the C++ rates agrees too
-    s_l <- simulate_ode(m, x0, method = "lsoda", rtol = 1e-10, atol = 1e-12)
+    s_l <- simulate_ode(m, x0, method = "lsoda", rtol = 1e-10, atol = 1e-12, record = "state")
     expect_lt(max(abs(s_l$state - s_r$state)) / max(s_r$state), 1e-6)
     tot <- rowSums(s_c$state[, grep("^H", colnames(s_c$state))])
     expect_lt(max(abs(tot - m$hosts$n)), 1e-8 * m$hosts$n)
@@ -409,7 +409,7 @@ test_that("the deterministic host map converges to the ODE as dt shrinks", {
   p <- cb_configs$full_eggs
   m <- cb_model(p, days = 15, area = 40)
   x0 <- cb_init(m)
-  ode <- simulate_ode(m, x0, rtol = 1e-10, atol = 1e-12)
+  ode <- simulate_ode(m, x0, rtol = 1e-10, atol = 1e-12, record = "state")
   hosts <- grep("^H", sg_state_names(m))
   err <- vapply(c(0.1, 0.02), function(dt) {
     d <- ns$.sg_cb_run_cpp(m, x0, dt = dt, stochastic = FALSE)
@@ -423,19 +423,22 @@ test_that("simulate_cb() runs host models", {
   p <- host_params(host_density = 20, wounded_fraction = 0.2, wound_search_rate = 0.02)
   m <- sg_model(p, cube3, sg_forcing(sg_constant_weather(25, days = 60), p), area = 25)
   x0 <- sg_init(m, values = c(E = 20, L = 20, P = 20, M = 10, F = 10))
-  sim <- simulate_cb(m, x0, n_rep = 40, seed = 2)
+  sim <- simulate_cb(m, x0, n_rep = 40, seed = 2, record = "state")
   hosts <- grep("^H", dimnames(sim$state)[[2]])
   tot <- apply(sim$state[, hosts, ], c(1, 3), sum)
   expect_true(all(tot == rep(tot[1, ], each = nrow(tot))))
   # replicate mean of infested hosts follows the ODE
-  ode <- simulate_ode(m, x0)
+  ode <- simulate_ode(m, x0, record = "state")
   inf <- grep("^HI", dimnames(sim$state)[[2]])
   cb_inf <- mean(apply(sim$state[31:61, inf, ], 3, sum)) / 31
   ode_inf <- sum(ode$state[31:61, grep("^HI", colnames(ode$state))]) / 31
   expect_equal(cb_inf, ode_inf, tolerance = 0.15)
   totals <- simulate_cb(m, x0, n_rep = 2, seed = 2, keep = "totals")
   expect_true(all(c("HS[hosts]", "HW[hosts]", "HI[hosts]") %in% dimnames(totals$totals)[[2]]))
-  expect_equal(totals$totals[, "HI[hosts]", ], apply(simulate_cb(m, x0, n_rep = 2, seed = 2)$state[
+  expect_equal(totals$totals[, "HI[hosts]", ], apply(simulate_cb(m, x0,
+    n_rep = 2, seed = 2,
+    record = "state"
+  )$state[
     , inf, ,
     drop = FALSE
   ], c(1, 3), sum))
@@ -445,7 +448,7 @@ test_that("flies can die out while the hosts go on", {
   p <- host_params(host_density = 10, wounded_fraction = 0.2)
   m <- sg_model(p, cube3, sg_forcing(sg_constant_weather(10, days = 120), p), area = 1)
   x0 <- sg_init(m, values = c(E = 1, L = 1, P = 1, M = 1, F = 1))
-  sim <- simulate_cb(m, x0, n_rep = 3, seed = 4)
+  sim <- simulate_cb(m, x0, n_rep = 3, seed = 4, record = "state")
   expect_true(all(!is.na(sim$extinct_day)))
   hosts <- grep("^H", dimnames(sim$state)[[2]])
   last <- dim(sim$state)[1]
@@ -479,7 +482,7 @@ test_that("the host-mode equilibrium is a fixed point of the ODE", {
   expect_gt(info$adult_females, 1000)
   hosts <- ScrewDrivE:::.sg_host_index(m)
   expect_equal(sum(e[hosts]), 30000, tolerance = 1e-10)
-  sim <- simulate_ode(m, e, rtol = 1e-10, atol = 1e-8)
+  sim <- simulate_ode(m, e, rtol = 1e-10, atol = 1e-8, record = "state")
   rel <- max(abs(sweep(sim$state, 2, as.numeric(e))) / pmax(as.numeric(e), 1))
   expect_lt(rel, 1e-6)
   eq <- sg_equilibria(m)
@@ -513,7 +516,7 @@ test_that("with an Allee effect the hosts' region has two stable equilibria", {
     x[fly] <- k * x[fly]
     x
   }
-  females <- function(k) tail(sg_females(simulate_ode(m, start(k)))$females, 1)
+  females <- function(k) tail(sg_females(simulate_ode(m, start(k), record = "state"))$females, 1)
   expect_lt(females(0.9), 0.01 * eq$adult_females[2])
   expect_equal(females(1.1), eq$adult_females[3], tolerance = 1e-3)
 })
@@ -595,26 +598,26 @@ out_model <- function(days = 120) {
 test_that("sg_hosts() reports hosts for ODE and stochastic runs", {
   m <- out_model()
   e <- sg_init(m, "equilibrium")
-  s <- simulate_ode(m, e)
+  s <- simulate_ode(m, e, record = "state")
   h <- sg_hosts(s)
   expect_named(h, c("day", "date", "unwounded", "wounded", "infested", "hosts", "prevalence"))
   expect_equal(h$hosts, rep(30000, nrow(h)), tolerance = 1e-10)
   expect_equal(h$prevalence, h$infested / h$hosts)
   expect_equal(sg_hosts(s, per = "km2")$hosts, rep(30, nrow(h)), tolerance = 1e-10)
   expect_equal(h$infested[1], sum(e[sg_state_index(m, "HI")]))
-  cb <- simulate_cb(m, e, n_rep = 2, seed = 1, output_every = 10)
+  cb <- simulate_cb(m, e, n_rep = 2, seed = 1, output_every = 10, record = "state")
   hc <- sg_hosts(cb)
   expect_true("replicate" %in% names(hc))
   expect_true(all(hc$hosts == round(hc$hosts)))
   hct <- sg_hosts(simulate_cb(m, e, n_rep = 2, seed = 1, output_every = 10, keep = "totals"))
   expect_equal(hct[names(hc)], hc)
-  s_static <- simulate_ode(region_model(sg_params(), days = 10))
+  s_static <- simulate_ode(region_model(sg_params(), days = 10), record = "state")
   expect_error(sg_hosts(s_static), "wound_model = \"hosts\"")
 })
 
 test_that("sg_cases() counts new infestations of hosts in host mode", {
   m <- out_model()
-  s <- simulate_ode(m, sg_init(m, "equilibrium"))
+  s <- simulate_ode(m, sg_init(m, "equilibrium"), record = "state")
   cs <- sg_cases(s, period = "month", per = "node")
   k <- s$counters
   expect_equal(sum(cs$cases), sum(k[, "infestations"]))
@@ -633,8 +636,8 @@ test_that("sg_cases() uses daily counters when states are recorded less often", 
   for (p in list(sg_params(), region_params())) {
     m <- region_model(p, days = 70)
     x0 <- sg_init(m, "equilibrium")
-    a <- sg_cases(simulate_ode(m, x0), period = "week")
-    b <- sg_cases(simulate_ode(m, x0, output_every = 7), period = "week")
+    a <- sg_cases(simulate_ode(m, x0, record = "state"), period = "week")
+    b <- sg_cases(simulate_ode(m, x0, output_every = 7, record = "state"), period = "week")
     expect_equal(b$cases, a$cases, tolerance = 1e-10)
     expect_identical(b$period, a$period)
   }
@@ -643,20 +646,21 @@ test_that("sg_cases() uses daily counters when states are recorded less often", 
 test_that("flow balance checks host conservation", {
   m <- out_model()
   e <- sg_init(m, "equilibrium")
-  fb <- sg_flow_balance(simulate_ode(m, e))
+  fb <- sg_flow_balance(simulate_ode(m, e, record = "state"))
   expect_lt(max(abs(fb$host_residual)), 1e-8 * 30000)
   expect_lt(max(abs(fb$residual)), 1e-6 * sum(e))
-  fc <- sg_flow_balance(simulate_cb(m, e, n_rep = 2, seed = 3, output_every = 5))
+  fc <- sg_flow_balance(simulate_cb(m, e, n_rep = 2, seed = 3, output_every = 5, record = "state"))
   expect_identical(max(abs(fc$host_residual)), 0)
   expect_identical(max(abs(fc$residual)), 0)
   expect_false("host_residual" %in% names(sg_flow_balance(simulate_ode(
-    region_model(sg_params(), days = 10)
+    region_model(sg_params(), days = 10),
+    record = "state"
   ))))
 })
 
 test_that("fly totals leave the hosts out", {
   m <- out_model(days = 10)
-  s <- simulate_ode(m, sg_init(m, "equilibrium"))
+  s <- simulate_ode(m, sg_init(m, "equilibrium"), record = "state")
   tot <- sg_totals(s, by = character(0))
   fly <- !grepl("^H", colnames(s$state))
   expect_equal(tot$value, rowSums(s$state[, fly]))
@@ -664,14 +668,17 @@ test_that("fly totals leave the hosts out", {
 
 test_that("plots, prints and check_model() show the hosts", {
   m <- out_model(days = 365)
-  s <- simulate_ode(m, sg_init(m, "equilibrium"))
+  s <- simulate_ode(m, sg_init(m, "equilibrium"), record = "state")
   d <- sg_plot_data(s, "hosts")
   expect_identical(levels(d$series), c("unwounded", "wounded", "infested"))
   expect_identical(attr(sg_plot_data(s, "cases"), "title"), "New infestations of hosts")
   skip_if_not_installed("ggplot2")
   expect_s3_class(plot(s, "hosts"), "ggplot")
   expect_true(any(grepl("hosts: .* infested of 30000", capture.output(print(s)))))
-  cb <- simulate_cb(m, sg_init(m, "equilibrium"), n_rep = 2, seed = 1, output_every = 30)
+  cb <- simulate_cb(m, sg_init(m, "equilibrium"),
+    n_rep = 2, seed = 1, output_every = 30,
+    record = "state"
+  )
   expect_true(any(grepl("hosts infested at the end", capture.output(print(cb)))))
   chk <- check_model(m)
   expect_equal(chk$size$hosts$n, 30000)

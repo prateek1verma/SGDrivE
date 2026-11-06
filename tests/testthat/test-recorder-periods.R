@@ -52,7 +52,7 @@ test_that("periods are 7-day blocks from the first day, or calendar months and y
 test_that("ODE counter sums by period equal the sums of the daily counters", {
   m <- rp_model()
   x0 <- rp_init(m)
-  full <- simulate_ode(m, x0)
+  full <- simulate_ode(m, x0, record = "state")
   dates <- m$forcing$dates
   eggs_laid <- c("eggs_laid[AA]", "eggs_laid[Aa]", "eggs_laid[aa]")
   terms <- sg_counter("eggs", counter = eggs_laid, by = "node")
@@ -83,7 +83,7 @@ test_that("ODE counter sums by period equal the sums of the daily counters", {
 test_that("periods continue across C++ chunks and in the R paths", {
   m <- rp_model(n_node = 1L)
   x0 <- as.numeric(rp_init(m))
-  full <- simulate_ode(m, x0)
+  full <- simulate_ode(m, x0, record = "state")
   rec <- .sg_recorder(sg_record("cases", every = "week"), m, colnames(full$counters))
   ptr <- sg_kernel_new_cpp(.sg_model_view(m))
   n <- m$forcing$n_days
@@ -101,7 +101,7 @@ test_that("periods continue across C++ chunks and in the R paths", {
   expect_equal(sums, ref, tolerance = 1e-12)
   # the R backend (deSolve path) adds days into period rows in R
   skip_if_not_installed("deSolve")
-  r_full <- simulate_ode(m, x0, backend = "R")
+  r_full <- simulate_ode(m, x0, backend = "R", record = "state")
   r_week <- simulate_ode(m, x0, backend = "R", record = sg_record("cases", every = "week"))
   expect_equal(unname(r_week$counter_sums),
     rp_by_period(r_full$counters[, c("fertile_batches", "egg_batches")], m$forcing$dates, "week"),
@@ -113,7 +113,7 @@ test_that("chain-binomial counter sums by period are exact in every replicate", 
   for (hosts in c(FALSE, TRUE)) {
     m <- rp_model(hosts)
     x0 <- rp_init(m)
-    full <- simulate_cb(m, x0, n_rep = 3, seed = 2)
+    full <- simulate_cb(m, x0, n_rep = 3, seed = 2, record = "state")
     for (every in c("week", "month")) {
       rec <- sg_record("state", "cases", every = every)
       sim <- simulate_cb(m, x0, n_rep = 3, seed = 2, record = rec)
@@ -168,7 +168,7 @@ test_that("sg_cases() reads the cases set as it reads the counters", {
       m <- rp_model(hosts, n_node)
       x0 <- rp_init(m)
       info <- paste(hosts, n_node)
-      full <- simulate_ode(m, x0)
+      full <- simulate_ode(m, x0, record = "state")
       daily <- simulate_ode(m, x0, record = sg_record("state", "cases"))
       weekly <- simulate_ode(m, x0, record = sg_record("state", "cases", every = "week"))
       for (period in c("day", "week", "month")) {
@@ -179,7 +179,7 @@ test_that("sg_cases() reads the cases set as it reads the counters", {
       expect_equal(sg_cases(weekly, "week"), sg_cases(full, "week"), tolerance = 1e-12, info = info)
       expect_error(sg_cases(weekly, "month"), "recorded by week")
       expect_error(sg_cases(weekly, "day"), "needs daily sums \\(")
-      cb_full <- simulate_cb(m, x0, n_rep = 2, seed = 4)
+      cb_full <- simulate_cb(m, x0, n_rep = 2, seed = 4, record = "state")
       weekly_rec <- sg_record("state", "cases", every = "week")
       cb_week <- simulate_cb(m, x0, n_rep = 2, seed = 4, record = weekly_rec)
       expect_identical(sg_cases(cb_week, "week"), sg_cases(cb_full, "week"), info = info)

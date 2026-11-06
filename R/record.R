@@ -21,11 +21,11 @@
 #'   (`"counters"`) stay daily.
 #'
 #' @details
-#' * `simulate_ode(record = "state")` (the default) keeps full states and all
-#'   counters, as before; `record = "totals"` keeps totals and all counters.
-#'   `simulate_cb(record = )` works the same way for each replicate, with an
-#'   extra last dimension for the replicates (`keep = "totals"` is a
-#'   shortcut for `record = "totals"`).
+#' * `simulate_ode(record = "totals")` (the default since phase 3, decision
+#'   13) keeps totals and all counters; `record = "state"` keeps full states
+#'   and all counters, as before. `simulate_cb(record = )` works the same
+#'   way for each replicate, with an extra last dimension for the replicates
+#'   (`keep = "totals"` is a shortcut for `record = "totals"`).
 #' * Quantities are stored in `sim$recorded` (one row per output day, day 0
 #'   included), totals in `sim$totals`, states in `sim$state`.
 #' * With `sg_counter()` terms or the `"cases"` set only those counter sums
@@ -95,12 +95,12 @@ sg_record <- function(..., every = c("day", "week", "month", "year")) {
         )
       }
       sets <- union(sets, x)
-    } else if (inherits(x, c("sg_quantity", "sg_quantity_weights", "sg_counter"))) {
+    } else if (inherits(x, c("sg_quantity", "sg_quantity_weights", "sg_counter", "sg_alleles"))) {
       terms[[length(terms) + 1L]] <- x
     } else {
       .sg_stop(
         "sg_record() takes \"state\", \"totals\", \"counters\", \"cases\" and objects from ",
-        "sg_quantity(), sg_quantity_weights() and sg_counter()."
+        "sg_quantity(), sg_quantity_weights(), sg_alleles() and sg_counter()."
       )
     }
   }
@@ -123,6 +123,7 @@ print.sg_record <- function(x, ...) {
     kind <- switch(class(t)[1L],
       sg_quantity = "quantity",
       sg_quantity_weights = "weights",
+      sg_alleles = "allele copies",
       sg_counter = "counter sum"
     )
     cat("  ", kind, " \"", t$name, "\"",
@@ -219,6 +220,38 @@ sg_quantity_weights <- function(W, names = NULL) { # nolint: object_name_linter.
 }
 
 #' @rdname sg_record
+#' @param alleles For `sg_alleles()`: optional matrix of allele copies per
+#'   genotype (rows named by genotype, columns by allele), as in
+#'   [sg_allele_freq()]; by default each genotype name is split into
+#'   single-letter alleles.
+#' @details `sg_alleles(name, ...)` records the allele copies carried by the
+#'   individuals of `stage` (default adults; mated females count their own
+#'   genotype), one quantity per allele named `name[allele]` (with
+#'   `by = "node"` also `@node`). [sg_allele_freq()] reads them when the run
+#'   kept neither states nor totals.
+#' @export
+sg_alleles <- function(name, alleles = NULL, stage = "adults", sex = NULL, node = NULL,
+                       by = character(0)) {
+  .sg_check_record_name(name)
+  stage <- .sg_record_blocks(stage)
+  if (!is.null(sex)) {
+    sex <- .sg_match_choice(sex, c("male", "female"), "sex")
+    stage <- intersect(stage, if (sex == "male") "M" else c("U", "F"))
+    if (length(stage) == 0L) .sg_stop("No stage of the chosen `sex` in `stage`.")
+  }
+  if (!is.null(alleles) && (!is.matrix(alleles) || !is.numeric(alleles))) {
+    .sg_stop("`alleles` must be a numeric matrix (rows: genotypes, columns: alleles).")
+  }
+  structure(
+    list(
+      name = name, alleles = alleles, stage = stage, node = node,
+      by = .sg_check_record_by(by, "node")
+    ),
+    class = "sg_alleles"
+  )
+}
+
+#' @rdname sg_record
 #' @param counter Base names of the daily counters to add up, e.g.
 #'   `"fertile_batches"` or `c("deaths_M", "senescence_M")` (see the columns
 #'   of `sim$counters`, without the `"@"` node suffix).
@@ -306,7 +339,16 @@ sg_counter <- function(name, counter, node = NULL, by = character(0)) {
   } else {
     n_totals <- 0L
   }
-  for (q in quantities) rows_x <- c(rows_x, .sg_quantity_rows(q, model))
+  allele_info <- list()
+  for (q in quantities) {
+    if (inherits(q, "sg_alleles")) {
+      a <- .sg_allele_rows(q, model)
+      rows_x <- c(rows_x, a$rows)
+      allele_info[[length(allele_info) + 1L]] <- a$info
+    } else {
+      rows_x <- c(rows_x, .sg_quantity_rows(q, model))
+    }
+  }
   rows_c <- unlist(lapply(sums, .sg_counter_rows, model = model, counter_names = counter_names),
     recursive = FALSE
   )
@@ -324,6 +366,7 @@ sg_counter <- function(name, counter, node = NULL, by = character(0)) {
     wx = .sg_rows_csr(rows_x), wc = .sg_rows_csr(rows_c),
     every = every, c_period = as.integer(per$index - 1L),
     counter_periods = per$periods,
+    alleles = allele_info,
     record = record
   )
 }
@@ -380,6 +423,53 @@ sg_counter <- function(name, counter, node = NULL, by = character(0)) {
     out[is.na(out)] <- 0
   }
   out
+}
+
+# Rows of W_x for one sg_alleles term: for each allele (and node with
+# by = "node") the states of the chosen stages and nodes weighted by their
+# genotype's copies of the allele (mated females by their own genotype).
+# Also the term's description for sg_allele_freq(): name, blocks, alleles,
+# node ids and whether it is split by node.
+.sg_allele_rows <- function(a, model) {
+  geno <- model$cube$genotypes
+  amat <- if (is.null(a$alleles)) {
+    .sg_default_alleles(geno)
+  } else {
+    .sg_check_allele_matrix(a$alleles, geno)[geno, , drop = FALSE]
+  }
+  ids <- .sg_node_ids(model)
+  nodes <- .sg_record_nodes(model, a$node)
+  by_node <- "node" %in% a$by && length(ids) > 1L
+  groups <- if (by_node) as.list(nodes) else list(nodes)
+  rows <- list()
+  for (grp in groups) {
+    idx <- integer(0)
+    gen <- character(0)
+    for (k in grp) {
+      for (b in a$stage) {
+        for (g in geno) {
+          i <- sg_state_index(model, b, genotype = g, node = k)
+          idx <- c(idx, i)
+          gen <- c(gen, rep(g, length(i)))
+        }
+      }
+    }
+    for (al in colnames(amat)) {
+      w <- amat[gen, al]
+      keep <- w > 0
+      rows[[length(rows) + 1L]] <- list(
+        name = paste0(a$name, "[", al, "]", if (by_node) paste0("@", ids[grp]) else ""),
+        index = idx[keep], weight = unname(w[keep])
+      )
+    }
+  }
+  list(
+    rows = rows,
+    info = list(
+      name = a$name, blocks = a$stage, alleles = colnames(amat), nodes = ids[nodes],
+      by_node = by_node
+    )
+  )
 }
 
 # Rows of W_x for one sg_quantity or sg_quantity_weights.

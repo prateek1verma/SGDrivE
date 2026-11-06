@@ -47,7 +47,7 @@ init_of <- function(m) sg_init(m, values = c(E = 20, L = 20, P = 20, M = 10, U =
 
 baseline <- lapply(cb_baseline_cases(), function(m) {
   x0 <- init_of(m)
-  sto <- simulate_cb(m, init = x0, n_rep = 2L, dt = 0.1, output_every = 10L, seed = 11L)
+  sto <- simulate_cb(m, init = x0, n_rep = 2L, dt = 0.1, output_every = 10L, seed = 11L, record = "state")
   det <- .sg_cb_run_cpp(m, init = x0, dt = 0.1, stochastic = FALSE)
   view <- .sg_model_view(m)
   xs <- unname(sto$state[3L, , 1L]) # a whole-number state from the run

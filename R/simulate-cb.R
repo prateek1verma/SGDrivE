@@ -30,11 +30,11 @@
 #'   1e9), for all replicates. Use `record = "totals"`, an [sg_record()]
 #'   object or a larger `output_every` for big runs.
 #' @param record What each replicate stores, as in [simulate_ode()]:
-#'   `"state"` (default: full states on output days and all daily counters),
-#'   `"totals"` (totals by stage and genotype per node, and all counters), or
-#'   an [sg_record()] object with chosen quantities and counter sums,
-#'   computed in C++ during the run. Recording uses no random numbers, so
-#'   the replicates are the same whatever is recorded.
+#'   `"totals"` (default: totals by stage and genotype per node, host
+#'   blocks, and all daily counters), `"state"` (full states on output days
+#'   and all counters), or an [sg_record()] object with chosen quantities and
+#'   counter sums, computed in C++ during the run. Recording uses no random
+#'   numbers, so the replicates are the same whatever is recorded.
 #'
 #' @details
 #' **Steps** (D-022). Each day is divided into steps of length `dt`; every
@@ -178,7 +178,7 @@ simulate_cb <- function(model, init = NULL, n_rep = 1L, dt = 0.1, output_every =
   view <- .sg_model_view(model)
   cnames <- attr(view, "counter_names")
   rec <- .sg_recorder(
-    if (!is.null(keep)) keep else if (is.null(record)) "state" else record,
+    if (!is.null(keep)) keep else if (is.null(record)) "totals" else record,
     model, cnames
   )
   n <- model$n_states
@@ -261,7 +261,7 @@ simulate_cb <- function(model, init = NULL, n_rep = 1L, dt = 0.1, output_every =
     backend = "cpp", dt = dt, n_rep = n_rep,
     record = list(
       sets = rec$record$sets, quantities = setdiff(rec$names_x, dimnames(out$totals)[[2L]]),
-      counter_sums = rec$names_c, every = rec$every
+      counter_sums = rec$names_c, every = rec$every, alleles = rec$alleles
     ),
     output_every = as.integer(output_every), seed = rng$seed,
     streams = do.call(cbind, rng$streams), parallel = parallel, run_time = run_time,

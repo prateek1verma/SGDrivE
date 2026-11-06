@@ -89,10 +89,15 @@
 #' releases, so recorded states show the zeros; the flow counters stay
 #' balanced through the `removed_*` counters.
 #'
-#' @param record What the run stores: `"state"` (default: full states on
-#'   output days and all daily counters), `"totals"` (totals by stage and
-#'   genotype per node, and all counters), or an [sg_record()] object with
-#'   chosen quantities and counter sums, computed in C++ during the run.
+#' @param record What the run stores: `"totals"` (default: totals by stage
+#'   and genotype per node, host blocks, and all daily counters), `"state"`
+#'   (full states on output days and all counters), or an [sg_record()]
+#'   object with chosen quantities and counter sums, computed in C++ during
+#'   the run. The final state is always kept. Totals add mated females over
+#'   their mates and all adults over their ages: summaries that need the
+#'   mate genotype (`sg_females()$fertile_equivalent`,
+#'   `sg_totals(by = "mate")`) or sub-stages need `record = "state"`
+#'   (decision 13, D-032).
 #'
 #' @return An object of class `sg_sim`, a list with:
 #'   \describe{
@@ -128,12 +133,12 @@
 #'   sim
 #'   # the pure-R reference backend gives the same result, more slowly
 #'   sim_r <- simulate_ode(mod, backend = "R")
-#'   max(abs(sim_r$state - sim$state)) / max(sim$state)
+#'   max(abs(sim_r$totals - sim$totals)) / max(sim$totals)
 #' }
 simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
                          rtol = 1e-8, atol = 1e-10, output_every = 1L,
                          stiff_fallback = NULL, node_extinction = FALSE, max_memory = 1e9,
-                         record = "state") {
+                         record = "totals") {
   if (!inherits(model, "sg_model")) {
     .sg_stop("`model` must be an sg_model object; create one with sg_model().")
   }
@@ -297,7 +302,7 @@ simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
         node_extinction = node_extinction,
         record = list(
           sets = rec$record$sets, quantities = setdiff(rec$names_x, colnames(totals)),
-          counter_sums = rec$names_c, every = rec$every
+          counter_sums = rec$names_c, every = rec$every, alleles = rec$alleles
         ),
         fallback_days = sum(res$diag$fallback), run_time = run_time,
         model_hash = model$meta$hash, info = .sg_output_info(model),

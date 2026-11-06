@@ -31,7 +31,8 @@ a female mated to a sterile male counts 0, one with half the viable
 eggs counts 0.5.}
 }
 \code{egg_laying} and \code{fertile_equivalent} need the full state, so they are
-\code{NA} for stochastic runs with \code{keep = "totals"}. With several nodes the
+\code{NA} unless the run used \code{record = "state"} (totals, the default, add
+mated females over mates and ages). With several nodes the
 females of \code{nodes} (default the study nodes) are summed.
 }
 \description{

@@ -26,8 +26,8 @@ flow_error <- function(sim) {
   max(abs(diff(tot) - pred)) / max(tot)
 }
 
-ref <- simulate_ode(m_rel, backend = "R", rtol = 1e-10, atol = 1e-12)
-cpp <- simulate_ode(m_rel, backend = "cpp", rtol = 1e-10, atol = 1e-12)
+ref <- simulate_ode(m_rel, backend = "R", rtol = 1e-10, atol = 1e-12, record = "state")
+cpp <- simulate_ode(m_rel, backend = "cpp", rtol = 1e-10, atol = 1e-12, record = "state")
 
 test_that("the C++ backend returns the same structure as the R backend", {
   expect_s3_class(cpp, "sg_sim")
@@ -57,32 +57,38 @@ test_that("the C++ backend agrees with the R backend, with releases", {
 })
 
 test_that("C++ rates driven by a deSolve method reproduce the R backend", {
-  a <- simulate_ode(m_rel, backend = "R", method = "lsoda")
-  b <- simulate_ode(m_rel, backend = "cpp", method = "lsoda")
+  a <- simulate_ode(m_rel, backend = "R", method = "lsoda", record = "state")
+  b <- simulate_ode(m_rel, backend = "cpp", method = "lsoda", record = "state")
   # same integrator and rates equal to round-off, but lsoda's step choices
   # react to round-off, so agreement is at the level of the integration error
   expect_lt(rel_diff(a, b), 1e-7)
   expect_identical(b$diagnostics$stiff, a$diagnostics$stiff)
-  r <- simulate_ode(m_rel, backend = "cpp", method = "radau", rtol = 1e-10, atol = 1e-12)
+  r <- simulate_ode(m_rel,
+    backend = "cpp", method = "radau", rtol = 1e-10, atol = 1e-12,
+    record = "state"
+  )
   expect_lt(rel_diff(ref, r), 1e-7)
   expect_true(all(is.na(r$diagnostics$stiff)))
   expect_true(any(grepl("stiffness not reported", capture.output(print(r)))))
 })
 
 test_that("default tolerances keep the backends within the integration error", {
-  a <- simulate_ode(m_rel, backend = "R")
-  b <- simulate_ode(m_rel, backend = "cpp")
+  a <- simulate_ode(m_rel, backend = "R", record = "state")
+  b <- simulate_ode(m_rel, backend = "cpp", record = "state")
   expect_lt(rel_diff(a, b), 1e-6)
   expect_lt(rel_diff(ref, b), 1e-6)
 })
 
 test_that("output_every and an empty population work in the C++ backend", {
-  sim <- simulate_ode(m_rel, backend = "cpp", output_every = 7, rtol = 1e-10, atol = 1e-12)
+  sim <- simulate_ode(m_rel,
+    backend = "cpp", output_every = 7, rtol = 1e-10, atol = 1e-12,
+    record = "state"
+  )
   expect_identical(sim$day, c(0L, seq(7L, 56L, by = 7L), 60L))
   expect_identical(sim$state, cpp$state[sim$day + 1L, ])
   expect_identical(sim$counters, cpp$counters)
   m <- sg_model(p, cube3, wx60)
-  empty <- simulate_ode(m, init = sg_init(m, values = c(E = 0)), backend = "cpp")
+  empty <- simulate_ode(m, init = sg_init(m, values = c(E = 0)), backend = "cpp", record = "state")
   expect_identical(sum(abs(empty$state)), 0)
   expect_identical(sum(abs(empty$counters)), 0)
 })
@@ -91,8 +97,8 @@ test_that("stiff days fall back to lsoda and give the same result", {
   # near-instant mating (nu = 1e4 per day) makes every day stiff
   ps <- sg_params(mating_rate = 1e4)
   ms <- sg_model(ps, cube3, sg_forcing(sg_example_weather(), ps, "1971-05-01", "1971-05-10"))
-  a <- simulate_ode(ms, backend = "R", rtol = 1e-9, atol = 1e-12)
-  b <- simulate_ode(ms, backend = "cpp", rtol = 1e-9, atol = 1e-12)
+  a <- simulate_ode(ms, backend = "R", rtol = 1e-9, atol = 1e-12, record = "state")
+  b <- simulate_ode(ms, backend = "cpp", rtol = 1e-9, atol = 1e-12, record = "state")
   expect_identical(b$meta$fallback_days, 10L)
   expect_true(all(b$diagnostics$fallback & b$diagnostics$stiff))
   expect_true(all(is.na(b$diagnostics$rejected)))
@@ -100,7 +106,10 @@ test_that("stiff days fall back to lsoda and give the same result", {
   out <- capture.output(print(b))
   expect_true(any(grepl("stiffness detected on 10 of 10 days, 10 integrated by the lsoda", out)))
   # without the fallback, Dormand-Prince gets there too, with many more steps
-  nf <- simulate_ode(ms, backend = "cpp", rtol = 1e-9, atol = 1e-12, stiff_fallback = FALSE)
+  nf <- simulate_ode(ms,
+    backend = "cpp", rtol = 1e-9, atol = 1e-12, stiff_fallback = FALSE,
+    record = "state"
+  )
   expect_identical(nf$meta$fallback_days, 0L)
   expect_false(nf$meta$stiff_fallback)
   expect_true(all(nf$diagnostics$stiff))
@@ -115,8 +124,11 @@ test_that("a stiff day in the middle of a run is handed over and the loop resume
   pc <- sg_params(mating_rate = 1e5, male_density_half_mating = 1e5)
   wx <- sg_forcing(sg_example_weather(), pc, "1971-05-01", "1971-05-30")
   mc <- sg_model(pc, cube3, wx, sg_releases("aa", "adult", "male", times = 10, number = 1e6))
-  a <- simulate_ode(mc, backend = "R", rtol = 1e-9, atol = 1e-12)
-  b <- simulate_ode(mc, backend = "cpp", rtol = 1e-9, atol = 1e-12, output_every = 3)
+  a <- simulate_ode(mc, backend = "R", rtol = 1e-9, atol = 1e-12, record = "state")
+  b <- simulate_ode(mc,
+    backend = "cpp", rtol = 1e-9, atol = 1e-12, output_every = 3,
+    record = "state"
+  )
   fb <- which(b$diagnostics$fallback)
   expect_gt(length(fb), 0L)
   expect_lt(length(fb), 20L)
@@ -129,30 +141,39 @@ test_that("a stiff day in the middle of a run is handed over and the loop resume
 test_that("a Dormand-Prince failure without fallback is an informative error", {
   local_mocked_bindings(.sg_dopri5_max_steps = 2)
   expect_error(
-    simulate_ode(m_rel, backend = "cpp", stiff_fallback = FALSE),
+    simulate_ode(m_rel, backend = "cpp", stiff_fallback = FALSE, record = "state"),
     "failed on day 1 \\(1971-05-01\\): too many steps"
   )
   # with the fallback, lsoda takes over every day
-  sim <- simulate_ode(m_rel, backend = "cpp")
+  sim <- simulate_ode(m_rel, backend = "cpp", record = "state")
   expect_identical(sim$meta$fallback_days, 60L)
   expect_false(any(sim$diagnostics$stiff))
-  expect_lt(rel_diff(simulate_ode(m_rel, backend = "R"), sim), 1e-7)
+  expect_lt(rel_diff(simulate_ode(m_rel, backend = "R", record = "state"), sim), 1e-7)
 })
 
 test_that("the C++ backend needs deSolve only for a fallback day or a deSolve method", {
   local_mocked_bindings(.sg_has_desolve = function() FALSE)
-  sim <- simulate_ode(m_rel)
+  sim <- simulate_ode(m_rel, record = "state")
   expect_identical(sim$meta$fallback_days, 0L)
   expect_identical(sim$meta$desolve_version, NA_character_)
-  expect_error(simulate_ode(m_rel, method = "lsoda"), "Method \"lsoda\" needs the 'deSolve'")
-  expect_error(simulate_ode(m_rel, backend = "R"), "Method \"lsoda\" needs the 'deSolve'")
+  expect_error(
+    simulate_ode(m_rel, method = "lsoda", record = "state"),
+    "Method \"lsoda\" needs the 'deSolve'"
+  )
+  expect_error(
+    simulate_ode(m_rel, backend = "R", record = "state"),
+    "Method \"lsoda\" needs the 'deSolve'"
+  )
   ps <- sg_params(mating_rate = 1e4)
   ms <- sg_model(ps, cube3, sg_forcing(sg_example_weather(), ps, "1971-05-01", "1971-05-03"))
   expect_error(
-    simulate_ode(ms),
+    simulate_ode(ms, record = "state"),
     "Day 1 \\(1971-05-01\\) is stiff; its fallback needs the 'deSolve' .*stiff_fallback = FALSE"
   )
-  expect_identical(simulate_ode(ms, stiff_fallback = FALSE)$meta$fallback_days, 0L)
+  expect_identical(
+    simulate_ode(ms, stiff_fallback = FALSE, record = "state")$meta$fallback_days,
+    0L
+  )
 })
 
 test_that("the C++ day loop can stop and resume without changing the result", {

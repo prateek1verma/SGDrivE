@@ -4,6 +4,7 @@
 \alias{sg_record}
 \alias{sg_quantity}
 \alias{sg_quantity_weights}
+\alias{sg_alleles}
 \alias{sg_counter}
 \title{What a simulation stores}
 \usage{
@@ -22,6 +23,15 @@ sg_quantity(
 )
 
 sg_quantity_weights(W, names = NULL)
+
+sg_alleles(
+  name,
+  alleles = NULL,
+  stage = "adults",
+  sex = NULL,
+  node = NULL,
+  by = character(0)
+)
 
 sg_counter(name, counter, node = NULL, by = character(0))
 }
@@ -69,6 +79,11 @@ with columns \code{quantity}, \code{state} (state names or positions) and
 \item{names}{Names of the quantities of a matrix \code{W} (default its row
 names).}
 
+\item{alleles}{For \code{sg_alleles()}: optional matrix of allele copies per
+genotype (rows named by genotype, columns by allele), as in
+\code{\link[=sg_allele_freq]{sg_allele_freq()}}; by default each genotype name is split into
+single-letter alleles.}
+
 \item{counter}{Base names of the daily counters to add up, e.g.
 \code{"fertile_batches"} or \code{c("deaths_M", "senescence_M")} (see the columns
 of \code{sim$counters}, without the \code{"@"} node suffix).}
@@ -87,11 +102,11 @@ only what is needed.
 }
 \details{
 \itemize{
-\item \code{simulate_ode(record = "state")} (the default) keeps full states and all
-counters, as before; \code{record = "totals"} keeps totals and all counters.
-\code{simulate_cb(record = )} works the same way for each replicate, with an
-extra last dimension for the replicates (\code{keep = "totals"} is a
-shortcut for \code{record = "totals"}).
+\item \code{simulate_ode(record = "totals")} (the default since phase 3, decision
+13) keeps totals and all counters; \code{record = "state"} keeps full states
+and all counters, as before. \code{simulate_cb(record = )} works the same
+way for each replicate, with an extra last dimension for the replicates
+(\code{keep = "totals"} is a shortcut for \code{record = "totals"}).
 \item Quantities are stored in \code{sim$recorded} (one row per output day, day 0
 included), totals in \code{sim$totals}, states in \code{sim$state}.
 \item With \code{sg_counter()} terms or the \code{"cases"} set only those counter sums
@@ -110,6 +125,12 @@ from it.
 \item Summaries such as \code{\link[=sg_totals]{sg_totals()}} need \code{"state"} or \code{"totals"}; \code{\link[=sg_cases]{sg_cases()}}
 and \code{\link[=sg_flow_balance]{sg_flow_balance()}} need \code{"counters"}. They say so when it is missing.
 }
+
+\code{sg_alleles(name, ...)} records the allele copies carried by the
+individuals of \code{stage} (default adults; mated females count their own
+genotype), one quantity per allele named \code{name[allele]} (with
+\code{by = "node"} also \verb{@node}). \code{\link[=sg_allele_freq]{sg_allele_freq()}} reads them when the run
+kept neither states nor totals.
 }
 \examples{
 rec <- sg_record(

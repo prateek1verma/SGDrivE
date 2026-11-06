@@ -22,8 +22,9 @@
 #'   out).
 #'
 #' @details Stages are the model's blocks E, L, P, M, U and F; juveniles have
-#'   sex `"unsexed"`. Grouping by `"mate"` needs the full state, so it is not
-#'   available for stochastic runs with `keep = "totals"`; the mate of
+#'   sex `"unsexed"`. Grouping by `"mate"` needs the full state, so it needs
+#'   runs with `record = "state"` (totals, the default, add mated females
+#'   over their mates); the mate of
 #'   individuals other than mated females is `NA`. With several nodes the
 #'   counts are summed over `nodes` unless `by` contains `"node"`.
 #' @return A data frame with columns `day`, `date`, `replicate` (stochastic
@@ -110,6 +111,10 @@ as.data.frame.sg_sim_cb <- function(x, row.names = NULL, optional = FALSE, ...,
 #'   one `a`; `"XY"` one `X` and one `Y`).
 #' @details With several nodes the individuals of `nodes` (default the study
 #'   nodes) are pooled.
+#'
+#'   The counts come from the run's states or totals or, when neither was
+#'   kept, from allele copies recorded with [sg_alleles()] for the same
+#'   stages and alleles (split by node, or for exactly the chosen nodes).
 #' @return A data frame with columns `day`, `date`, `replicate` (stochastic
 #'   runs only), `allele`, `count` (allele copies) and `freq` (share of all
 #'   copies; `NA` when no individuals are present).
@@ -124,6 +129,9 @@ as.data.frame.sg_sim_cb <- function(x, row.names = NULL, optional = FALSE, ...,
 #' }
 sg_allele_freq <- function(sim, stages = "adults", alleles = NULL, nodes = NULL) {
   geno <- .sg_sim_info(sim)$genotypes
+  if (is.null(sim$state) && is.null(sim$totals)) {
+    return(.sg_allele_freq_recorded(sim, stages, alleles, nodes))
+  }
   amat <- if (is.null(alleles)) {
     .sg_default_alleles(geno)
   } else {
@@ -138,6 +146,45 @@ sg_allele_freq <- function(sim, stages = "adults", alleles = NULL, nodes = NULL)
   freq <- sweep(counts, c(1L, 3L), total, "/")
   freq[!is.finite(freq)] <- NA_real_
   lev <- data.frame(allele = colnames(amat), stringsAsFactors = FALSE)
+  out <- .sg_long_table(sim, counts, lev)
+  names(out)[names(out) == "value"] <- "count"
+  out$freq <- .sg_long_table(sim, freq, lev)$value
+  out
+}
+
+# Allele frequencies from allele copies recorded with sg_alleles() (phase 3
+# WP5), for a run without states or totals: the recorded term must cover the
+# same stages and alleles, and be split by node or cover exactly `nodes`.
+.sg_allele_freq_recorded <- function(sim, stages, alleles, nodes) {
+  want <- .sg_expand_stages(stages)
+  blocks <- c("E", "L", "P", "M", "U", "F")
+  sel <- .sg_sim_nodes(sim, nodes)
+  fits <- Filter(function(a) {
+    same_stages <- setequal(.sg_stage_names[match(a$blocks, blocks)], want)
+    same_alleles <- is.null(alleles) || identical(sort(colnames(alleles)), sort(a$alleles))
+    same_nodes <- a$by_node || setequal(a$nodes, sel$ids)
+    same_stages && same_alleles && same_nodes
+  }, sim$meta$record$alleles)
+  if (length(fits) == 0L) {
+    .sg_stop(
+      "sg_allele_freq() needs the states or totals of the run, or allele copies recorded with ",
+      "sg_alleles() for these stages and nodes; add \"totals\" or sg_alleles(...) to sg_record()."
+    )
+  }
+  a <- fits[[1L]]
+  rec <- sim$recorded
+  if (length(dim(rec)) == 2L) {
+    rec <- array(rec, c(dim(rec), 1L), dimnames = list(NULL, colnames(rec), NULL))
+  }
+  counts <- vapply(a$alleles, function(al) {
+    cols <- paste0(a$name, "[", al, "]", if (a$by_node) paste0("@", sel$ids) else "")
+    apply(rec[, cols, , drop = FALSE], c(1L, 3L), sum)
+  }, matrix(0, dim(rec)[1L], dim(rec)[3L]))
+  counts <- aperm(array(counts, c(dim(rec)[1L], dim(rec)[3L], length(a$alleles))), c(1L, 3L, 2L))
+  total <- apply(counts, c(1L, 3L), sum)
+  freq <- sweep(counts, c(1L, 3L), total, "/")
+  freq[!is.finite(freq)] <- NA_real_
+  lev <- data.frame(allele = a$alleles, stringsAsFactors = FALSE)
   out <- .sg_long_table(sim, counts, lev)
   names(out)[names(out) == "value"] <- "count"
   out$freq <- .sg_long_table(sim, freq, lev)$value
@@ -163,7 +210,8 @@ sg_allele_freq <- function(sim, stages = "adults", alleles = NULL, nodes = NULL)
 #'       eggs counts 0.5.}
 #'   }
 #'   `egg_laying` and `fertile_equivalent` need the full state, so they are
-#'   `NA` for stochastic runs with `keep = "totals"`. With several nodes the
+#'   `NA` unless the run used `record = "state"` (totals, the default, add
+#'   mated females over mates and ages). With several nodes the
 #'   females of `nodes` (default the study nodes) are summed.
 #' @export
 #' @examples

@@ -67,8 +67,9 @@ genotype and (for mated females) mate genotype.
 }
 \details{
 Stages are the model's blocks E, L, P, M, U and F; juveniles have
-sex \code{"unsexed"}. Grouping by \code{"mate"} needs the full state, so it is not
-available for stochastic runs with \code{keep = "totals"}; the mate of
+sex \code{"unsexed"}. Grouping by \code{"mate"} needs the full state, so it needs
+runs with \code{record = "state"} (totals, the default, add mated females
+over their mates); the mate of
 individuals other than mated females is \code{NA}. With several nodes the
 counts are summed over \code{nodes} unless \code{by} contains \code{"node"}.
 

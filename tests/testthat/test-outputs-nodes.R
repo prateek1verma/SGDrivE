@@ -27,7 +27,8 @@ on_sim <- function(hosts = FALSE, days = 120) {
   )
   m <- sg_model(p, on_cube, releases = rel, landscape = land, movement = layer)
   sim <- simulate_ode(m,
-    init = sg_init(m, nodes = "src"), output_every = 10L, node_extinction = TRUE
+    init = sg_init(m, nodes = "src"), output_every = 10L, node_extinction = TRUE,
+    record = "state"
   )
   list(m = m, sim = sim)
 }

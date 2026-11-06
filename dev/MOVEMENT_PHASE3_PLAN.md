@@ -179,6 +179,15 @@ landscape: a transect from south Texas north.
 * Tests: every summary gives the same result from states, from totals and
   from the recorded quantities it accepts (both solvers, 1 and 3 nodes);
   clear errors otherwise.
+* *Done (2026-11-06):* `sg_alleles(name, alleles, stage, sex, node, by)`
+  (rows weighted by allele copies, `.sg_allele_rows()`; described in
+  `meta$record$alleles`) and `.sg_allele_freq_recorded()`. Default
+  `record = "totals"` in both solvers; `check_model()` reads totals and
+  burn-ins read `final_state`. The tests that read `sim$state` ask for
+  `record = "state"` (added with a parser-based rewrite to 150 calls;
+  `sim_ode()` in `helper-backends.R` defaults to it). README prose updated
+  in `README.Rmd` and `README.md` (not re-knitted: no pandoc locally).
+  Tests in `test-summaries-recorded.R`.
 
 ### WP6. Spread metrics and plots (M)
 

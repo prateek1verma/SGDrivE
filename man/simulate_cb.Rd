@@ -54,11 +54,11 @@ are the same as with \code{FALSE}.}
 object or a larger \code{output_every} for big runs.}
 
 \item{record}{What each replicate stores, as in \code{\link[=simulate_ode]{simulate_ode()}}:
-\code{"state"} (default: full states on output days and all daily counters),
-\code{"totals"} (totals by stage and genotype per node, and all counters), or
-an \code{\link[=sg_record]{sg_record()}} object with chosen quantities and counter sums,
-computed in C++ during the run. Recording uses no random numbers, so
-the replicates are the same whatever is recorded.}
+\code{"totals"} (default: totals by stage and genotype per node, host
+blocks, and all daily counters), \code{"state"} (full states on output days
+and all counters), or an \code{\link[=sg_record]{sg_record()}} object with chosen quantities and
+counter sums, computed in C++ during the run. Recording uses no random
+numbers, so the replicates are the same whatever is recorded.}
 }
 \value{
 An object of class \code{sg_sim_cb}, a list with:

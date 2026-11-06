@@ -27,7 +27,7 @@ timed <- function(expr) {
   list(value = val, seconds = proc.time()[["elapsed"]] - t0)
 }
 median_run <- function(m, ...) {
-  runs <- lapply(seq_len(reps), function(i) timed(simulate_ode(m, ...)))
+  runs <- lapply(seq_len(reps), function(i) timed(simulate_ode(m, ..., record = "state")))
   secs <- vapply(runs, `[[`, 0, "seconds")
   list(value = runs[[1L]]$value, seconds = stats::median(secs))
 }
@@ -37,7 +37,7 @@ scenario <- function(name, p, cube, start = NULL, end = NULL, releases = NULL, w
   m <- sg_model(p, sg_cube(cube), wx, releases)
   dp <- median_run(m, backend = "cpp")
   ls <- median_run(m, backend = "cpp", method = "lsoda")
-  r <- if (with_r) timed(simulate_ode(m, backend = "R")) else list(value = NULL, seconds = NA)
+  r <- if (with_r) timed(simulate_ode(m, backend = "R", record = "state")) else list(value = NULL, seconds = NA)
   years <- wx$n_days / 365.25
   d <- dp$value$diagnostics
   data.frame(

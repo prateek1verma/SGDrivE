@@ -33,7 +33,7 @@ test_that("the deterministic map converges to the multi-node ODE as dt -> 0", {
     for (hosts in c(FALSE, TRUE)) {
       m <- cbv_model(clock, hosts)
       x0 <- cbv_init(m)
-      ode <- simulate_ode(m, x0)
+      ode <- simulate_ode(m, x0, record = "state")
       nm <- sg_state_names(m)
       fly <- !.sg_is_host_name(nm)
       move <- grepl("^(emigrants|immigrants|lost)_", colnames(ode$counters))

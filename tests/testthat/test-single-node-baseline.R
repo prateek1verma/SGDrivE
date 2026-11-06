@@ -60,7 +60,7 @@ test_that("one-node models reproduce the pre-phase-1 baseline", {
     expect_identical(mod$layout, r$layout, info = nm)
     expect_baseline(mod$counts, r$counts, nm, 1e-14)
     expect_baseline(mod$releases, r$releases, nm, 1e-14)
-    sim <- simulate_ode(mod, output_every = 30L)
+    sim <- simulate_ode(mod, output_every = 30L, record = "state")
     expect_identical(sim$day, r$day, info = nm)
     expect_baseline(unname(sim$state), r$state, nm, 1e-9)
     expect_baseline(sim$counters, r$counters, nm, 1e-9)

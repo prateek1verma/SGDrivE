@@ -32,7 +32,7 @@ scenario <- function(name, p, cube, start, end, releases = NULL) {
   wx <- sg_forcing(wx_all, p, start = start, end = end)
   m <- sg_model(p, sg_cube(cube), wx, releases)
   t0 <- proc.time()
-  sim <- simulate_ode(m)
+  sim <- simulate_ode(m, record = "state")
   el <- (proc.time() - t0)[["elapsed"]]
   data.frame(
     scenario = name, genotypes = m$dims$n_genotypes, states = m$n_states,

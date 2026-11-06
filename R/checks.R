@@ -339,9 +339,9 @@ check_model <- function(model, dt = 0.1, scale = TRUE) {
   scale_info <- list(available = FALSE)
   if (scale && f$n_days >= 365L) {
     init <- suppressWarnings(sg_init(model, "burn_in"))
-    sim <- simulate_ode(model, init = init)
-    geno <- sub("^.\\[([^],|]+).*$", "\\1", colnames(sim$state))
-    wild_total <- rowSums(sim$state[, geno %in% cb$wild_type, drop = FALSE])
+    sim <- simulate_ode(model, init = init, record = "totals")
+    geno <- sub("^.\\[([^],|]+).*$", "\\1", colnames(sim$totals))
+    wild_total <- rowSums(sim$totals[, geno %in% cb$wild_type, drop = FALSE])
     scale_info <- list(
       available = TRUE, min_wild = min(wild_total), max_wild = max(wild_total),
       min_wild_date = sim$date[which.min(wild_total)]
@@ -462,14 +462,14 @@ check_model <- function(model, dt = 0.1, scale = TRUE) {
   f <- model$forcing
   if (scale && f$n_days >= 365L) {
     init <- suppressWarnings(sg_init(model, "burn_in"))
-    sim <- simulate_ode(model, init = init)
-    nm <- colnames(sim$state)
+    sim <- simulate_ode(model, init = init, record = "totals")
+    nm <- colnames(sim$totals)
     geno <- sub("^.\\[([^],|]+).*$", "\\1", nm)
     wild <- geno %in% model$cube$wild_type
     node_of <- .sg_name_node(nm)
     if (length(ids) == 1L) node_of <- rep(ids, length(nm))
     min_wild <- vapply(ids, function(id) {
-      min(rowSums(sim$state[, wild & node_of == id, drop = FALSE]))
+      min(rowSums(sim$totals[, wild & node_of == id, drop = FALSE]))
     }, 0)
     nodes$min_wild <- unname(min_wild)
     scale_info <- list(available = TRUE, min_wild = min(min_wild))

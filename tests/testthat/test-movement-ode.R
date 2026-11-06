@@ -33,9 +33,9 @@ test_that("two identical nodes with symmetric movement each equal the one-node r
   cube <- sg_cube(sg_test_cube_mendelian())
   one <- sg_model(p, cube, mo_forcing(p), area = 10)
   x1 <- as.numeric(sg_init(one))
-  ref <- simulate_ode(one, init = x1, output_every = 10L)
+  ref <- simulate_ode(one, init = x1, output_every = 10L, record = "state")
   m <- sg_model(p, cube, landscape = mo_land(p, 2), movement = mo_chain(2))
-  sim <- simulate_ode(m, init = c(x1, x1), output_every = 10L)
+  sim <- simulate_ode(m, init = c(x1, x1), output_every = 10L, record = "state")
   n_s <- length(x1)
   scale <- max(abs(ref$state))
   expect_lt(max(abs(sim$state[, seq_len(n_s)] - ref$state)) / scale, 1e-6)
@@ -50,10 +50,14 @@ test_that("released sterile males spread over a closed chain without changing th
   land <- mo_land(p, 4)
   rel <- sg_releases("S", stage = "adult", sex = "male", times = 1, number = 1000, node = "n1")
   x0 <- numeric(sg_model(p, cube, releases = rel, landscape = land)$n_states)
-  still <- simulate_ode(sg_model(p, cube, releases = rel, landscape = land), init = x0)
+  still <- simulate_ode(sg_model(p, cube, releases = rel, landscape = land),
+    init = x0,
+    record = "state"
+  )
   moving <- simulate_ode(
     sg_model(p, cube, releases = rel, landscape = land, movement = mo_chain(4)),
-    init = x0
+    init = x0,
+    record = "state"
   )
   males_s <- function(sim, node = NULL) {
     nm <- colnames(sim$state)
@@ -81,10 +85,14 @@ test_that("with an open end the network loses the counted flies", {
   land <- mo_land(p, 3)
   rel <- sg_releases("S", stage = "adult", sex = "male", times = 1, number = 1000, node = "n3")
   x0 <- numeric(sg_model(p, cube, releases = rel, landscape = land)$n_states)
-  still <- simulate_ode(sg_model(p, cube, releases = rel, landscape = land), init = x0)
+  still <- simulate_ode(sg_model(p, cube, releases = rel, landscape = land),
+    init = x0,
+    record = "state"
+  )
   open <- simulate_ode(
     sg_model(p, cube, releases = rel, landscape = land, movement = mo_chain(3, open_end = TRUE)),
-    init = x0
+    init = x0,
+    record = "state"
   )
   nm <- colnames(open$state)
   ms <- function(sim) sum(sim$state[nrow(sim$state), grepl("^M\\[S,", nm)])
@@ -107,8 +115,8 @@ test_that("an empty node is colonised only through movement, from a source node"
   x0 <- mo_state_first(p, cube, 2)
   m0 <- sg_model(p, cube, landscape = land)
   m1 <- sg_model(p, cube, landscape = land, movement = one_way)
-  s0 <- simulate_ode(m0, init = x0, output_every = 10L)
-  s1 <- simulate_ode(m1, init = x0, output_every = 10L)
+  s0 <- simulate_ode(m0, init = x0, output_every = 10L, record = "state")
+  s1 <- simulate_ode(m1, init = x0, output_every = 10L, record = "state")
   study <- grepl("@study$", colnames(s1$state))
   expect_identical(max(abs(s0$state[, study])), 0)
   expect_gt(sum(s1$state[nrow(s1$state), study]), 10)
@@ -130,7 +138,7 @@ test_that("releases happen in their node", {
     node = "n2"
   )
   m <- sg_model(p, cube, releases = rel, landscape = mo_land(p, 3, area = c(1, 2, 3)))
-  sim <- simulate_ode(m, init = numeric(m$n_states))
+  sim <- simulate_ode(m, init = numeric(m$n_states), record = "state")
   expect_identical(unname(sim$releases[5L, "M@n2"]), 200)
   nm <- colnames(sim$state)
   day5 <- sim$state[sim$day == 5L, ]
@@ -148,10 +156,11 @@ test_that("the C++ and R backends agree on a multi-node run with hosts and movem
   x1 <- as.numeric(sg_init(one))
   hosts_only <- replace(numeric(one$n_states), sg_state_index(one, "HS"), one$hosts$n)
   x0 <- c(x1, x1, hosts_only)
-  a <- simulate_ode(m, init = x0, output_every = 5L, rtol = 1e-10, atol = 1e-10)
+  a <- simulate_ode(m, init = x0, output_every = 5L, rtol = 1e-10, atol = 1e-10, record = "state")
   b <- simulate_ode(m,
     init = x0, backend = "R", method = "ode45", output_every = 5L,
-    rtol = 1e-10, atol = 1e-10
+    rtol = 1e-10, atol = 1e-10,
+    record = "state"
   )
   expect_lt(max(abs(a$state - b$state)) / max(abs(a$state)), 1e-6)
   expect_lt(max(abs(a$counters - b$counters)) / max(abs(a$counters)), 1e-6)
@@ -163,35 +172,38 @@ test_that("several nodes: stiff fallback, memory limits and the limiting-node di
   m <- sg_model(p, cube, landscape = mo_land(p, 3, days = 20), movement = mo_chain(3))
   x0 <- mo_state_first(p, cube, 3, days = 20)
   expect_error(
-    simulate_ode(m, init = x0, stiff_fallback = TRUE),
+    simulate_ode(m, init = x0, stiff_fallback = TRUE, record = "state"),
     "not available with several nodes"
   )
-  expect_error(simulate_ode(m, init = x0, max_memory = 1e4), "more than max_memory")
+  expect_error(
+    simulate_ode(m, init = x0, max_memory = 1e4, record = "state"),
+    "more than max_memory"
+  )
   skip_if_not_installed("deSolve")
   expect_error(
-    simulate_ode(m, init = x0, method = "lsoda", max_memory = 1e5),
+    simulate_ode(m, init = x0, method = "lsoda", max_memory = 1e5, record = "state"),
     "needs a dense Jacobian"
   )
-  sim <- simulate_ode(m, init = x0)
+  sim <- simulate_ode(m, init = x0, record = "state")
   expect_false(sim$meta$stiff_fallback)
   d <- sim$diagnostics
   expect_true("limiting_node" %in% names(d))
   expect_true(all(d$limiting_node %in% c("n1", "n2", "n3")))
   # one-node runs keep their diagnostics columns and the fallback default
   one <- sg_model(p, cube, mo_forcing(p, 20), area = 10)
-  s1 <- simulate_ode(one, init = x0[seq_len(one$n_states)])
+  s1 <- simulate_ode(one, init = x0[seq_len(one$n_states)], record = "state")
   expect_false("limiting_node" %in% names(s1$diagnostics))
   expect_true(s1$meta$stiff_fallback)
-  expect_error(simulate_ode(one, stiff_fallback = NA), "TRUE or FALSE \\(or NULL")
-  expect_error(simulate_ode(one, max_memory = 0), "single positive number")
-  expect_error(simulate_ode(one, max_memory = 100), "more than max_memory")
+  expect_error(simulate_ode(one, stiff_fallback = NA, record = "state"), "TRUE or FALSE \\(or NULL")
+  expect_error(simulate_ode(one, max_memory = 0, record = "state"), "single positive number")
+  expect_error(simulate_ode(one, max_memory = 100, record = "state"), "more than max_memory")
 })
 
 test_that("print summarises nodes and movement", {
   p <- sg_params()
   cube <- sg_cube(sg_test_cube_mendelian())
   m <- sg_model(p, cube, landscape = mo_land(p, 3, days = 20), movement = mo_chain(3))
-  sim <- simulate_ode(m, init = mo_state_first(p, cube, 3, days = 20))
+  sim <- simulate_ode(m, init = mo_state_first(p, cube, 3, days = 20), record = "state")
   out <- capture.output(print(sim))
   expect_true(any(grepl("nodes: 3, [0-9] with flies at the end", out)))
   expect_true(any(grepl("movers [0-9.e+]+, lost from the landscape 0", out)))
