@@ -11,6 +11,13 @@ Plan: `dev/MOVEMENT_PHASE3_PLAN.md`.
   rate i -> j = D L_ij / (d_ij A_i); closed edges by default, open edges
   with `outer_border`. On a transect of spacing h each neighbour gets
   D / h^2.
+* `sg_movement_from_prob()` turns a matrix of daily transition
+  probabilities into a layer, as MGDrivE2's `movement_prob2rate()` (rows
+  summing below 1 become losses). `sg_rate_from_fraction()` converts a daily
+  leave fraction into a rate (e.g. Matlock & Skoda's 16% of females and 10%
+  of males per day) and `sg_rate_from_lifetime()` a lifetime leave
+  probability, inverted exactly for the model's adult chain at
+  `movement_t_ref`.
 
 ## Several nodes and adult movement, phase 2: chain-binomial solver (D-032)
 

@@ -95,6 +95,13 @@ landscape: a transect from south Texas north.
   → rate) to round-off; `sg_movement_from_prob()` reproduces the daily
   leave probabilities and destination shares of P; Matlock & Skoda
   fractions give the expected rates.
+* *Done (2026-11-05):* `R/movement-tools.R`: `sg_movement_from_prob()`,
+  `sg_rate_from_fraction()`, `sg_rate_from_lifetime(p, model, class, clock,
+  genotype)`; internal `.sg_adult_life()`, `.sg_lifetime_leave()` and
+  `.sg_expected_life()` (exact recursions over the adult chain, for WP3).
+  The lifespans reproduce the design note table of 5.3 to its printed
+  digits; `sg_movement_from_prob()` equals MGDrivE2 `movement_prob2rate()`
+  on closed rows. Tests in `test-movement-tools.R`.
 
 ### WP3. `check_movement()` and `check_model()` (M)
 
