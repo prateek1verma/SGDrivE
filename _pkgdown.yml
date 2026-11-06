@@ -28,6 +28,7 @@ reference:
     contents:
       - sg_landscape
       - sg_movement_layer
+      - sg_movement_diffusion
   - title: Model assembly
     contents:
       - sg_model

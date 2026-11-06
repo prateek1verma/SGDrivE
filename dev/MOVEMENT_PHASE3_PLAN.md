@@ -73,6 +73,12 @@ landscape: a transect from south Texas north.
   polygons with known borders matches a hand calculation; a marked cohort
   on a long chain (no births or deaths, generator exponentiated in the
   test) spreads with variance 2Dt.
+* *Done (2026-11-05):* `sg_movement_diffusion(area, border, dist, D,
+  outer_border, outer_dist, clock)` in `R/movement.R`; returns an
+  ordinary layer (edge table with node ids, `n_nodes` set). A pair in an
+  edge table may be listed once or both ways (equal values); the default
+  outer distance is `area / outer_border`. Tests in
+  `test-movement-diffusion.R`.
 
 ### WP2. `sg_movement_from_prob()` and conversions (S)
 

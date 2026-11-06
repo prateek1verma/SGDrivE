@@ -1,5 +1,17 @@
 # ScrewDrivE 0.0.0.9000
 
+## Several nodes and adult movement, phase 3: constructors, diagnostics, outputs (D-032)
+
+Plan: `dev/MOVEMENT_PHASE3_PLAN.md`.
+
+* `sg_movement_diffusion()` builds a movement layer for local diffusion on
+  any network from a diffusion coefficient D (km^2 per day, one value or
+  one per class) and the nodes' areas, shared border lengths and centroid
+  distances (matrices or an edge table), by the finite-volume formula
+  rate i -> j = D L_ij / (d_ij A_i); closed edges by default, open edges
+  with `outer_border`. On a transect of spacing h each neighbour gets
+  D / h^2.
+
 ## Several nodes and adult movement, phase 2: chain-binomial solver (D-032)
 
 Plan: `dev/MOVEMENT_PHASE2_PLAN.md`. One-node runs give the same results as
