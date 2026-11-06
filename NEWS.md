@@ -1,5 +1,33 @@
 # ScrewDrivE 0.0.0.9000
 
+## Several nodes and adult movement, phase 3: constructors, diagnostics, outputs (D-032)
+
+Plan: `dev/MOVEMENT_PHASE3_PLAN.md`.
+
+* `sg_movement_diffusion()` builds a movement layer for local diffusion on
+  any network from a diffusion coefficient D (km^2 per day, one value or
+  one per class) and the nodes' areas, shared border lengths and centroid
+  distances (matrices or an edge table), by the finite-volume formula
+  rate i -> j = D L_ij / (d_ij A_i); closed edges by default, open edges
+  with `outer_border`. On a transect of spacing h each neighbour gets
+  D / h^2.
+* `sg_movement_from_prob()` turns a matrix of daily transition
+  probabilities into a layer, as MGDrivE2's `movement_prob2rate()` (rows
+  summing below 1 become losses). `sg_rate_from_fraction()` converts a daily
+  leave fraction into a rate (e.g. Matlock & Skoda's 16% of females and 10%
+  of males per day) and `sg_rate_from_lifetime()` a lifetime leave
+  probability, inverted exactly for the model's adult chain at
+  `movement_t_ref`.
+* `check_movement()` translates leave rates back into biology at
+  `movement_t_ref`: per node and class the daily and lifetime leave
+  probability, moves per lifetime, the share lost and, with node
+  coordinates, the path length per lifetime and the implied diffusion
+  coefficient; a table of lifetime movement against temperature for the
+  model's clock. `check_model()` includes it, adds each node's largest
+  movement rate over the forcing to the rate check, and warns when flies
+  almost surely leave their node in a lifetime (rates on the wrong scale
+  for the grid?) or when movement within one chain-binomial step is large.
+
 ## Several nodes and adult movement, phase 2: chain-binomial solver (D-032)
 
 Plan: `dev/MOVEMENT_PHASE2_PLAN.md`. One-node runs give the same results as

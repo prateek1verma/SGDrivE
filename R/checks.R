@@ -193,7 +193,15 @@ sg_flow_balance <- function(sim) {
 #' smallest wild population in the node from a burn-in and run of the whole
 #' landscape with movement. `movement` summarises the movement groups
 #' (largest leave rate by class at the reference temperature, nodes with open
-#' edges). Warnings are those of the nodes and of the model; with more than
+#' edges), the range over nodes of the lifetime leave probability and, with
+#' coordinates, of the implied diffusion coefficient by class
+#' ([check_movement()], kept in `movement$check`), and the largest chance of
+#' leaving a node within one chain-binomial step of length `dt`; `nodes`
+#' gains `max_move_rate`, the largest movement rate over the forcing (kappa
+#' at the node's warmest day times the leave rate), which also enters the
+#' largest-rate check. Warnings: lifetime leave probabilities above 0.99
+#' (rates on the wrong scale for the grid?) and movement rates times `dt`
+#' above 0.5. Warnings are those of the nodes and of the model; with more than
 #' one node a note recalls that ODE runs without `node_extinction` can show
 #' recolonisation by fractions of a fly.
 #' @seealso [sg_r0()], [sg_flow_balance()]
@@ -406,6 +414,35 @@ check_model <- function(model, dt = 0.1, scale = TRUE) {
   movement <- if (is.null(mv)) {
     NULL
   } else {
+    # biology of the rates at T_ref (phase 3 WP3) and the largest movement
+    # rate over the forcing: kappa at each node's warmest day (design note 6.2)
+    ck <- check_movement(model, temperatures = NULL)
+    warn <- c(warn, ck$warnings)
+    kappa_hi <- function(g) {
+      if (g$clock == "calendar") {
+        return(rep(1, length(ids)))
+      }
+      dx_hi <- vapply(nd$forcing_series, function(k) max(model$landscape$forcing[[k]]$dx), 0)
+      pmin(mv$kappa_max, dx_hi / mv$dx_ref)
+    }
+    lam_hi <- .sg_movement_shares(mv, length(ids), kappa_hi)$lambda
+    nodes$max_move_rate <- apply(lam_hi, 2L, max)
+    step_prob <- -expm1(-max(lam_hi) * dt)
+    if (max(lam_hi) * dt > 0.5) {
+      warn <- c(warn, sprintf(
+        paste(
+          "Movement rates up to %.3g per day (kappa x leave rate): with dt = %g a fly leaves",
+          "its node within one chain-binomial step with probability %.2f; use a smaller dt."
+        ),
+        max(lam_hi), dt, step_prob
+      ))
+    }
+    if (max(lam_hi) >= 1000) {
+      warn <- c(warn, sprintf(
+        "Movement rates up to %.3g per day: the ODE may need many small steps.", max(lam_hi)
+      ))
+    }
+    by_class <- split(ck$nodes, factor(ck$nodes$class, levels = .sg_movement_classes))
     list(
       t_ref = mv$t_ref, kappa_max = mv$kappa_max,
       groups = lapply(mv$groups, function(g) {
@@ -414,7 +451,11 @@ check_model <- function(model, dt = 0.1, scale = TRUE) {
           max_rate = apply(g$rate, 1L, max),
           open_nodes = ids[apply(g$loss, 2L, function(v) any(v > 0))]
         )
-      })
+      }),
+      lifetime_leave = vapply(by_class, function(d) range(d$lifetime_leave), numeric(2)),
+      D = if (!all(is.na(ck$nodes$D))) vapply(by_class, function(d) range(d$D), numeric(2)),
+      max_step_probability = step_prob,
+      check = ck
     )
   }
   scale_info <- list(available = FALSE)
@@ -465,7 +506,7 @@ check_model <- function(model, dt = 0.1, scale = TRUE) {
   structure(
     list(
       size = size, options = first$options, rates = list(
-        max_rate = max(nodes$max_rate), mating_rate = first$rates$mating_rate,
+        max_rate = max(nodes$max_rate, nodes$max_move_rate), mating_rate = first$rates$mating_rate,
         mating_probability_per_step = first$rates$mating_probability_per_step
       ),
       r0 = list(available = any(!is.na(nodes$r0_max))), scale = scale_info,
@@ -579,6 +620,35 @@ print.sg_check <- function(x, ...) {
         ),
         g$clock, g$edges, x$movement$t_ref, g$max_rate[1L], g$max_rate[2L], g$max_rate[3L],
         if (length(g$open_nodes)) paste(g$open_nodes, collapse = ", ") else "no node"
+      ))
+    }
+    ll <- x$movement$lifetime_leave
+    if (!is.null(ll)) {
+      fmt <- function(r) {
+        if (isTRUE(all.equal(r[1L], r[2L]))) {
+          format(r[1L], digits = 3L)
+        } else {
+          paste0(format(r[1L], digits = 3L), "-", format(r[2L], digits = 3L))
+        }
+      }
+      cat(sprintf(
+        "  lifetime leave probability at %g degC: male %s, virgin %s, mated %s%s\n",
+        x$movement$t_ref, fmt(ll[, "male"]), fmt(ll[, "virgin"]), fmt(ll[, "mated"]),
+        if (is.null(x$movement$D)) {
+          ""
+        } else {
+          sprintf(
+            "; implied D (km^2/d): male %s, virgin %s, mated %s",
+            fmt(x$movement$D[, "male"]), fmt(x$movement$D[, "virgin"]), fmt(x$movement$D[, "mated"])
+          )
+        }
+      ))
+      cat(sprintf(
+        paste(
+          "  largest chance of leaving a node within one chain-binomial step: %.3g",
+          "(see check_movement())\n"
+        ),
+        x$movement$max_step_probability
       ))
     }
   } else {

@@ -28,6 +28,10 @@ reference:
     contents:
       - sg_landscape
       - sg_movement_layer
+      - sg_movement_diffusion
+      - sg_movement_from_prob
+      - sg_rate_from_fraction
+      - check_movement
   - title: Model assembly
     contents:
       - sg_model

@@ -70,6 +70,127 @@ sg_movement_layer <- function(rate, dest, clock = c("physiological", "calendar")
   )
 }
 
+#' Local diffusion between nodes
+#'
+#' Builds a movement layer for local, diffusion-like movement on any network
+#' of nodes (a transect, a grid, counties) from a diffusion coefficient and
+#' the geometry of the nodes, by the finite-volume formula (design note
+#' dev/MOVEMENT_DESIGN.md section 6.1, D-032):
+#' \deqn{\textrm{rate}_{ij} = D L_{ij} / (d_{ij} A_i)}{rate[i, j] = D L[i, j] / (d[i, j] A[i])}
+#' per day at the reference temperature `movement_t_ref`, with \eqn{A_i}{A[i]}
+#' the area of node i (km^2), \eqn{L_{ij}}{L[i, j]} the length of the border
+#' it shares with node j (km) and \eqn{d_{ij}}{d[i, j]} the distance between
+#' their centroids (km). The leave rate of node i is the sum of its rates and
+#' the destination probabilities are the rates divided by it.
+#'
+#' @param area Node areas in km^2, in node order (or named by node id).
+#' @param border Shared border lengths in km: a symmetric square matrix
+#'   (zero for nodes that do not touch, zero diagonal; with node ids as
+#'   dimnames or in node order), or an edge table with columns `from`, `to`
+#'   (node ids or numbers), `border` and `dist`, each pair of neighbours
+#'   listed once or in both directions with equal values.
+#' @param dist Distances between node centroids in km: a square matrix like
+#'   `border` (only entries of touching nodes are used), or `NULL` when
+#'   `border` is an edge table.
+#' @param D Diffusion coefficient in km^2 per day at `movement_t_ref`: one
+#'   value for all adults, or a named list (or vector) with `male`, `virgin`
+#'   and `mated`.
+#' @param outer_border Optional length of each node's border with the
+#'   outside of the landscape (km, in node order; 0 for inner nodes). Flies
+#'   crossing it leave the landscape (open edges, counted as lost). `NULL`
+#'   (default): closed edges.
+#' @param outer_dist Distance from each node's centroid to a mirrored node
+#'   outside (km). Default `area / outer_border`, twice the
+#'   centroid-to-border distance of a rectangular cell whose outer side is
+#'   `outer_border` long.
+#' @param clock Movement clock, as in [sg_movement_layer()].
+#'
+#' @details
+#' The package computes nothing from shapes: compute areas, shared border
+#' lengths and centroid distances with your own tools (for example
+#' `sf::st_area()`, `sf::st_touches()` with the lengths of the shared
+#' boundaries, and `sf::st_distance()` between centroids).
+#'
+#' On a transect of cells with spacing h (and any width), each neighbour
+#' gets \eqn{D/h^2}{D / h^2}: an interior cell leaves at \eqn{2D/h^2}{2 D / h^2},
+#' a closed end at \eqn{D/h^2}{D / h^2} and an open end (`outer_border` = the
+#' cell width) at \eqn{2D/h^2}{2 D / h^2}, half of it lost. On a regular grid of
+#' square cells an interior cell leaves at \eqn{4D/h^2}{4 D / h^2}. The
+#' destination probabilities do not depend on D, so the three classes share
+#' them, as a layer requires.
+#'
+#' Rates depend on the grid: the same D gives \eqn{D/h^2}{D / h^2}, so a
+#' 50 km grid has 2,500 times smaller rates than a 1 km grid. Use
+#' `check_movement()` (phase 3) to see the lifetime dispersal a layer
+#' implies.
+#'
+#' @return An `sg_movement_layer` ([sg_movement_layer()]) with `n_nodes`
+#'   set, which can be inspected and changed like any other layer.
+#' @seealso [sg_movement_layer()], [sg_landscape()], [sg_model()]
+#' @export
+#' @examples
+#' # a transect of 5 cells, 50 km long and 50 km wide, open at the north end
+#' h <- 50
+#' n <- 5
+#' border <- matrix(0, n, n)
+#' border[cbind(1:(n - 1), 2:n)] <- h
+#' border <- border + t(border)
+#' dist <- matrix(h, n, n)
+#' layer <- sg_movement_diffusion(
+#'   area = rep(h * h, n), border = border, dist = dist,
+#'   D = list(male = 0.25, virgin = 0.4, mated = 0.4),
+#'   outer_border = c(0, 0, 0, 0, h)
+#' )
+#' layer
+#' layer$rate$mated # 0.4 / 50^2 at the south end, twice that inside
+#'
+#' # the same transect as an edge table
+#' edges <- data.frame(from = 1:4, to = 2:5, border = h, dist = h)
+#' sg_movement_diffusion(rep(h * h, n), edges, D = 0.4, outer_border = c(0, 0, 0, 0, h))
+sg_movement_diffusion <- function(area, border, dist = NULL,
+                                  D, # nolint: object_name_linter.
+                                  outer_border = NULL, outer_dist = NULL,
+                                  clock = c("physiological", "calendar")) {
+  clock <- .sg_match_choice(clock, c("physiological", "calendar"), "clock")
+  if (!is.numeric(area) || length(area) < 1L || any(!is.finite(area)) || any(area <= 0)) {
+    .sg_stop("`area` must be positive node areas in km^2.")
+  }
+  n <- length(area)
+  geo <- .sg_diffusion_geometry(border, dist, n, names(area))
+  ids <- geo$ids
+  coef <- .sg_check_diffusion_coef(D)
+  # outer border: open edges
+  w_out <- numeric(n)
+  if (!is.null(outer_border)) {
+    ok <- is.numeric(outer_border) && length(outer_border) == n && all(is.finite(outer_border)) &&
+      all(outer_border >= 0)
+    if (!ok) .sg_stop("`outer_border` must be ", n, " lengths >= 0 in km (one per node).")
+    if (is.null(outer_dist)) {
+      outer_dist <- ifelse(outer_border > 0, area / pmax(outer_border, 1e-300), Inf)
+    }
+    ok <- is.numeric(outer_dist) && length(outer_dist) == n && !anyNA(outer_dist) &&
+      all(outer_dist[outer_border > 0] > 0 & is.finite(outer_dist[outer_border > 0]))
+    if (!ok) {
+      .sg_stop("`outer_dist` must be ", n, " positive distances in km (one per node).")
+    }
+    open <- outer_border > 0
+    w_out[open] <- outer_border[open] / (outer_dist[open] * area[open])
+  } else if (!is.null(outer_dist)) {
+    .sg_stop("`outer_dist` needs `outer_border` (the border with the outside).")
+  }
+  # per unit D: rate i -> j = L_ij / (d_ij A_i)
+  e <- geo$edges
+  e$w <- e$border / (e$dist * area[e$i])
+  w_in <- vapply(seq_len(n), function(i) sum(e$w[e$i == i]), 0)
+  w_tot <- w_in + w_out
+  prob <- e$w / w_tot[e$i]
+  dest <- data.frame(from = ids[e$i], to = ids[e$j], prob = prob, stringsAsFactors = FALSE)
+  rate <- lapply(coef, function(d) d * w_tot)
+  layer <- sg_movement_layer(rate, dest, clock = clock)
+  layer$n_nodes <- n
+  layer
+}
+
 #' @export
 print.sg_movement_layer <- function(x, ...) {
   e <- x$edges
@@ -132,6 +253,112 @@ print.sg_movement_layer <- function(x, ...) {
     as.numeric(unname(v))
   })
   stats::setNames(out, .sg_movement_classes)
+}
+
+# Diffusion coefficients of sg_movement_diffusion(): list(male, virgin, mated)
+# of single positive numbers.
+.sg_check_diffusion_coef <- function(d) {
+  if (is.numeric(d) && length(d) == 1L && is.null(names(d))) {
+    d <- list(male = d, virgin = d, mated = d)
+  }
+  if (is.numeric(d) && !is.null(names(d))) d <- as.list(d)
+  ok <- is.list(d) && setequal(names(d), .sg_movement_classes) && length(d) == 3L &&
+    all(vapply(d, function(v) is.numeric(v) && length(v) == 1L && is.finite(v) && v >= 0, TRUE))
+  if (!ok) {
+    .sg_stop(
+      "`D` must be one diffusion coefficient >= 0 (km^2 per day) or a named list with ",
+      "`male`, `virgin` and `mated`."
+    )
+  }
+  d[.sg_movement_classes]
+}
+
+# Geometry of sg_movement_diffusion(): node ids and the directed edges (i, j
+# as positions, border, dist) between touching nodes, from matrices or an
+# edge table.
+.sg_diffusion_geometry <- function(border, dist, n, area_names) {
+  sym <- function(m) isTRUE(all.equal(m, t(m), tolerance = 1e-12, check.attributes = FALSE))
+  if (is.matrix(border)) {
+    if (!is.numeric(border) || !identical(dim(border), c(n, n))) {
+      .sg_stop("`border` must be a ", n, " x ", n, " numeric matrix (one row per node of `area`).")
+    }
+    if (any(!is.finite(border)) || any(border < 0) || any(diag(border) != 0) || !sym(border)) {
+      .sg_stop("`border` must hold finite lengths >= 0, be symmetric and have a zero diagonal.")
+    }
+    if (!is.matrix(dist) || !is.numeric(dist) || !identical(dim(dist), c(n, n))) {
+      .sg_stop("`dist` must be a ", n, " x ", n, " numeric matrix of centroid distances.")
+    }
+    ids <- rownames(border)
+    if (!identical(ids, colnames(border))) {
+      .sg_stop("Row and column names of `border` must be the same node ids.")
+    }
+    if (is.null(ids)) ids <- area_names
+    if (!is.null(area_names) && !identical(ids, area_names)) {
+      .sg_stop("The names of `area` and the dimnames of `border` must be the same node ids.")
+    }
+    nz <- which(border > 0, arr.ind = TRUE)
+    nz <- nz[order(nz[, 1L], nz[, 2L]), , drop = FALSE]
+    d <- dist[nz]
+    if (any(!is.finite(d)) || any(d <= 0) || !sym(dist * (border > 0))) {
+      .sg_stop("`dist` must be positive, finite and symmetric for every pair of touching nodes.")
+    }
+    edges <- data.frame(i = nz[, 1L], j = nz[, 2L], border = border[nz], dist = d)
+  } else if (is.data.frame(border)) {
+    if (!is.null(dist)) .sg_stop("With an edge table `border`, leave `dist` NULL (use its column).")
+    miss <- setdiff(c("from", "to", "border", "dist"), names(border))
+    if (length(miss) > 0L) {
+      .sg_stop(
+        "An edge table `border` needs columns `from`, `to`, `border` and `dist`; missing: ",
+        paste(miss, collapse = ", "), "."
+      )
+    }
+    ids <- area_names
+    pos <- function(v) {
+      if (is.numeric(v)) {
+        if (any(v < 1 | v > n | v != round(v), na.rm = TRUE) || anyNA(v)) {
+          .sg_stop("Node numbers in `border` must be whole numbers between 1 and ", n, ".")
+        }
+        return(as.integer(v))
+      }
+      if (is.null(ids)) {
+        .sg_stop("Node ids in `border` need `area` named by node id (or use node numbers).")
+      }
+      p <- match(as.character(v), ids)
+      if (anyNA(p)) {
+        bad <- as.character(v)[is.na(p)][1L]
+        .sg_stop("Unknown node \"", bad, "\" in `border`.", .sg_suggest(bad, ids))
+      }
+      p
+    }
+    i <- pos(border$from)
+    j <- pos(border$to)
+    b <- border$border
+    d <- border$dist
+    ok <- is.numeric(b) && is.numeric(d) && all(is.finite(b)) && all(b >= 0) &&
+      all(is.finite(d)) && all(d > 0)
+    if (!ok) .sg_stop("`border$border` must be lengths >= 0 and `border$dist` positive (km).")
+    if (any(i == j)) .sg_stop("`border` must not pair a node with itself.")
+    both <- data.frame(i = c(i, j), j = c(j, i), border = c(b, b), dist = c(d, d))
+    key <- paste(both$i, both$j)
+    first <- !duplicated(key)
+    # a pair given in both directions must agree
+    agree <- vapply(split(seq_len(nrow(both)), key), function(r) {
+      length(unique(both$border[r])) == 1L && length(unique(both$dist[r])) == 1L
+    }, TRUE)
+    if (!all(agree)) {
+      .sg_stop("A pair of nodes appears in `border` with different `border` or `dist` values.")
+    }
+    edges <- both[first & both$border > 0, , drop = FALSE]
+    edges <- edges[order(edges$i, edges$j), , drop = FALSE]
+  } else {
+    .sg_stop(
+      "`border` must be a numeric matrix or a data frame with columns `from`, `to`, ",
+      "`border`, `dist`."
+    )
+  }
+  rownames(edges) <- NULL
+  if (is.null(ids)) ids <- seq_len(n)
+  list(ids = ids, edges = edges)
 }
 
 # Destinations as a sorted edge table (from, to, prob > 0) and the number of
