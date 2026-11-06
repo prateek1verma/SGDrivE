@@ -1,7 +1,7 @@
 # Phase 2 implementation plan: movement in the chain-binomial solver
 
 Status: **accepted**, 2026-11-05 (choices of section 4 confirmed by the user
-the same day); not implemented. Implements phase 2 of dev/MOVEMENT_DESIGN.md
+the same day); implemented 2026-11-05 (WP1–WP6; findings in D-032). Implements phase 2 of dev/MOVEMENT_DESIGN.md
 (section 9) against MODEL_SPEC section 8a (N4) and D-032. Phase 1 (ODE,
 recorder) is in dev/MOVEMENT_PHASE1_PLAN.md.
 
@@ -169,6 +169,13 @@ fractions of flies, and the recorder of phase 1 for stochastic runs.
   nodes behind a barrier (no edges) stay empty.
 * Documentation: help of `simulate_cb()`, NEWS, D-032 findings, design note
   and roadmap status; `R CMD check` 0/0/0; sanitizers.
+* *Done (2026-11-05):* A/B one-node within 5% after removing a
+  per-replicate release-matrix build; `bench/phase2_cb_nodes.R` (1, 10, 50
+  nodes); larval-chain profile recorded, not optimised (D-032);
+  `test-cb-validation.R` (convergence to the ODE as dt -> 0 at first order,
+  replicate mean against the deterministic map, sink-node extinction and
+  recolonisation, barrier node); D-032 findings, design note, roadmap,
+  NEWS and bench README updated.
 
 ### Pull requests
 

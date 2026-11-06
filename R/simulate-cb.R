@@ -182,7 +182,7 @@ simulate_cb <- function(model, init = NULL, n_rep = 1L, dt = 0.1, output_every =
   n_x <- length(rec$names_x)
   n_sums <- length(rec$names_c)
 
-  n_rel <- ncol(.sg_release_matrix(model)) # 4 release columns per node
+  n_rel <- length(.sg_release_columns(model)) # 4 release columns per node
   width_out <- (if (rec$state) n else 0) + n_x
   width_day <- (if (rec$counters) length(cnames) else 0) + n_sums + n_rel
   bytes <- 8 * n_rep * ((length(out_days) + 1) * width_out + n_days * width_day + n)

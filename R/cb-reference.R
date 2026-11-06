@@ -591,13 +591,15 @@
     x <- .sg_cb_round(x)
     rel$count <- .sg_cb_round(rel$count)
   }
-  cols <- colnames(.sg_release_matrix(model))
+  cols <- .sg_release_columns(model)
   released <- matrix(0, n_days, length(cols), dimnames = list(NULL, cols))
-  nm <- sg_state_names(model)[rel$index]
-  rel_col <- substr(nm, 1L, 1L)
-  if (length(cols) > 4L) rel_col <- paste0(rel_col, "@", .sg_name_node(nm))
-  for (j in which(rel$day <= n_days)) {
-    released[rel$day[j], rel_col[j]] <- released[rel$day[j], rel_col[j]] + rel$count[j]
+  if (nrow(rel) > 0L) { # state names only when needed (called per replicate)
+    nm <- sg_state_names(model)[rel$index]
+    rel_col <- substr(nm, 1L, 1L)
+    if (length(cols) > 4L) rel_col <- paste0(rel_col, "@", .sg_name_node(nm))
+    for (j in which(rel$day <= n_days)) {
+      released[rel$day[j], rel_col[j]] <- released[rel$day[j], rel_col[j]] + rel$count[j]
+    }
   }
   list(steps = steps, n_days = n_days, x = x, rel = rel, released = released)
 }

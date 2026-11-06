@@ -618,21 +618,26 @@ print.sg_sim <- function(x, ...) {
 # several nodes per block and node ("M@north", D-032).
 .sg_release_matrix <- function(model) {
   rel <- model$releases
-  blocks <- c("E", "P", "M", "U")
-  ids <- .sg_node_ids(model)
-  cols <- if (length(ids) == 1L) {
-    blocks
-  } else {
-    paste0(rep(blocks, length(ids)), "@", rep(ids, each = length(blocks)))
-  }
+  cols <- .sg_release_columns(model)
   out <- matrix(0, model$forcing$n_days, length(cols), dimnames = list(NULL, cols))
   nm <- sg_state_names(model)[rel$index]
   rel_col <- substr(nm, 1L, 1L)
-  if (length(ids) > 1L) rel_col <- paste0(rel_col, "@", .sg_name_node(nm))
+  if (length(cols) > 4L) rel_col <- paste0(rel_col, "@", .sg_name_node(nm))
   for (j in seq_along(rel$day)) {
     out[rel$day[j], rel_col[j]] <- out[rel$day[j], rel_col[j]] + rel$count[j]
   }
   out
+}
+
+# Columns of the release matrix: blocks E, P, M, U, with several nodes per
+# block and node ("M@north").
+.sg_release_columns <- function(model) {
+  blocks <- c("E", "P", "M", "U")
+  ids <- .sg_node_ids(model)
+  if (length(ids) == 1L) {
+    return(blocks)
+  }
+  paste0(rep(blocks, length(ids)), "@", rep(ids, each = length(blocks)))
 }
 
 .sg_check_init <- function(model, init) {

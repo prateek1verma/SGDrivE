@@ -22,6 +22,11 @@ before, draw for draw.
   stays as a shortcut (`keep = "totals"` is `record = "totals"`); giving
   both is an error. `max_memory` counts what is recorded. The C++ recorder
   is shared by both solvers (`src/recorder.h`).
+* Speed: one-node runs are as fast as before (within about 3%); run time
+  grows about linearly with the number of occupied nodes (about 0.04 s per
+  node and simulated year for a Mendelian model; `bench/phase2_cb_nodes.R`).
+  The deterministic map converges to the multi-node ODE as `dt` shrinks
+  (node totals within about 1% at `dt = 0.1`).
 * Summaries of stochastic runs (`sg_totals()`, `sg_females()`,
   `sg_allele_freq()`, `sg_cases()`, `sg_hosts()`, `sg_flow_balance()`,
   plots) work per node, with `nodes` as for `simulate_ode()`.

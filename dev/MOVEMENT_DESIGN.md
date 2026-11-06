@@ -3,7 +3,9 @@
 Status: **accepted**, 2026-11-04 (phase 0 done); decisions of section 10
 made by the user on 2026-11-02 and 2026-11-04. Phase 1 (landscape, one
 layer, ODE, recorder) implemented 2026-11-05 (dev/MOVEMENT_PHASE1_PLAN.md;
-findings in D-032); phases 2–4 open. Equations in MODEL_SPEC section 8a (N1 movement terms, N2
+findings in D-032); phase 2 (chain-binomial movement and recorder)
+implemented 2026-11-05 (dev/MOVEMENT_PHASE2_PLAN.md; findings in D-032);
+phases 3–4 open. Equations in MODEL_SPEC section 8a (N1 movement terms, N2
 losses, N3 clock, N4 chain-binomial step, N5 node extinction rule);
 decision D-032 (DECISIONS.md), which also records the choices made in
 writing the specification. Biology from the sources in section 2,
@@ -631,7 +633,10 @@ aim is to keep it linear and avoid the traps below.
    saving is probably small.
 5. **Larval chains** (phase 2). With larval crowding the larval chain is
    rebuilt every step in every node (n_L = 6, small); profile it and
-   optimise only if it shows up.
+   optimise only if it shows up. *Profiled in phase 2:* about 8
+   microseconds per rebuild, +80% run time for ten crowded nodes on one
+   forcing series; not optimised (an exact change of algorithm alters the
+   last bits of the probabilities; D-032 phase 2 findings).
 6. **Movement pass fitted to the memory layout** (phase 1). States are
    stored node by node, so a node's adult block of a class is contiguous;
    movement is one loop over the sparse edges, each adding a scaled
@@ -711,7 +716,7 @@ decisions.
   final state kept; the `"totals"` set; `record = "state"` (full states
   stay the default until decision 13 is made).
 
-### Phase 2. Chain-binomial movement
+### Phase 2. Chain-binomial movement (done 2026-11-05)
 Section 5.6 in `.sg_cb_step_r()` and `cb_step.cpp`; counters (emigrants,
 immigrants, losses); draw-for-draw and map tests. Performance (8a): skip
 empty nodes (exact, same random numbers); profile the per-step larval

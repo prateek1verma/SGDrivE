@@ -742,6 +742,39 @@ chain-binomial baseline saved before any phase 2 change
 (`data-raw/make_cb_baseline.R`) guards one-node results: draw for draw on
 the machine that made it, the deterministic map elsewhere.
 
+Phase 2 findings (implemented 2026-11-05, WP1–WP6):
+* One-node runs are identical draw for draw to the code before phase 2 and
+  within the 5% speed target (Mendelian +2.5%, host model +0–1%, homing
+  2–5% faster in an A/B run). A per-replicate cost found on the way (the
+  release matrix built in every replicate for its column names) was
+  removed.
+* Run time grows about linearly with the number of occupied nodes (one
+  year, Mendelian, nodes in a row: 0.40 s for 10 occupied nodes, 1.71 s for
+  50; movement adds 10–25%). Nodes on one forcing series share their
+  chains, so ten nodes cost less than ten one-node runs; empty nodes cost
+  about a third of an occupied one (`bench/phase2_cb_nodes.R`).
+* Larval crowding rebuilds the larval chain per node and step (design note
+  8a item 5): +12% on one node, +80% on ten nodes on one series (where the
+  chains are otherwise shared), about 8 microseconds per rebuild. Not
+  optimised: an exact shortcut exists only when all larval sub-stages
+  progress at the same rate, and any change of algorithm alters the
+  probabilities in the last bits, which breaks the draw-for-draw match
+  with the R reference and the single-node baseline. Revisit with the
+  phase 3 profile if crowded landscapes of many nodes are slow.
+* The deterministic map converges to the multi-node ODE at first order in
+  dt: node totals within about 0.5–1% at dt = 0.1 (half of that at 0.05).
+  Movement counters converge more slowly for unmated females (about 9% low
+  at dt = 0.1, 4.5% at 0.05): emerged females arrive after the movement of
+  their step (the order above), and unmated females stay unmated for only
+  about a day, so the half step without movement is a visible share of
+  their time in U. Mated females and males are within about 1–3%.
+* Validation: the replicate mean matches the deterministic map; a sink
+  node fed by rare emigrants goes extinct and is recolonised repeatedly; a
+  node behind a barrier stays empty (`test-cb-validation.R`).
+* `simulate_cb(record = )` shares the C++ recorder with the ODE
+  (`src/recorder.h`); `keep` defaults to `NULL` and stays a shortcut;
+  `meta$keep` is replaced by `meta$record`.
+
 ---
 
 ## Open questions
