@@ -24,21 +24,21 @@ test_that("node_extinction = FALSE leaves runs unchanged", {
   p <- sg_params()
   m <- sg_model(p, sg_cube(sg_test_cube_mendelian()), ne_forcing(p), area = 5)
   x0 <- as.numeric(sg_init(m))
-  a <- simulate_ode(m, init = x0)
-  b <- simulate_ode(m, init = x0, node_extinction = FALSE)
+  a <- simulate_ode(m, init = x0, record = "state")
+  b <- simulate_ode(m, init = x0, node_extinction = FALSE, record = "state")
   expect_identical(a$state, b$state)
   expect_identical(a$counters, b$counters)
   expect_false(any(grepl("^removed_", colnames(a$counters))))
   expect_false(b$meta$node_extinction)
-  expect_error(simulate_ode(m, init = x0, node_extinction = NA), "TRUE or FALSE")
+  expect_error(simulate_ode(m, init = x0, node_extinction = NA, record = "state"), "TRUE or FALSE")
 })
 
 test_that("a node below the threshold is set to zero and the removal is counted", {
   p <- sg_params()
   m <- sg_model(p, sg_cube(sg_test_cube_mendelian()), ne_forcing(p), area = 5)
   x0 <- ne_small_state(m, 0.5)
-  free <- simulate_ode(m, init = x0)
-  ruled <- simulate_ode(m, init = x0, node_extinction = TRUE)
+  free <- simulate_ode(m, init = x0, record = "state")
+  ruled <- simulate_ode(m, init = x0, node_extinction = TRUE, record = "state")
   expect_true(ruled$meta$node_extinction)
   stages <- c("E", "L", "P", "M", "U", "F")
   expect_identical(colnames(ruled$counters)[ncol(ruled$counters) - 5:0], paste0("removed_", stages))
@@ -52,8 +52,8 @@ test_that("a node below the threshold is set to zero and the removal is counted"
   # above the threshold nothing happens
   big <- as.numeric(sg_init(m))
   expect_equal(
-    simulate_ode(m, init = big, node_extinction = TRUE)$state,
-    simulate_ode(m, init = big)$state
+    simulate_ode(m, init = big, node_extinction = TRUE, record = "state")$state,
+    simulate_ode(m, init = big, record = "state")$state
   )
 })
 
@@ -64,8 +64,8 @@ test_that("with hosts, a removed node's infested hosts return to HS and count as
   x0[sg_state_index(m, "HI")] <- 2
   x0[sg_state_index(m, "HW")] <- 10
   x0[sg_state_index(m, "HS")] <- m$hosts$n - 10 - 2 * m$dims$n_I
-  free <- simulate_ode(m, init = x0)
-  ruled <- simulate_ode(m, init = x0, node_extinction = TRUE)
+  free <- simulate_ode(m, init = x0, record = "state")
+  ruled <- simulate_ode(m, init = x0, node_extinction = TRUE, record = "state")
   hi1 <- sum(free$state[free$day == 1L, sg_state_index(m, "HI")])
   expect_gt(hi1, 0)
   r1 <- ruled$state[ruled$day == 1L, ]
@@ -103,8 +103,11 @@ ne_two_nodes <- function(p) {
 test_that("a cold node keeps fractions of flies without the rule and is emptied with it", {
   p <- sg_params()
   nn <- ne_two_nodes(p)
-  free <- simulate_ode(nn$m, init = nn$x0, output_every = 30L)
-  ruled <- simulate_ode(nn$m, init = nn$x0, output_every = 30L, node_extinction = TRUE)
+  free <- simulate_ode(nn$m, init = nn$x0, output_every = 30L, record = "state")
+  ruled <- simulate_ode(nn$m,
+    init = nn$x0, output_every = 30L, node_extinction = TRUE,
+    record = "state"
+  )
   cold <- ne_fly_idx(nn$m, "cold")
   last <- nrow(free$state)
   expect_gt(sum(free$state[last, cold]), 0)
@@ -118,7 +121,7 @@ test_that("a cold node keeps fractions of flies without the rule and is emptied 
 test_that("flies change only by births, deaths, removals and losses", {
   p <- sg_params()
   nn <- ne_two_nodes(p)
-  sim <- simulate_ode(nn$m, init = nn$x0, node_extinction = TRUE)
+  sim <- simulate_ode(nn$m, init = nn$x0, node_extinction = TRUE, record = "state")
   cn <- colnames(sim$counters)
   tot <- function(pattern) sum(sim$counters[, grepl(pattern, cn)])
   fly <- !grepl("^H", colnames(sim$state))
@@ -136,10 +139,11 @@ test_that("the C++ day loop and the R deSolve path apply the rule alike", {
   x0 <- nn$x0
   x0[hosts] <- 0
   x0[sg_state_index(nn$m, "HS")] <- nn$m$hosts$n
-  a <- simulate_ode(nn$m, init = x0, node_extinction = TRUE, output_every = 30L)
+  a <- simulate_ode(nn$m, init = x0, node_extinction = TRUE, output_every = 30L, record = "state")
   b <- simulate_ode(nn$m,
     init = x0, node_extinction = TRUE, output_every = 30L,
-    backend = "R", method = "ode45"
+    backend = "R", method = "ode45",
+    record = "state"
   )
   expect_lt(max(abs(a$state - b$state)) / max(a$state), 1e-6)
   removed <- grepl("^removed_", colnames(a$counters))

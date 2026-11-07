@@ -4,6 +4,26 @@
 
 Plan: `dev/MOVEMENT_PHASE3_PLAN.md`.
 
+* **Changed default output** (decision 13): `simulate_ode()` and
+  `simulate_cb()` now keep totals by stage and genotype per node (and host
+  blocks), all daily counters and the final state, instead of full states.
+  Results do not change, only what is stored: outputs are about 10 times
+  smaller for one node with 3 genotypes and more for larger cubes and
+  landscapes. All summaries and plots work from totals, except those that
+  need the mate genotype or the age of individuals:
+  `sg_females()$fertile_equivalent` and `egg_laying` are `NA`, and
+  `sg_totals(by = "mate")` stops with a hint. Use `record = "state"` (or
+  `keep = "state"` in `simulate_cb()`) for full states, as before.
+* `sg_alleles()` records allele copies (one quantity per allele, optionally
+  by node); `sg_allele_freq()` reads them when a run kept neither states
+  nor totals.
+* `sg_spread()` measures spread through a landscape: per node the first
+  and last output day with flies (at least `extinction_threshold`, 1 by
+  default) and the days occupied; over time the number of occupied nodes
+  and the front (the farthest occupied node by its `x` coordinate or a
+  given position); per replicate for stochastic runs. New plots:
+  `plot(sim, "nodes")` (heat map of individuals by node and day) and
+  `plot(sim, "front")`.
 * `sg_movement_diffusion()` builds a movement layer for local diffusion on
   any network from a diffusion coefficient D (km^2 per day, one value or
   one per class) and the nodes' areas, shared border lengths and centroid
@@ -27,6 +47,14 @@ Plan: `dev/MOVEMENT_PHASE3_PLAN.md`.
   movement rate over the forcing to the rate check, and warns when flies
   almost surely leave their node in a lifetime (rates on the wrong scale
   for the grid?) or when movement within one chain-binomial step is large.
+* Counter sums by period: `sg_record(..., every = "week")` (or `"month"`,
+  `"year"`; default `"day"`) adds the counter sums up by period during the
+  run, in C++ for both solvers, and stores one row per period
+  (`sim$counter_periods` gives each period's first day and length). A new
+  built-in set `"cases"` records the counters `sg_cases()` needs for every
+  node, so `sg_cases()` works without full counters (from daily sums or
+  sums by the same period): weekly cases per county over decades take a few
+  megabytes.
 
 ## Several nodes and adult movement, phase 2: chain-binomial solver (D-032)
 

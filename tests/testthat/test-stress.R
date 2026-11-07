@@ -29,8 +29,12 @@ rel_diff <- function(a, b, cols, floor_rel = 1e-9) {
 both_methods <- function(m, backend, init = NULL) {
   main <- if (backend == "R") "lsoda" else "dopri5"
   list(
-    main = simulate_ode(m, init, backend, method = main, rtol = 1e-9, atol = 1e-12),
-    radau = simulate_ode(m, init, backend, method = "radau", rtol = 1e-9, atol = 1e-12)
+    main = simulate_ode(m, init, backend,
+      method = main, rtol = 1e-9, atol = 1e-12, record = "state"
+    ),
+    radau = simulate_ode(m, init, backend,
+      method = "radau", rtol = 1e-9, atol = 1e-12, record = "state"
+    )
   )
 }
 

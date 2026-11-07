@@ -39,7 +39,7 @@ rel_err <- function(a, b) if (max(abs(b)) > 0) max(abs(a - b)) / max(abs(b)) els
 res <- list()
 for (nm in names(scenarios)) {
   m <- scenarios[[nm]]
-  ode <- simulate_ode(m, rtol = 1e-10, atol = 1e-12)
+  ode <- simulate_ode(m, rtol = 1e-10, atol = 1e-12, record = "state")
   tot_ode <- .sg_sim_block_totals(ode)
   adults_ode <- rowSums(tot_ode[, c("M", "U", "F")])
   eggs_ode <- sum(ode$counters[, grepl("^eggs_laid", colnames(ode$counters))])

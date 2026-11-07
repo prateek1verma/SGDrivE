@@ -22,8 +22,9 @@
 #'   out).
 #'
 #' @details Stages are the model's blocks E, L, P, M, U and F; juveniles have
-#'   sex `"unsexed"`. Grouping by `"mate"` needs the full state, so it is not
-#'   available for stochastic runs with `keep = "totals"`; the mate of
+#'   sex `"unsexed"`. Grouping by `"mate"` needs the full state, so it needs
+#'   runs with `record = "state"` (totals, the default, add mated females
+#'   over their mates); the mate of
 #'   individuals other than mated females is `NA`. With several nodes the
 #'   counts are summed over `nodes` unless `by` contains `"node"`.
 #' @return A data frame with columns `day`, `date`, `replicate` (stochastic
@@ -110,6 +111,10 @@ as.data.frame.sg_sim_cb <- function(x, row.names = NULL, optional = FALSE, ...,
 #'   one `a`; `"XY"` one `X` and one `Y`).
 #' @details With several nodes the individuals of `nodes` (default the study
 #'   nodes) are pooled.
+#'
+#'   The counts come from the run's states or totals or, when neither was
+#'   kept, from allele copies recorded with [sg_alleles()] for the same
+#'   stages and alleles (split by node, or for exactly the chosen nodes).
 #' @return A data frame with columns `day`, `date`, `replicate` (stochastic
 #'   runs only), `allele`, `count` (allele copies) and `freq` (share of all
 #'   copies; `NA` when no individuals are present).
@@ -124,6 +129,9 @@ as.data.frame.sg_sim_cb <- function(x, row.names = NULL, optional = FALSE, ...,
 #' }
 sg_allele_freq <- function(sim, stages = "adults", alleles = NULL, nodes = NULL) {
   geno <- .sg_sim_info(sim)$genotypes
+  if (is.null(sim$state) && is.null(sim$totals)) {
+    return(.sg_allele_freq_recorded(sim, stages, alleles, nodes))
+  }
   amat <- if (is.null(alleles)) {
     .sg_default_alleles(geno)
   } else {
@@ -138,6 +146,45 @@ sg_allele_freq <- function(sim, stages = "adults", alleles = NULL, nodes = NULL)
   freq <- sweep(counts, c(1L, 3L), total, "/")
   freq[!is.finite(freq)] <- NA_real_
   lev <- data.frame(allele = colnames(amat), stringsAsFactors = FALSE)
+  out <- .sg_long_table(sim, counts, lev)
+  names(out)[names(out) == "value"] <- "count"
+  out$freq <- .sg_long_table(sim, freq, lev)$value
+  out
+}
+
+# Allele frequencies from allele copies recorded with sg_alleles() (phase 3
+# WP5), for a run without states or totals: the recorded term must cover the
+# same stages and alleles, and be split by node or cover exactly `nodes`.
+.sg_allele_freq_recorded <- function(sim, stages, alleles, nodes) {
+  want <- .sg_expand_stages(stages)
+  blocks <- c("E", "L", "P", "M", "U", "F")
+  sel <- .sg_sim_nodes(sim, nodes)
+  fits <- Filter(function(a) {
+    same_stages <- setequal(.sg_stage_names[match(a$blocks, blocks)], want)
+    same_alleles <- is.null(alleles) || identical(sort(colnames(alleles)), sort(a$alleles))
+    same_nodes <- a$by_node || setequal(a$nodes, sel$ids)
+    same_stages && same_alleles && same_nodes
+  }, sim$meta$record$alleles)
+  if (length(fits) == 0L) {
+    .sg_stop(
+      "sg_allele_freq() needs the states or totals of the run, or allele copies recorded with ",
+      "sg_alleles() for these stages and nodes; add \"totals\" or sg_alleles(...) to sg_record()."
+    )
+  }
+  a <- fits[[1L]]
+  rec <- sim$recorded
+  if (length(dim(rec)) == 2L) {
+    rec <- array(rec, c(dim(rec), 1L), dimnames = list(NULL, colnames(rec), NULL))
+  }
+  counts <- vapply(a$alleles, function(al) {
+    cols <- paste0(a$name, "[", al, "]", if (a$by_node) paste0("@", sel$ids) else "")
+    apply(rec[, cols, , drop = FALSE], c(1L, 3L), sum)
+  }, matrix(0, dim(rec)[1L], dim(rec)[3L]))
+  counts <- aperm(array(counts, c(dim(rec)[1L], dim(rec)[3L], length(a$alleles))), c(1L, 3L, 2L))
+  total <- apply(counts, c(1L, 3L), sum)
+  freq <- sweep(counts, c(1L, 3L), total, "/")
+  freq[!is.finite(freq)] <- NA_real_
+  lev <- data.frame(allele = a$alleles, stringsAsFactors = FALSE)
   out <- .sg_long_table(sim, counts, lev)
   names(out)[names(out) == "value"] <- "count"
   out$freq <- .sg_long_table(sim, freq, lev)$value
@@ -163,7 +210,8 @@ sg_allele_freq <- function(sim, stages = "adults", alleles = NULL, nodes = NULL)
 #'       eggs counts 0.5.}
 #'   }
 #'   `egg_laying` and `fertile_equivalent` need the full state, so they are
-#'   `NA` for stochastic runs with `keep = "totals"`. With several nodes the
+#'   `NA` unless the run used `record = "state"` (totals, the default, add
+#'   mated females over mates and ages). With several nodes the
 #'   females of `nodes` (default the study nodes) are summed.
 #' @export
 #' @examples
@@ -244,6 +292,10 @@ sg_females <- function(sim, per = c("node", "km2"), nodes = NULL) {
 #'   fertile batches laid on uninfested wounds, counted once per host they
 #'   infest; fertile batches on hosts already infested are
 #'   `superinfestations`.
+#'
+#'   The counters come from the run's daily counters or, when those were not
+#'   kept, from the counter sums of the `"cases"` set of [sg_record()]
+#'   (daily, or by the same period as `period`).
 #' @return A data frame with columns `period` (first day), `days`,
 #'   `replicate` (stochastic runs only), `cases` (per km^2 or node), `events`
 #'   (all oviposition events, also those with no viable egg),
@@ -277,11 +329,10 @@ sg_cases <- function(sim, period = c("day", "week", "month", "year"), per = c("k
       "model's own host density."
     )
   }
-  k <- .sg_need_counters(sim, "sg_cases()")
   sel <- .sg_sim_nodes(sim, nodes)
-  if (!sel$multi && !"fertile_batches" %in% dimnames(k)[[2L]]) {
-    .sg_stop("This simulation was made by an older version of ScrewDrivE; run it again.")
-  }
+  # daily counters, or the counter sums of the "cases" set (phase 3 WP4)
+  src <- .sg_cases_source(sim, if (is.null(hosts)) "fertile_batches" else "infestations", period)
+  k <- src$k
   column <- function(name) {
     if (sel$multi) { # the counter summed over the chosen nodes (D-032)
       kc <- .sg_columns(k, paste0(name, "@", sel$ids))
@@ -291,26 +342,32 @@ sg_cases <- function(sim, period = c("day", "week", "month", "year"), per = c("k
     v <- if (length(dim(k)) == 3L) k[, name, ] else k[, name]
     matrix(v, nrow = dim(k)[1L])
   }
-  # counters are daily even when states are recorded less often (output_every)
-  dates <- sim$date[1L] + seq_len(dim(k)[1L])
-  key <- switch(EXPR = period,
-    day = format(dates),
-    week = format(dates[1L] + 7L * ((seq_along(dates) - 1L) %/% 7L)),
-    month = format(dates, "%Y-%m-01"),
-    year = format(dates, "%Y-01-01")
-  )
+  # rows: days (counters are daily even when states are recorded less often),
+  # or periods of the counter sums when they match `period`
+  dates <- src$dates
+  key <- if (src$grouped) {
+    format(dates)
+  } else {
+    switch(EXPR = period,
+      day = format(dates),
+      week = format(dates[1L] + 7L * ((seq_along(dates) - 1L) %/% 7L)),
+      month = format(dates, "%Y-%m-01"),
+      year = format(dates, "%Y-01-01")
+    )
+  }
   groups <- unique(key)
   agg <- outer(key, groups, `==`) * 1
   cases <- t(agg) %*% column(if (is.null(hosts)) "fertile_batches" else "infestations")
   events <- t(agg) %*% column("egg_batches")
-  days <- colSums(agg)
+  days <- as.vector(t(agg) %*% src$days)
   wounds <- if (sel$multi) sum(sel$all$wounds[sel$pos]) else info$H * info$area # wounds per node
   n_hosts <- if (is.null(hosts)) NA_real_ else sum(hosts$n[sel$pos])
   if (!is.null(hosts)) {
     superinf <- t(agg) %*% column("superinfestations")
     # wounded hosts on the recorded days of each period, averaged
     h <- sg_hosts(sim, nodes = nodes)
-    out_key <- key[match(h$date, dates)]
+    row <- findInterval(h$date, dates) # the row (day or period) of each recorded day
+    out_key <- ifelse(row > 0L, key[pmax(row, 1L)], NA_character_)
     reps <- if (is.null(h$replicate)) rep(1L, nrow(h)) else h$replicate
     wounded <- vapply(seq_len(ncol(cases)), function(r) {
       vapply(groups, function(g) {
@@ -330,7 +387,7 @@ sg_cases <- function(sim, period = c("day", "week", "month", "year"), per = c("k
       NA_real_
     }
     d <- data.frame(
-      period = as.Date(dates[match(groups, key)]), days = as.integer(days),
+      period = as.Date(dates[match(groups, key)]), days = as.integer(round(days)),
       cases = cases[, r] * scale, events = events[, r] * scale, wound_fraction = wf
     )
     if (!is.null(hosts)) {
@@ -347,6 +404,41 @@ sg_cases <- function(sim, period = c("day", "week", "month", "year"), per = c("k
 }
 
 # ---- internal ------------------------------------------------------------------
+
+# The counters sg_cases() reads: the daily counters, or the counter sums of
+# the "cases" set (sg_record("cases"), phase 3 WP4) when the full counters
+# were not kept. Returns k [row, column(, replicate)], the first day `dates`
+# and length `days` of each row, and whether the rows already are the
+# periods of `period` (`grouped`).
+.sg_cases_source <- function(sim, cases_counter, period) {
+  if (!is.null(sim$counters)) {
+    k <- sim$counters
+    if (!any(sub("@.*$", "", dimnames(k)[[2L]]) == cases_counter)) {
+      .sg_stop("This simulation was made by an older version of ScrewDrivE; run it again.")
+    }
+    n <- dim(k)[1L]
+    return(list(k = k, dates = sim$date[1L] + seq_len(n), days = rep(1, n), grouped = FALSE))
+  }
+  k <- sim$counter_sums
+  has <- !is.null(k) && any(sub("@.*$", "", dimnames(k)[[2L]]) == cases_counter)
+  if (!has) {
+    .sg_stop(
+      "sg_cases() needs all daily counters or the counter sums of the \"cases\" set; ",
+      "add \"counters\" to sg_record() (or \"cases\", which keeps far less)."
+    )
+  }
+  every <- sim$meta$record$every
+  if (is.null(every)) every <- "day"
+  per <- sim$counter_periods
+  if (every != "day" && every != period) {
+    .sg_stop(
+      "The counter sums were recorded by ", every, "; sg_cases(period = \"", period,
+      "\") needs ", if (period == "day") "daily sums" else paste("daily sums or sums by", period),
+      " (sg_record(..., every = \"", period, "\"))."
+    )
+  }
+  list(k = k, dates = per$period, days = per$days, grouped = every != "day")
+}
 
 # Output information stored in a simulation's metadata (D-026).
 #' Hosts of the host-wound model
@@ -401,13 +493,24 @@ sg_hosts <- function(sim, per = c("node", "km2"), nodes = NULL) {
     area = model$area, H = model$params$wound_density, genotypes = cb$genotypes,
     wild_type = cb$wild_type, laying = as.logical(laying), viability = cb$egg_total,
     hosts = if (is.null(h)) NULL else list(n = h$n, classes = h$classes),
-    # nodes (D-032): id, role, area, wounds per node (static model)
+    # nodes (D-032): id, role, area, wounds per node (static model) and the
+    # coordinates x, y (km; NA when not given)
     nodes = data.frame(
       id = ids,
       role = if (is.null(model$landscape)) "study" else model$landscape$nodes$role,
-      area = model$area, wounds = model$counts$H, stringsAsFactors = FALSE
-    )
+      area = model$area, wounds = model$counts$H,
+      x = .sg_node_coordinate(model, "x"), y = .sg_node_coordinate(model, "y"),
+      stringsAsFactors = FALSE
+    ),
+    extinction_threshold = model$params$extinction_threshold
   )
+}
+
+# Node coordinate `xy` ("x" or "y") of a model's landscape, NA when absent.
+.sg_node_coordinate <- function(model, xy) {
+  nd <- model$landscape$nodes
+  n <- length(.sg_node_ids(model))
+  if (is.null(nd) || is.null(nd[[xy]])) rep(NA_real_, n) else as.numeric(nd[[xy]])
 }
 
 # Nodes of a simulation chosen for a summary (D-032): ids or numbers, by

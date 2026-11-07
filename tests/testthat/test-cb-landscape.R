@@ -145,14 +145,14 @@ test_that("extinction refers to the whole landscape; releases elsewhere keep a r
   }
   # two old males in node a: they die and the landscape is extinct
   m <- cbl_model(days = 40, releases = NULL)
-  sim <- simulate_cb(m, old_males(m), n_rep = 2, seed = 1)
+  sim <- simulate_cb(m, old_males(m), n_rep = 2, seed = 1, record = "state")
   expect_true(all(sim$extinct_day > 0))
   expect_identical(sum(sim$state[41L, , ][!.sg_is_host_name(sg_state_names(m)), ]), 0)
   # a release in node c on day 20 keeps the run going after the extinction
   m2 <- cbl_model(days = 40, releases = sg_releases("AA",
     stage = "adult", sex = "male", times = 20, number = 5, node = "c"
   ))
-  s2 <- simulate_cb(m2, old_males(m2), n_rep = 2, seed = 1)
+  s2 <- simulate_cb(m2, old_males(m2), n_rep = 2, seed = 1, record = "state")
   expect_true(all(s2$extinct_day < 20L))
   at_c <- endsWith(sg_state_names(m2), "@c") & !.sg_is_host_name(sg_state_names(m2))
   expect_gt(min(apply(s2$state[21L, at_c, , drop = FALSE], 3L, sum)), 0)
@@ -163,8 +163,8 @@ test_that("parallel replicates of a landscape equal sequential ones", {
   old <- future::plan("sequential")
   on.exit(future::plan(old))
   m <- cbl_model(days = 15)
-  a <- simulate_cb(m, cbl_init(m), n_rep = 2, seed = 8)
-  b <- simulate_cb(m, cbl_init(m), n_rep = 2, seed = 8, parallel = TRUE)
+  a <- simulate_cb(m, cbl_init(m), n_rep = 2, seed = 8, record = "state")
+  b <- simulate_cb(m, cbl_init(m), n_rep = 2, seed = 8, parallel = TRUE, record = "state")
   expect_identical(b$state, a$state)
   expect_identical(b$counters, a$counters)
   expect_identical(b$releases, a$releases)
@@ -175,9 +175,12 @@ test_that("the memory estimate counts every node", {
   n_rel <- 12L # 4 release blocks x 3 nodes
   n_c <- length(attr(.sg_model_view(m), "counter_names"))
   bytes <- 8 * 2 * (16 * m$n_states + 15 * (n_c + n_rel) + m$n_states) # and the final state
-  expect_no_error(simulate_cb(m, cbl_init(m), n_rep = 2, seed = 1, max_memory = bytes))
+  expect_no_error(simulate_cb(m, cbl_init(m),
+    n_rep = 2, seed = 1, max_memory = bytes,
+    record = "state"
+  ))
   expect_error(
-    simulate_cb(m, cbl_init(m), n_rep = 2, seed = 1, max_memory = bytes - 1),
+    simulate_cb(m, cbl_init(m), n_rep = 2, seed = 1, max_memory = bytes - 1, record = "state"),
     "max_memory"
   )
 })

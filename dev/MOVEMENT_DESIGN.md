@@ -845,8 +845,10 @@ targets: section 8a.
     for multi-node runs (user, 2026-11-04; section 5.7).
 13. Whether `"totals"` replaces v0.1's full `sim$state` as the default
     output everywhere is decided once the recorder is fully integrated in
-    the package (user, 2026-11-04; section 7.1). Until then full states
-    remain the default and `"totals"` is available on request.
+    the package (user, 2026-11-04; section 7.1). *Decided 2026-11-05
+    (user, phase 3 plan choice 4):* `"totals"` plus all counters is the
+    default of both solvers from phase 3 WP5; full states with
+    `record = "state"`. Totals keep mated females summed over their mates.
 
 ## References
 

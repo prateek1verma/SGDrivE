@@ -264,8 +264,9 @@ Rcpp::List sg_cb_step_cpp(const Rcpp::List& view, int day, double dt,
 // genotype; 0 if none), the number of days simulated and the final state x.
 // `recorder` (NULL: full states and counters; recorder.h) is a list with
 // logical `state` and `counters` and CSR matrices `wx` [sums x states] and
-// `wc` [sums x counters]; the result then also has `recorded` (W_x x on
-// recorded days) and `counter_sums` (W_c c per day), and `states` or
+// `wc` [sums x counters] (and optionally `c_period`, each day's period); the
+// result then also has `recorded` (W_x x on recorded days) and
+// `counter_sums` (W_c c summed by period, one row per period), and `states` or
 // `counters` with no columns when they are not kept (phase 2 WP5).
 // Recording uses no random numbers.
 // [[Rcpp::export]]
@@ -304,6 +305,7 @@ Rcpp::List sg_cb_run_cpp(const Rcpp::List& view, const Rcpp::NumericVector& x0,
   Rcpp::IntegerVector state_days(n_record);
   // results in growable row-major storage, copied once at the end
   std::vector<double> st_states, st_counters, st_recorded, st_sums;
+  std::vector<int> st_periods;
   std::vector<double> x(x0.begin(), x0.end()), flows(nc), day_counters(nc);
   screwdrive::CbStepper stepper(mv, dt);
   screwdrive::RandomDraws random_draws;
@@ -366,7 +368,7 @@ Rcpp::List sg_cb_run_cpp(const Rcpp::List& view, const Rcpp::NumericVector& x0,
           d);
     }
     if (rec.counters) st_counters.insert(st_counters.end(), day_counters.begin(), day_counters.end());
-    rec.wc.multiply_append(day_counters.data(), st_sums);
+    rec.add_sums(d, day_counters.data(), st_sums, st_periods);
     if (record[d - 1]) {
       if (rec.state) st_states.insert(st_states.end(), x.begin(), x.end());
       rec.wx.multiply_append(x.data(), st_recorded);
@@ -380,9 +382,10 @@ Rcpp::List sg_cb_run_cpp(const Rcpp::List& view, const Rcpp::NumericVector& x0,
   }
   // days after an early stop stay zero (the state is zero); give them their
   // rows
+  std::fill(day_counters.begin(), day_counters.end(), 0.0);
   for (int d = days_run + 1; d <= n_days; ++d) {
     if (rec.counters) st_counters.insert(st_counters.end(), nc, 0.0);
-    st_sums.insert(st_sums.end(), rec.wc.rows(), 0.0);
+    rec.add_sums(d, day_counters.data(), st_sums, st_periods);
     if (record[d - 1]) {
       if (rec.state) st_states.insert(st_states.end(), n, 0.0);
       st_recorded.insert(st_recorded.end(), rec.wx.rows(), 0.0);
@@ -395,7 +398,8 @@ Rcpp::List sg_cb_run_cpp(const Rcpp::List& view, const Rcpp::NumericVector& x0,
       Rcpp::Named("state_days") = state_days,
       Rcpp::Named("counters") = as_matrix(st_counters, n_days, rec.counters ? nc : 0),
       Rcpp::Named("recorded") = as_matrix(st_recorded, n_record, rec.wx.rows()),
-      Rcpp::Named("counter_sums") = as_matrix(st_sums, n_days, rec.wc.rows()),
+      Rcpp::Named("counter_sums") =
+          as_matrix(st_sums, static_cast<int>(st_periods.size()), rec.wc.rows()),
       Rcpp::Named("x") = Rcpp::NumericVector(x.begin(), x.end()),
       Rcpp::Named("extinct_day") = extinct_day, Rcpp::Named("wild_extinct_day") = wild_extinct_day,
       Rcpp::Named("days_run") = days_run);

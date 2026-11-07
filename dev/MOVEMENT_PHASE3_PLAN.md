@@ -148,6 +148,16 @@ landscape: a transect from south Texas north.
   for both solvers and every replicate (ODE to round-off, chain-binomial
   exactly); partial last periods; `sg_cases()` from the set equals
   `sg_cases()` from full counters; memory estimates count period rows.
+* *Done (2026-11-06):* `every` is an argument of `sg_record()`, not of
+  `sg_counter()`: a run has one period for all its counter sums (and the
+  `"cases"` set), so `sim$counter_sums` stays one matrix (array for
+  `simulate_cb()`) with `sim$counter_periods`. `Recorder::add_sums()` in
+  `src/recorder.h` adds a day into its period's row (`c_period` from R);
+  the ODE driver adds C++ chunks and the R paths (deSolve backend, stiff
+  fallback days) into period rows, so a period may span them. The
+  `"cases"` set names its sums like the counters (`fertile_batches@a`) and
+  covers every node; `sg_cases()` reads it through `.sg_cases_source()`.
+  Tests in `test-recorder-periods.R`.
 
 ### WP5. Allele quantities and summaries reading recorded quantities (M)
 
@@ -169,6 +179,15 @@ landscape: a transect from south Texas north.
 * Tests: every summary gives the same result from states, from totals and
   from the recorded quantities it accepts (both solvers, 1 and 3 nodes);
   clear errors otherwise.
+* *Done (2026-11-06):* `sg_alleles(name, alleles, stage, sex, node, by)`
+  (rows weighted by allele copies, `.sg_allele_rows()`; described in
+  `meta$record$alleles`) and `.sg_allele_freq_recorded()`. Default
+  `record = "totals"` in both solvers; `check_model()` reads totals and
+  burn-ins read `final_state`. The tests that read `sim$state` ask for
+  `record = "state"` (added with a parser-based rewrite to 150 calls;
+  `sim_ode()` in `helper-backends.R` defaults to it). README prose updated
+  in `README.Rmd` and `README.md` (not re-knitted: no pandoc locally).
+  Tests in `test-summaries-recorded.R`.
 
 ### WP6. Spread metrics and plots (M)
 
@@ -185,6 +204,11 @@ landscape: a transect from south Texas north.
 * Tests: metrics against direct calculations on small runs (both
   solvers); a front moving through a chain at a known order of arrival;
   plot data shapes (`sg_plot_data()`), as the existing plot tests do.
+* *Done (2026-11-06):* `R/spread.R`: `sg_spread(sim, threshold, nodes,
+  position, quantity)` with a print method; the simulation's node
+  information now carries `x`, `y` and `extinction_threshold`. Plots
+  `"nodes"` (viridis heat map, a panel per replicate, the first replicate
+  by default) and `"front"` in `R/plots.R`. Tests in `test-spread.R`.
 
 ### WP7. Benchmarks, tolerance study, profiles (M)
 

@@ -12,7 +12,7 @@ sg_test_each_backend <- function(desc, code) {
     test_env$backend <- backend
     test_env$sim_ode <- local({
       b <- backend
-      function(...) simulate_ode(..., backend = b)
+      function(..., record = "state") simulate_ode(..., backend = b, record = record)
     })
     testthat::test_that(paste0(desc, " [", backend, "]"), eval(code, test_env))
   }

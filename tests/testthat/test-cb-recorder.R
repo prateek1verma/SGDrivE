@@ -49,7 +49,7 @@ test_that("recorded sums equal the sums of a full-state run with the same seed",
       m <- cbr_model(n_node, hosts)
       x0 <- cbr_init(m)
       info <- paste(n_node, hosts)
-      full <- simulate_cb(m, x0, n_rep = 3, seed = 6, output_every = 4)
+      full <- simulate_cb(m, x0, n_rep = 3, seed = 6, output_every = 4, record = "state")
       rr <- cbr_record(m)
       rec <- simulate_cb(m, x0, n_rep = 3, seed = 6, output_every = 4, record = rr)
       cn <- dimnames(full$counters)[[2L]]
@@ -89,7 +89,7 @@ test_that("keep is a shortcut for record; both together are an error", {
   x0 <- cbr_init(m)
   a <- simulate_cb(m, x0, n_rep = 2, seed = 2, keep = "totals")
   b <- simulate_cb(m, x0, n_rep = 2, seed = 2, record = "totals")
-  st <- simulate_cb(m, x0, n_rep = 2, seed = 2)
+  st <- simulate_cb(m, x0, n_rep = 2, seed = 2, record = "state")
   expect_identical(a$totals, b$totals)
   expect_identical(a$counters, b$counters)
   expect_null(a$state)
@@ -107,7 +107,7 @@ test_that("keep is a shortcut for record; both together are an error", {
 test_that("states and counters together with recorded quantities", {
   m <- cbr_model()
   x0 <- cbr_init(m)
-  st <- simulate_cb(m, x0, n_rep = 2, seed = 5)
+  st <- simulate_cb(m, x0, n_rep = 2, seed = 5, record = "state")
   both <- simulate_cb(m, x0, n_rep = 2, seed = 5, record = sg_record(
     "state", "counters", sg_counter("cases", counter = "fertile_batches")
   ))
@@ -177,7 +177,8 @@ test_that("the memory limit counts what is recorded", {
 
 test_that("print() shows recorded quantities and counter sums", {
   m <- cbr_model()
-  out <- capture.output(print(simulate_cb(m, cbr_init(m), n_rep = 2, seed = 1,
+  out <- capture.output(print(simulate_cb(m, cbr_init(m),
+    n_rep = 2, seed = 1,
     record = sg_record(
       sg_quantity("adults", stage = "adults", by = "node"),
       sg_counter("cases", counter = "fertile_batches")

@@ -28,7 +28,7 @@ test_that("the largest-rate diagnostic includes mating of unmated females", {
   x0[sg_state_index(m, "M")] <- 0
   expect_lt(ns$.sg_max_rate(5, x0, s), 100)
   expect_equal(ns$sg_max_rate_cpp(v, 5L, x0), ns$.sg_max_rate(5, x0, s), tolerance = 1e-14)
-  sim <- simulate_ode(m, init = x)
+  sim <- simulate_ode(m, init = x, record = "state")
   expect_true(all(sim$diagnostics$max_rate > 100))
 })
 
@@ -98,7 +98,7 @@ test_that("flow balance: round-off for the ODE, exactly zero for stochastic runs
   m <- sg_model(p, cube3, month(p), sg_releases("aa", "adult", "male", times = 3, number = 40),
     area = 100
   )
-  sim <- simulate_ode(m)
+  sim <- simulate_ode(m, record = "state")
   fb <- sg_flow_balance(sim)
   expect_identical(names(fb), c("day", "change", "releases", "eggs_laid", "deaths", "residual"))
   expect_lt(max(abs(fb$residual)) / max(rowSums(sim$state)), 1e-10)
@@ -116,9 +116,15 @@ test_that("runtime guards stop runs whose numbers blow up", {
   p <- sg_params(eggs_per_day_max = 1e300)
   m <- sg_model(p, sg_cube(sg_test_cube_wild()), month(p), area = 10)
   for (b in c("cpp", "R")) {
-    expect_error(suppressWarnings(simulate_ode(m, backend = b)), "failed on day 1")
+    expect_error(
+      suppressWarnings(simulate_ode(m, backend = b, record = "state")),
+      "failed on day 1"
+    )
   }
   p2 <- sg_params(eggs_per_day_max = 1e308, clutch_size = 1e-300)
   m2 <- sg_model(p2, sg_cube(sg_test_cube_wild()), month(p2), area = 10)
-  expect_error(suppressWarnings(simulate_cb(m2, seed = 1)), "non-finite or negative on day 1")
+  expect_error(
+    suppressWarnings(simulate_cb(m2, seed = 1, record = "state")),
+    "non-finite or negative on day 1"
+  )
 })

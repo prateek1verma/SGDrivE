@@ -149,7 +149,9 @@ double sg_kernel_max_rate_cpp(SEXP ptr, int day, const Rcpp::NumericVector& x) {
 // `recorder` (NULL: full states and counters) is a list with logical `state`
 // and `counters` and CSR matrices `wx` [sums x states] and `wc` [sums x
 // counters, including the removed ones]; the result then also has
-// `recorded` (W_x x on recorded days) and `counter_sums` (W_c c per day), and
+// `recorded` (W_x x on recorded days) and `counter_sums` (W_c c summed by
+// period, one row per period touched, with their 1-based periods in
+// `sum_periods`; a period may continue from the previous call), and
 // `states` or `counters` with no columns when they are not kept.
 // [[Rcpp::export]]
 Rcpp::List sg_ode_run_cpp(SEXP ptr, const Rcpp::NumericVector& x0, int day_from, int day_to,
@@ -183,7 +185,7 @@ Rcpp::List sg_ode_run_cpp(SEXP ptr, const Rcpp::NumericVector& x0, int day_from,
   // results are accumulated in growable vectors and copied once at the end, so
   // a run that stops early (stiff fallback) costs no more than the days it did
   std::vector<double> st_states, st_counters, st_max_rate, st_min_state, st_recorded, st_sums;
-  std::vector<int> st_days, st_steps, st_rejected, st_evals, st_stiff, st_limiting;
+  std::vector<int> st_days, st_steps, st_rejected, st_evals, st_stiff, st_limiting, st_periods;
   // limiting node (D-032): counts per node of the steps it limited
   const bool track_nodes = mv.n_node > 1;
   std::vector<int> node_counts(mv.n_node, 0);
@@ -229,7 +231,7 @@ Rcpp::List sg_ode_run_cpp(SEXP ptr, const Rcpp::NumericVector& x0, int day_from,
     std::copy(y.begin() + n, y.end(), counter_row.begin());
     std::copy(removed.begin(), removed.end(), counter_row.begin() + nc);
     if (rec.counters) st_counters.insert(st_counters.end(), counter_row.begin(), counter_row.end());
-    rec.wc.multiply_append(counter_row.data(), st_sums);
+    rec.add_sums(d, counter_row.data(), st_sums, st_periods);
     st_steps.push_back(static_cast<int>(st.steps));
     st_rejected.push_back(static_cast<int>(st.rejected));
     st_evals.push_back(static_cast<int>(st.evaluations));
@@ -255,7 +257,9 @@ Rcpp::List sg_ode_run_cpp(SEXP ptr, const Rcpp::NumericVector& x0, int day_from,
   Rcpp::NumericMatrix states = as_matrix(st_states, n_rec, rec.state ? n : 0);
   Rcpp::NumericMatrix counters = as_matrix(st_counters, n_done, rec.counters ? nc_all : 0);
   Rcpp::NumericMatrix recorded = as_matrix(st_recorded, n_rec, rec.wx.rows());
-  Rcpp::NumericMatrix counter_sums = as_matrix(st_sums, n_done, rec.wc.rows());
+  const int n_sum_rows = static_cast<int>(st_periods.size());
+  Rcpp::NumericMatrix counter_sums = as_matrix(st_sums, n_sum_rows, rec.wc.rows());
+  for (int& p : st_periods) ++p;  // 1-based for R
   Rcpp::LogicalVector stiff(n_done);
   for (int r = 0; r < n_done; ++r) stiff[r] = st_stiff[r];
 
@@ -270,5 +274,6 @@ Rcpp::List sg_ode_run_cpp(SEXP ptr, const Rcpp::NumericVector& x0, int day_from,
       Rcpp::Named("max_rate") = Rcpp::wrap(st_max_rate),
       Rcpp::Named("min_state") = Rcpp::wrap(st_min_state),
       Rcpp::Named("limiting_node") = Rcpp::wrap(st_limiting),
-      Rcpp::Named("recorded") = recorded, Rcpp::Named("counter_sums") = counter_sums);
+      Rcpp::Named("recorded") = recorded, Rcpp::Named("counter_sums") = counter_sums,
+      Rcpp::Named("sum_periods") = Rcpp::wrap(st_periods));
 }

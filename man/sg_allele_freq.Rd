@@ -32,6 +32,10 @@ Frequencies of alleles among the individuals of chosen stages.
 \details{
 With several nodes the individuals of \code{nodes} (default the study
 nodes) are pooled.
+
+The counts come from the run's states or totals or, when neither was
+kept, from allele copies recorded with \code{\link[=sg_alleles]{sg_alleles()}} for the same
+stages and alleles (split by node, or for exactly the chosen nodes).
 }
 \examples{
 if (requireNamespace("MGDrivE", quietly = TRUE)) {

@@ -248,7 +248,7 @@ test_that("the burn-in can apply the node extinction rule", {
 test_that("the default start lets simulate_ode() run a landscape", {
   p <- sg_params()
   m <- sg_model(p, in_cube, landscape = in_landscape(p, days = 30), movement = in_chain())
-  sim <- simulate_ode(m)
+  sim <- simulate_ode(m, record = "state")
   expect_identical(unname(sim$state[1L, ]), as.numeric(sg_init(m)))
 })
 

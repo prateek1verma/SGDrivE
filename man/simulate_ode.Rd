@@ -15,7 +15,7 @@ simulate_ode(
   stiff_fallback = NULL,
   node_extinction = FALSE,
   max_memory = 1e+09,
-  record = "state"
+  record = "totals"
 )
 }
 \arguments{
@@ -66,10 +66,15 @@ several nodes (D-032); see Details.}
 than one node, of the dense Jacobian of the deSolve methods \code{"lsoda"},
 \code{"lsode"}, \code{"bdf"} and \code{"radau"}. Larger runs stop before they start.}
 
-\item{record}{What the run stores: \code{"state"} (default: full states on
-output days and all daily counters), \code{"totals"} (totals by stage and
-genotype per node, and all counters), or an \code{\link[=sg_record]{sg_record()}} object with
-chosen quantities and counter sums, computed in C++ during the run.}
+\item{record}{What the run stores: \code{"totals"} (default: totals by stage
+and genotype per node, host blocks, and all daily counters), \code{"state"}
+(full states on output days and all counters), or an \code{\link[=sg_record]{sg_record()}}
+object with chosen quantities and counter sums, computed in C++ during
+the run. The final state is always kept. Totals add mated females over
+their mates and all adults over their ages: summaries that need the
+mate genotype (\code{sg_females()$fertile_equivalent},
+\code{sg_totals(by = "mate")}) or sub-stages need \code{record = "state"}
+(decision 13, D-032).}
 }
 \value{
 An object of class \code{sg_sim}, a list with:
@@ -82,7 +87,10 @@ when not recorded.}
 genotype, and the recorded quantities (rows: output days).}
 \item{\code{counters}}{Matrix of daily flow totals (rows: days 1 to n);
 \code{NULL} when only counter sums are recorded.}
-\item{\code{counter_sums}}{With \code{sg_counter()} terms: daily counter sums.}
+\item{\code{counter_sums}, \code{counter_periods}}{With \code{sg_counter()} terms or
+the \code{"cases"} set: counter sums, one row per period of
+\code{sg_record(every = )} (daily by default), and the periods' first days
+and lengths.}
 \item{\code{final_state}}{The state at the end of the run (named), to
 continue from.}
 \item{\code{releases}}{Matrix of individuals released per day and block.}
@@ -153,7 +161,7 @@ if (requireNamespace("deSolve", quietly = TRUE) &&
   sim
   # the pure-R reference backend gives the same result, more slowly
   sim_r <- simulate_ode(mod, backend = "R")
-  max(abs(sim_r$state - sim$state)) / max(sim$state)
+  max(abs(sim_r$totals - sim$totals)) / max(sim$totals)
 }
 }
 \seealso{

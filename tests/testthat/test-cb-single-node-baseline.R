@@ -65,7 +65,10 @@ test_that("one-node chain-binomial runs reproduce the pre-phase-2 baseline", {
     cbb_expect(sg_cb_step_cpp(view, 30L, 0.1, r$step$x, FALSE), r$step$deterministic, nm, 1e-12)
     if (cbb_bitwise()) {
       expect_identical(m$meta$hash, r$hash, info = nm)
-      sto <- simulate_cb(m, init = x0, n_rep = 2L, dt = 0.1, output_every = 10L, seed = 11L)
+      sto <- simulate_cb(m,
+        init = x0, n_rep = 2L, dt = 0.1, output_every = 10L, seed = 11L,
+        record = "state"
+      )
       expect_identical(unname(sto$state), r$stochastic$state, info = nm)
       expect_identical(unname(sto$counters), r$stochastic$counters, info = nm)
       expect_identical(unname(sto$extinct_day), r$stochastic$extinct_day, info = nm)

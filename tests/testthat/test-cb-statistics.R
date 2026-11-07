@@ -178,7 +178,7 @@ test_that("stress: huge counts, step sizes, fast mating, long chains, many genot
   # step sizes from 0.05 to 1 day give similar means
   m <- sg_model(p, sg_cube(sg_test_cube_wild()), wx, area = 1e5)
   x <- sg_init(m, "state", state = as.numeric(sg_init(m, "equilibrium", temperature = 27)))
-  ode <- rowSums(simulate_ode(m, x)$state)
+  ode <- rowSums(simulate_ode(m, x, record = "state")$state)
   for (dt in c(0.05, 0.5, 1)) {
     set.seed(7)
     r <- ns$.sg_cb_run_cpp(m, x, dt = dt)

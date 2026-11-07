@@ -13,10 +13,13 @@
 #'   frequencies, [sg_allele_freq()]), `"females"` (female classes,
 #'   [sg_females()]), `"cases"` (cases per period, [sg_cases()]) or `"hosts"`
 #'   (hosts without a wound, wounded and infested, [sg_hosts()]; host-wound
-#'   model only).
-#' @param stages Stages included for `"stages"`, `"genotypes"` and
-#'   `"alleles"` (see [sg_totals()]); default all stages for `"stages"`,
-#'   adults otherwise.
+#'   model only), `"nodes"` (heat map of individuals of the chosen `stages`
+#'   by node and day; for stochastic runs one panel per replicate, the first
+#'   replicate unless `replicates` is given) or `"front"` (position of the
+#'   farthest occupied node over time, [sg_spread()]; needs node positions).
+#' @param stages Stages included for `"stages"`, `"genotypes"`, `"alleles"`
+#'   and `"nodes"` (see [sg_totals()]); default all stages for `"stages"` and
+#'   `"nodes"`, adults otherwise.
 #' @param per `"km2"` (default) or `"node"`.
 #' @param period For `"cases"`: `"day"`, `"week"` (default), `"month"` or
 #'   `"year"`.
@@ -50,7 +53,11 @@
 #'   plot(sim, "alleles")
 #'   plot(sim, "cases", period = "month")
 #' }
-plot.sg_sim <- function(x, what = c("stages", "genotypes", "alleles", "females", "cases", "hosts"),
+plot.sg_sim <- function(x,
+                        what = c(
+                          "stages", "genotypes", "alleles", "females", "cases", "hosts", "nodes",
+                          "front"
+                        ),
                         stages = NULL, per = c("km2", "node"), period = "week",
                         host_density = NULL, replicates = NULL,
                         palette = c("okabe_ito", "brewer", "viridis"), nodes = NULL, ...) {
@@ -60,7 +67,10 @@ plot.sg_sim <- function(x, what = c("stages", "genotypes", "alleles", "females",
 #' @rdname plot.sg_sim
 #' @export
 plot.sg_sim_cb <- function(x,
-                           what = c("stages", "genotypes", "alleles", "females", "cases", "hosts"),
+                           what = c(
+                             "stages", "genotypes", "alleles", "females", "cases", "hosts", "nodes",
+                             "front"
+                           ),
                            stages = NULL, per = c("km2", "node"), period = "week",
                            host_density = NULL, replicates = NULL,
                            palette = c("okabe_ito", "brewer", "viridis"), nodes = NULL, ...) {
@@ -86,16 +96,20 @@ plot.sg_sim_cb <- function(x,
 #'   head(sg_plot_data(sim, "genotypes"))
 #' }
 sg_plot_data <- function(sim,
-                         what = c("stages", "genotypes", "alleles", "females", "cases", "hosts"),
+                         what = c(
+                           "stages", "genotypes", "alleles", "females", "cases", "hosts", "nodes",
+                           "front"
+                         ),
                          stages = NULL, per = c("km2", "node"), period = "week",
                          host_density = NULL, replicates = NULL, nodes = NULL) {
   what <- .sg_match_choice(
-    what, c("stages", "genotypes", "alleles", "females", "cases", "hosts"), "what"
+    what, c("stages", "genotypes", "alleles", "females", "cases", "hosts", "nodes", "front"), "what"
   )
   per <- .sg_match_choice(per, c("km2", "node"), "per")
   .sg_sim_info(sim)
   unit <- if (per == "km2") "per km^2" else "per node"
-  if (is.null(stages)) stages <- if (what == "stages") "all" else "adults"
+  if (is.null(stages)) stages <- if (what %in% c("stages", "nodes")) "all" else "adults"
+  if (what == "nodes" && is.null(replicates) && inherits(sim, "sg_sim_cb")) replicates <- 1L
   d <- switch(EXPR = what,
     stages = {
       t <- sg_totals(sim, by = "stage", stages = stages, per = per, nodes = nodes)
@@ -148,6 +162,32 @@ sg_plot_data <- function(sim,
         }
       )
     },
+    nodes = {
+      t <- sg_totals(sim, by = "node", stages = stages, per = per, nodes = nodes)
+      sel <- .sg_sim_nodes(sim, nodes)
+      if (is.null(t$node)) t$node <- sel$ids
+      out <- .sg_series(t, "node", "value")
+      out$series <- factor(out$series, levels = sel$ids)
+      structure(out,
+        ylab = paste("individuals", unit),
+        title = paste("Individuals by node:", paste(stages, collapse = ", "))
+      )
+    },
+    front = {
+      sp <- sg_spread(sim, nodes = nodes)
+      if (all(is.na(sp$time$front))) {
+        .sg_stop(
+          "The front needs node positions: give `x` in sg_landscape() ",
+          "(or use sg_spread(position = ))."
+        )
+      }
+      ids <- intersect(c("date", "replicate"), names(sp$time))
+      out <- cbind(sp$time[ids], series = "front", value = sp$time$front)
+      structure(out,
+        ylab = "position of the farthest occupied node",
+        title = sprintf("Front (nodes with at least %g flies)", sp$threshold)
+      )
+    },
     hosts = {
       hs <- sg_hosts(sim, per = per, nodes = nodes)
       classes <- c("unwounded", "wounded", "infested")
@@ -180,6 +220,9 @@ sg_plot_data <- function(sim,
   }
   d <- sg_plot_data(sim, what, stages, per, period, host_density, replicates, nodes)
   stochastic <- "replicate" %in% names(d)
+  if (identical(what, "nodes")) {
+    return(.sg_plot_nodes(d, stochastic))
+  }
   if (stochastic) d$line <- interaction(d$series, d$replicate, drop = TRUE)
   aes_of <- function(...) do.call(ggplot2::aes, lapply(list(...), as.name))
   map <- if (stochastic) {
@@ -201,6 +244,21 @@ sg_plot_data <- function(sim,
     ggplot2::guides(
       colour = if (one_series) "none" else ggplot2::guide_legend(override.aes = list(alpha = 1))
     )
+}
+
+# Heat map of individuals by node (rows) and date: viridis fill (readable for
+# colour-blind readers and in grey), one panel per replicate.
+.sg_plot_nodes <- function(d, stochastic) {
+  aes_of <- function(...) do.call(ggplot2::aes, lapply(list(...), as.name))
+  p <- ggplot2::ggplot(d, aes_of(x = "date", y = "series", fill = "value")) +
+    ggplot2::geom_tile() +
+    ggplot2::scale_fill_viridis_c(name = attr(d, "ylab")) +
+    ggplot2::labs(x = NULL, y = "node", title = attr(d, "title")) +
+    ggplot2::theme_minimal()
+  if (stochastic) {
+    p <- p + ggplot2::facet_wrap(ggplot2::vars(replicate), labeller = ggplot2::label_both)
+  }
+  p
 }
 
 # Okabe & Ito (2008) colour-blind-safe palette, yellow last (low contrast on

@@ -46,10 +46,9 @@
   run <- function(x0) {
     sim <- simulate_ode(burn,
       init = as.numeric(x0), output_every = forcing$n_days,
-      node_extinction = node_extinction
+      node_extinction = node_extinction, record = "totals"
     )
-    x <- unname(sim$state)
-    x <- x[nrow(x), ]
+    x <- unname(sim$final_state)
     x[x < 0] <- 0 # round-off near extinction
     x
   }

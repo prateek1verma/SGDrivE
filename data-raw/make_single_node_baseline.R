@@ -42,7 +42,7 @@ cases <- list(
 baseline <- lapply(cases, function(cs) {
   wx <- sg_forcing(weather, cs$params, start = "1971-01-01", end = "1971-12-31")
   mod <- sg_model(cs$params, cs$cube, wx, cs$releases, area = 2)
-  sim <- simulate_ode(mod, output_every = 30L)
+  sim <- simulate_ode(mod, output_every = 30L, record = "state")
   view <- .sg_model_view(mod)
   # kernel rates at three states of the run (start, middle, end)
   probe_rows <- c(1L, ceiling(nrow(sim$state) / 2), nrow(sim$state))

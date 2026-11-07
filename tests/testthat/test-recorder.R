@@ -38,7 +38,7 @@ rc_sum <- function(sim, keep) rowSums(sim$state[, keep(colnames(sim$state)), dro
 test_that("the default record keeps states and counters as before", {
   m <- rc_one()
   x0 <- as.numeric(sg_init(m))
-  a <- simulate_ode(m, init = x0, output_every = 7L)
+  a <- simulate_ode(m, init = x0, output_every = 7L, record = "state")
   b <- simulate_ode(m, init = x0, output_every = 7L, record = "state")
   expect_identical(a$state, b$state)
   expect_identical(a$counters, b$counters)
@@ -159,7 +159,7 @@ test_that("totals give the same summaries as the full state", {
   for (hosts in c(FALSE, TRUE)) {
     for (m in list(rc_one(hosts), rc_nodes(hosts))) {
       x0 <- sg_init(m)
-      st <- simulate_ode(m, init = x0, output_every = 10L)
+      st <- simulate_ode(m, init = x0, output_every = 10L, record = "state")
       tt <- simulate_ode(m, init = x0, output_every = 10L, record = "totals")
       expect_null(tt$state)
       expect_identical(colnames(tt$totals), colnames(.sg_totals_matrix(m)))
@@ -217,7 +217,10 @@ test_that("only quantities: summaries ask for totals, print shows the quantities
 test_that("the memory limit uses what is recorded", {
   m <- rc_nodes(days = 60)
   x0 <- sg_init(m)
-  expect_error(simulate_ode(m, init = x0, max_memory = 2e5), "more than max_memory")
+  expect_error(
+    simulate_ode(m, init = x0, max_memory = 2e5, record = "state"),
+    "more than max_memory"
+  )
   small <- sg_record(
     sg_quantity("adults", stage = "adults", by = "node"), sg_counter("cases", "fertile_batches")
   )

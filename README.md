@@ -189,7 +189,9 @@ Output tables work the same for deterministic and stochastic results:
 `sg_totals()` (by stage, sex, genotype and mate), `sg_allele_freq()`,
 `sg_females()` (including females weighted by the fertility of their
 mate) and `sg_cases()`, the case proxy: wounds newly infested with
-viable eggs, so that females mated to sterile males cause no cases.
+viable eggs, so that females mated to sterile males cause no cases. Runs
+keep totals by stage and genotype and all daily counters by default;
+summaries by mate genotype or age need `record = "state"`.
 
 ``` r
 head(sg_cases(sim, period = "month", host_density = 20))
@@ -230,7 +232,7 @@ probabilities on a degree-day or calendar clock (design:
 [`dev/MOVEMENT_DESIGN.md`](dev/MOVEMENT_DESIGN.md), equations:
 MODEL_SPEC section 8a). The ODE solver, initial states, summaries, an
 optional node extinction rule and a recorder that keeps only chosen
-quantities are available; the stochastic solver follows.
+quantities work with both solvers.
 
 ``` r
 land <- sg_landscape(

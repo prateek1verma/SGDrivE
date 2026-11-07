@@ -7,11 +7,11 @@ wx <- sg_forcing(sg_example_weather(), p, "1971-05-01", "1971-05-31")
 cube3 <- sg_cube(sg_test_cube_mendelian())
 mod <- sg_model(p, cube3, wx, area = 10)
 hw <- sg_init(mod, "hardy_weinberg", alleles = c(A = 0.8, a = 0.2))
-sim <- simulate_ode(mod, init = hw)
+sim <- simulate_ode(mod, init = hw, record = "state")
 hw20 <- sg_init(mod, "hardy_weinberg",
   alleles = c(A = 0.8, a = 0.2), values = c(E = 20, L = 20, P = 20, M = 10, F = 10)
 )
-cb <- simulate_cb(mod, hw20, n_rep = 2, seed = 1)
+cb <- simulate_cb(mod, hw20, n_rep = 2, seed = 1, record = "state")
 block_sum <- function(state, b) rowSums(state[, substr(colnames(state), 1, 1) == b, drop = FALSE])
 
 test_that("totals add up the states, by any grouping and per km^2", {
@@ -70,11 +70,11 @@ test_that("allele frequencies: Hardy-Weinberg, custom allele tables, empty popul
   custom <- matrix(c(2, 1, 0), 3, 1, dimnames = list(cube3$genotypes, "A"))
   expect_equal(sg_allele_freq(sim, alleles = custom)$freq, rep(1, 32))
   expect_error(sg_allele_freq(sim, alleles = custom[1:2, , drop = FALSE]), "row for every genotype")
-  empty <- simulate_ode(mod, init = sg_init(mod, values = c(E = 0)))
+  empty <- simulate_ode(mod, init = sg_init(mod, values = c(E = 0)), record = "state")
   expect_true(all(is.na(sg_allele_freq(empty)$freq)))
   skip_if_not_installed("MGDrivE")
   xs <- sg_model(p, sg_cube(MGDrivE::cubeXShredderY()), wx)
-  axs <- sg_allele_freq(simulate_ode(xs))
+  axs <- sg_allele_freq(simulate_ode(xs, record = "state"))
   expect_true(all(c("X", "Y") %in% axs$allele))
   # wild type only: Y is one of four sex chromosomes among equal males and females
   expect_equal(axs$freq[axs$allele == "Y" & axs$day == 0], 0.25)
@@ -95,7 +95,7 @@ test_that("female classes: identities, wild type and fertility weights", {
   x <- numeric(ms$n_states)
   x[sg_state_index(ms, "F", genotype = "W", mate = "W", substage = 5)] <- 10
   x[sg_state_index(ms, "F", genotype = "W", mate = "S", substage = 5)] <- 20
-  s1 <- simulate_ode(ms, init = x)
+  s1 <- simulate_ode(ms, init = x, record = "state")
   expect_equal(sg_females(s1)$fertile_equivalent[1], 10 + 0.1 * 20)
   ct <- simulate_cb(mod, n_rep = 1, seed = 2, keep = "totals")
   expect_true(all(is.na(sg_females(ct)$egg_laying)))
@@ -129,13 +129,13 @@ test_that("females mated to sterile males lay eggs but cause no cases", {
   x <- numeric(ms$n_states)
   laying <- 5:10
   x[sg_state_index(ms, "F", genotype = "W", mate = "S", substage = laying)] <- 20
-  only_sterile <- simulate_ode(ms, init = x)
+  only_sterile <- simulate_ode(ms, init = x, record = "state")
   day1 <- sg_cases(only_sterile, per = "node")[1, ]
   expect_gt(day1$events, 0)
   expect_identical(day1$cases, 0)
   x2 <- x
   x2[sg_state_index(ms, "F", genotype = "W", mate = "W", substage = laying)] <- 20
-  half <- sg_cases(simulate_ode(ms, init = x2), per = "node")[1, ]
+  half <- sg_cases(simulate_ode(ms, init = x2, record = "state"), per = "node")[1, ]
   expect_equal(half$cases / half$events, 0.5, tolerance = 1e-6) # wild-mated half
   # residual fertility 1e-8: essentially no cases; a cross with half the
   # viable eggs: still nearly every batch is a case
@@ -144,7 +144,7 @@ test_that("females mated to sterile males lay eggs but cause no cases", {
     mv <- sg_model(p, sg_cube(rv), wx, area = 1)
     xv <- numeric(mv$n_states)
     xv[sg_state_index(mv, "F", genotype = "W", mate = "S", substage = laying)] <- 20
-    d1 <- sg_cases(simulate_ode(mv, init = xv), per = "node")[1, ]
+    d1 <- sg_cases(simulate_ode(mv, init = xv, record = "state"), per = "node")[1, ]
     if (v < 1e-6) expect_lt(d1$cases / d1$events, 1e-5) else expect_gt(d1$cases / d1$events, 0.99)
   }
   # stochastic: sterile-mated females' batches are never cases

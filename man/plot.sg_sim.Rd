@@ -7,7 +7,8 @@
 \usage{
 \method{plot}{sg_sim}(
   x,
-  what = c("stages", "genotypes", "alleles", "females", "cases", "hosts"),
+  what = c("stages", "genotypes", "alleles", "females", "cases", "hosts", "nodes",
+    "front"),
   stages = NULL,
   per = c("km2", "node"),
   period = "week",
@@ -20,7 +21,8 @@
 
 \method{plot}{sg_sim_cb}(
   x,
-  what = c("stages", "genotypes", "alleles", "females", "cases", "hosts"),
+  what = c("stages", "genotypes", "alleles", "females", "cases", "hosts", "nodes",
+    "front"),
   stages = NULL,
   per = c("km2", "node"),
   period = "week",
@@ -39,11 +41,14 @@
 frequencies, \code{\link[=sg_allele_freq]{sg_allele_freq()}}), \code{"females"} (female classes,
 \code{\link[=sg_females]{sg_females()}}), \code{"cases"} (cases per period, \code{\link[=sg_cases]{sg_cases()}}) or \code{"hosts"}
 (hosts without a wound, wounded and infested, \code{\link[=sg_hosts]{sg_hosts()}}; host-wound
-model only).}
+model only), \code{"nodes"} (heat map of individuals of the chosen \code{stages}
+by node and day; for stochastic runs one panel per replicate, the first
+replicate unless \code{replicates} is given) or \code{"front"} (position of the
+farthest occupied node over time, \code{\link[=sg_spread]{sg_spread()}}; needs node positions).}
 
-\item{stages}{Stages included for \code{"stages"}, \code{"genotypes"} and
-\code{"alleles"} (see \code{\link[=sg_totals]{sg_totals()}}); default all stages for \code{"stages"},
-adults otherwise.}
+\item{stages}{Stages included for \code{"stages"}, \code{"genotypes"}, \code{"alleles"}
+and \code{"nodes"} (see \code{\link[=sg_totals]{sg_totals()}}); default all stages for \code{"stages"} and
+\code{"nodes"}, adults otherwise.}
 
 \item{per}{\code{"km2"} (default) or \code{"node"}.}
 

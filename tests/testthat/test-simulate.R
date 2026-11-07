@@ -15,7 +15,7 @@ flow_error <- function(sim) {
 }
 
 test_that("simulate_ode() returns daily states, counters, releases and diagnostics", {
-  sim <- simulate_ode(m3)
+  sim <- simulate_ode(m3, record = "state")
   expect_s3_class(sim, "sg_sim")
   expect_identical(sim$day, 0:60)
   expect_identical(sim$date[1], as.Date("1971-04-30"))
@@ -32,7 +32,7 @@ test_that("simulate_ode() returns daily states, counters, releases and diagnosti
   expect_identical(sim$meta$model_hash, m3$meta$hash)
   expect_identical(sim$meta$backend, "cpp") # default since M3 (D-021)
   expect_identical(sim$meta$method, "dopri5")
-  r <- simulate_ode(m3, backend = "R")
+  r <- simulate_ode(m3, backend = "R", record = "state")
   expect_identical(r$meta$method, "lsoda")
   expect_true(all(is.na(r$diagnostics$rejected)) && !any(r$diagnostics$fallback))
 })
@@ -69,8 +69,8 @@ sg_test_each_backend("an empty population stays empty", {
 })
 
 test_that("results do not depend on the integration method", {
-  a <- simulate_ode(m3, method = "lsoda", rtol = 1e-10, atol = 1e-12)
-  b <- simulate_ode(m3, method = "radau", rtol = 1e-10, atol = 1e-12)
+  a <- simulate_ode(m3, method = "lsoda", rtol = 1e-10, atol = 1e-12, record = "state")
+  b <- simulate_ode(m3, method = "radau", rtol = 1e-10, atol = 1e-12, record = "state")
   rel <- max(abs(a$state - b$state)) / max(abs(a$state))
   expect_lt(rel, 1e-7)
   expect_true(is.logical(a$diagnostics$stiff) && !anyNA(a$diagnostics$stiff))
@@ -85,10 +85,10 @@ sg_test_each_backend("states stay non-negative up to round-off", {
 })
 
 test_that("output_every thins the stored states but keeps daily counters", {
-  sim <- simulate_ode(m3, output_every = 7)
+  sim <- simulate_ode(m3, output_every = 7, record = "state")
   expect_identical(sim$day, c(0L, seq(7L, 56L, by = 7L), 60L))
   expect_identical(nrow(sim$counters), 60L)
-  full <- simulate_ode(m3)
+  full <- simulate_ode(m3, record = "state")
   expect_equal(sim$state[nrow(sim$state), ], full$state[61, ], tolerance = sg_tol_exact)
 })
 
@@ -102,19 +102,22 @@ sg_test_each_backend("init is checked against the model", {
 })
 
 test_that("invalid arguments give informative errors", {
-  expect_error(simulate_ode(list()), "sg_model object")
+  expect_error(simulate_ode(list(), record = "state"), "sg_model object")
   expect_error(
-    simulate_ode(m3, backend = "R", method = "dopri5"), "C\\+\\+ backend's own integrator"
+    simulate_ode(m3,
+      backend = "R", method = "dopri5",
+      record = "state"
+    ), "C\\+\\+ backend's own integrator"
   )
-  expect_error(simulate_ode(m3, method = 1), "single string")
-  expect_error(simulate_ode(m3, stiff_fallback = NA), "TRUE or FALSE")
-  expect_error(simulate_ode(m3, backend = "julia"), "must be one of")
-  expect_error(simulate_ode(m3, rtol = -1), "positive")
-  expect_error(simulate_ode(m3, output_every = 0), "whole number >= 1")
+  expect_error(simulate_ode(m3, method = 1, record = "state"), "single string")
+  expect_error(simulate_ode(m3, stiff_fallback = NA, record = "state"), "TRUE or FALSE")
+  expect_error(simulate_ode(m3, backend = "julia", record = "state"), "must be one of")
+  expect_error(simulate_ode(m3, rtol = -1, record = "state"), "positive")
+  expect_error(simulate_ode(m3, output_every = 0, record = "state"), "whole number >= 1")
 })
 
 test_that("print() summarises the simulation", {
-  sim <- simulate_ode(m3)
+  sim <- simulate_ode(m3, record = "state")
   out <- capture.output(print(sim))
   expect_match(out[1], "^<sg_sim> 60 days \\(1971-05-01 to 1971-06-29\\), backend \"cpp\"")
   expect_true(any(grepl("final totals: E", out)))

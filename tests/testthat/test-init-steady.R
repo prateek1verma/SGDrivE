@@ -41,7 +41,7 @@ test_that("an ODE started at the equilibrium stays there", {
   pp <- sg_params()
   m <- sg_model(pp, cube3, sg_forcing(const_weather(27, 60), pp))
   x <- sg_init(m, "equilibrium", temperature = 27)
-  sim <- simulate_ode(m, init = x, rtol = 1e-10, atol = 1e-12)
+  sim <- simulate_ode(m, init = x, rtol = 1e-10, atol = 1e-12, record = "state")
   last <- sim$state[nrow(sim$state), ]
   expect_lt(max(abs(last - as.numeric(x))) / max(x), 1e-6)
 })
@@ -83,7 +83,7 @@ test_that("a burn-in forgets its starting state and uses the right weather", {
   bw <- sg_init(m, "burn_in", weather = wx_all)
   expect_match(attr(bw, "burn_in")$source, "weather before")
   m70 <- sg_model(p, cube3, sg_forcing(wx_all, p, "1970-01-01", "1970-12-31"))
-  direct <- simulate_ode(m70, init = sg_init(m70, "burn_in", weather = wx_all))
+  direct <- simulate_ode(m70, init = sg_init(m70, "burn_in", weather = wx_all), record = "state")
   expect_lt(max(abs(direct$state[366, ] - bw)) / max(bw), 1e-6)
   expect_true(any(grepl("1-year burn-in", capture.output(print(bw)))))
   # Hardy-Weinberg start: genotype frequencies carry through a neutral burn-in
@@ -133,7 +133,7 @@ test_that("adult_females sets the area so the equilibrium holds that many female
   expect_identical(m$meta$adult_females$temperature, 20)
   expect_true(any(grepl("area chosen for 1000 adult females", capture.output(print(m)))))
   # the ODE stays at the equilibrium
-  fem <- sg_females(simulate_ode(m, e))$females
+  fem <- sg_females(simulate_ode(m, e, record = "state"))$females
   expect_lt(max(abs(fem - 1000)), 1e-6)
 })
 

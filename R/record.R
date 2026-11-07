@@ -9,21 +9,35 @@
 #' only what is needed.
 #'
 #' @param ... Any of the built-in sets `"state"` (full states on output days),
-#'   `"totals"` (totals by stage and genotype, and host blocks, for each node)
-#'   and `"counters"` (all daily counters), and objects from `sg_quantity()`,
+#'   `"totals"` (totals by stage and genotype, and host blocks, for each node),
+#'   `"counters"` (all daily counters) and `"cases"` (the counter sums
+#'   [sg_cases()] needs, for every node), and objects from `sg_quantity()`,
 #'   `sg_quantity_weights()` and `sg_counter()`.
+#' @param every Period of the counter sums (`sg_counter()` terms and the
+#'   `"cases"` set): `"day"` (default), `"week"` (7-day blocks from the first
+#'   simulated day, as `sg_cases(period = "week")`), `"month"` or `"year"`
+#'   (calendar months and years). The sums are added up by period during the
+#'   run, so only one row per period is stored. Full counters
+#'   (`"counters"`) stay daily.
 #'
 #' @details
-#' * `simulate_ode(record = "state")` (the default) keeps full states and all
-#'   counters, as before; `record = "totals"` keeps totals and all counters.
-#'   `simulate_cb(record = )` works the same way for each replicate, with an
-#'   extra last dimension for the replicates (`keep = "totals"` is a
-#'   shortcut for `record = "totals"`).
+#' * `simulate_ode(record = "totals")` (the default since phase 3, decision
+#'   13) keeps totals and all counters; `record = "state"` keeps full states
+#'   and all counters, as before. `simulate_cb(record = )` works the same
+#'   way for each replicate, with an extra last dimension for the replicates
+#'   (`keep = "totals"` is a shortcut for `record = "totals"`).
 #' * Quantities are stored in `sim$recorded` (one row per output day, day 0
 #'   included), totals in `sim$totals`, states in `sim$state`.
-#' * With `sg_counter()` terms only those counter sums are kept (in
-#'   `sim$counter_sums`, one row per day) unless `"counters"` is also given;
-#'   without them all counters are kept in `sim$counters`.
+#' * With `sg_counter()` terms or the `"cases"` set only those counter sums
+#'   are kept (in `sim$counter_sums`, one row per period of `every`, with the
+#'   periods' first days and lengths in `sim$counter_periods`) unless
+#'   `"counters"` is also given; without them all counters are kept in
+#'   `sim$counters`.
+#' * The `"cases"` set records, for every node, the counters `sg_cases()`
+#'   reads (`fertile_batches` and `egg_batches`; with the host-wound model
+#'   `infestations`, `egg_batches` and `superinfestations`), named like the
+#'   counters, so `sg_cases()` works without full counters: weekly county
+#'   cases over decades take a few megabytes.
 #' * `sim$final_state` (the state at the end of the run; for `simulate_cb()`
 #'   a matrix state x replicate) is always kept, so a run can be continued
 #'   from it.
@@ -65,7 +79,8 @@
 #'   )
 #'   tail(sim3$recorded)
 #' }
-sg_record <- function(...) {
+sg_record <- function(..., every = c("day", "week", "month", "year")) {
+  every <- .sg_match_choice(every, c("day", "week", "month", "year"), "every")
   parts <- list(...)
   sets <- character(0)
   terms <- list()
@@ -80,28 +95,35 @@ sg_record <- function(...) {
         )
       }
       sets <- union(sets, x)
-    } else if (inherits(x, c("sg_quantity", "sg_quantity_weights", "sg_counter"))) {
+    } else if (inherits(x, c("sg_quantity", "sg_quantity_weights", "sg_counter", "sg_alleles"))) {
       terms[[length(terms) + 1L]] <- x
     } else {
       .sg_stop(
-        "sg_record() takes \"state\", \"totals\", \"counters\" and objects from ",
-        "sg_quantity(), sg_quantity_weights() and sg_counter()."
+        "sg_record() takes \"state\", \"totals\", \"counters\", \"cases\" and objects from ",
+        "sg_quantity(), sg_quantity_weights(), sg_alleles() and sg_counter()."
       )
     }
   }
   if (length(sets) == 0L && length(terms) == 0L) {
     .sg_stop("sg_record() needs at least one set or quantity.")
   }
-  structure(list(sets = sets, terms = terms), class = "sg_record")
+  structure(list(sets = sets, terms = terms, every = every), class = "sg_record")
 }
 
 #' @export
 print.sg_record <- function(x, ...) {
-  cat("<sg_record>", if (length(x$sets)) paste0("sets: ", paste(x$sets, collapse = ", ")), "\n")
+  cat(
+    "<sg_record>",
+    paste0(
+      if (length(x$sets)) paste0("sets: ", paste(x$sets, collapse = ", ")),
+      if (!identical(x$every, "day") && !is.null(x$every)) paste0("; counter sums by ", x$every)
+    ), "\n"
+  )
   for (t in x$terms) {
     kind <- switch(class(t)[1L],
       sg_quantity = "quantity",
       sg_quantity_weights = "weights",
+      sg_alleles = "allele copies",
       sg_counter = "counter sum"
     )
     cat("  ", kind, " \"", t$name, "\"",
@@ -198,6 +220,38 @@ sg_quantity_weights <- function(W, names = NULL) { # nolint: object_name_linter.
 }
 
 #' @rdname sg_record
+#' @param alleles For `sg_alleles()`: optional matrix of allele copies per
+#'   genotype (rows named by genotype, columns by allele), as in
+#'   [sg_allele_freq()]; by default each genotype name is split into
+#'   single-letter alleles.
+#' @details `sg_alleles(name, ...)` records the allele copies carried by the
+#'   individuals of `stage` (default adults; mated females count their own
+#'   genotype), one quantity per allele named `name[allele]` (with
+#'   `by = "node"` also `@node`). [sg_allele_freq()] reads them when the run
+#'   kept neither states nor totals.
+#' @export
+sg_alleles <- function(name, alleles = NULL, stage = "adults", sex = NULL, node = NULL,
+                       by = character(0)) {
+  .sg_check_record_name(name)
+  stage <- .sg_record_blocks(stage)
+  if (!is.null(sex)) {
+    sex <- .sg_match_choice(sex, c("male", "female"), "sex")
+    stage <- intersect(stage, if (sex == "male") "M" else c("U", "F"))
+    if (length(stage) == 0L) .sg_stop("No stage of the chosen `sex` in `stage`.")
+  }
+  if (!is.null(alleles) && (!is.matrix(alleles) || !is.numeric(alleles))) {
+    .sg_stop("`alleles` must be a numeric matrix (rows: genotypes, columns: alleles).")
+  }
+  structure(
+    list(
+      name = name, alleles = alleles, stage = stage, node = node,
+      by = .sg_check_record_by(by, "node")
+    ),
+    class = "sg_alleles"
+  )
+}
+
+#' @rdname sg_record
 #' @param counter Base names of the daily counters to add up, e.g.
 #'   `"fertile_batches"` or `c("deaths_M", "senescence_M")` (see the columns
 #'   of `sim$counters`, without the `"@"` node suffix).
@@ -215,7 +269,7 @@ sg_counter <- function(name, counter, node = NULL, by = character(0)) {
 
 # ---- internal ------------------------------------------------------------------
 
-.sg_record_sets <- c("state", "totals", "counters")
+.sg_record_sets <- c("state", "totals", "counters", "cases")
 
 .sg_check_record_name <- function(name) {
   ok <- is.character(name) && length(name) == 1L && !is.na(name) && nzchar(name) &&
@@ -263,6 +317,17 @@ sg_counter <- function(name, counter, node = NULL, by = character(0)) {
     .sg_stop("`record` must be \"state\", \"totals\" or an sg_record() object.")
   }
   sums <- Filter(function(t) inherits(t, "sg_counter"), record$terms)
+  if ("cases" %in% record$sets) { # the counters sg_cases() reads, every node
+    cases <- if (is.null(model$hosts)) {
+      c("fertile_batches", "egg_batches")
+    } else {
+      c("infestations", "egg_batches", "superinfestations")
+    }
+    all_nodes <- seq_along(.sg_node_ids(model))
+    sums <- c(sums, lapply(cases, function(cn) {
+      sg_counter(cn, counter = cn, node = all_nodes, by = "node")
+    }))
+  }
   quantities <- Filter(function(t) !inherits(t, "sg_counter"), record$terms)
   rows_x <- list()
   if ("totals" %in% record$sets) {
@@ -274,7 +339,16 @@ sg_counter <- function(name, counter, node = NULL, by = character(0)) {
   } else {
     n_totals <- 0L
   }
-  for (q in quantities) rows_x <- c(rows_x, .sg_quantity_rows(q, model))
+  allele_info <- list()
+  for (q in quantities) {
+    if (inherits(q, "sg_alleles")) {
+      a <- .sg_allele_rows(q, model)
+      rows_x <- c(rows_x, a$rows)
+      allele_info[[length(allele_info) + 1L]] <- a$info
+    } else {
+      rows_x <- c(rows_x, .sg_quantity_rows(q, model))
+    }
+  }
   rows_c <- unlist(lapply(sums, .sg_counter_rows, model = model, counter_names = counter_names),
     recursive = FALSE
   )
@@ -282,12 +356,17 @@ sg_counter <- function(name, counter, node = NULL, by = character(0)) {
   names_c <- vapply(rows_c, `[[`, "", "name")
   dup <- c(names_x[duplicated(names_x)], names_c[duplicated(names_c)])
   if (length(dup) > 0L) .sg_stop("Recorded names must be distinct; repeated: ", dup[1L], ".")
+  every <- if (is.null(record$every)) "day" else record$every
+  per <- .sg_counter_periods(model$forcing$dates, every)
   list(
     state = "state" %in% record$sets,
     counters = "counters" %in% record$sets || length(sums) == 0L,
     n_totals = n_totals,
     names_x = names_x, names_c = names_c,
     wx = .sg_rows_csr(rows_x), wc = .sg_rows_csr(rows_c),
+    every = every, c_period = as.integer(per$index - 1L),
+    counter_periods = per$periods,
+    alleles = allele_info,
     record = record
   )
 }
@@ -298,6 +377,26 @@ sg_counter <- function(name, counter, node = NULL, by = character(0)) {
     return(.sg_node_numbers(model, node))
   }
   which(model$landscape$nodes$role == "study")
+}
+
+# Periods of counter sums over the days of a run with these dates: the
+# 1-based period of each day and a data frame of each period's first day
+# (`period`) and number of days (`days`). Weeks are 7-day blocks from the
+# first day (as sg_cases(period = "week")); months and years are calendar
+# periods.
+.sg_counter_periods <- function(dates, every) {
+  key <- switch(EXPR = every,
+    day = seq_along(dates),
+    week = (seq_along(dates) - 1L) %/% 7L,
+    month = format(dates, "%Y-%m"),
+    year = format(dates, "%Y")
+  )
+  index <- match(key, unique(key))
+  first <- !duplicated(index)
+  list(
+    index = index,
+    periods = data.frame(period = dates[first], days = as.integer(tabulate(index)))
+  )
 }
 
 # CSR form (0-based columns) of rows given as list(name, index, weight).
@@ -324,6 +423,53 @@ sg_counter <- function(name, counter, node = NULL, by = character(0)) {
     out[is.na(out)] <- 0
   }
   out
+}
+
+# Rows of W_x for one sg_alleles term: for each allele (and node with
+# by = "node") the states of the chosen stages and nodes weighted by their
+# genotype's copies of the allele (mated females by their own genotype).
+# Also the term's description for sg_allele_freq(): name, blocks, alleles,
+# node ids and whether it is split by node.
+.sg_allele_rows <- function(a, model) {
+  geno <- model$cube$genotypes
+  amat <- if (is.null(a$alleles)) {
+    .sg_default_alleles(geno)
+  } else {
+    .sg_check_allele_matrix(a$alleles, geno)[geno, , drop = FALSE]
+  }
+  ids <- .sg_node_ids(model)
+  nodes <- .sg_record_nodes(model, a$node)
+  by_node <- "node" %in% a$by && length(ids) > 1L
+  groups <- if (by_node) as.list(nodes) else list(nodes)
+  rows <- list()
+  for (grp in groups) {
+    idx <- integer(0)
+    gen <- character(0)
+    for (k in grp) {
+      for (b in a$stage) {
+        for (g in geno) {
+          i <- sg_state_index(model, b, genotype = g, node = k)
+          idx <- c(idx, i)
+          gen <- c(gen, rep(g, length(i)))
+        }
+      }
+    }
+    for (al in colnames(amat)) {
+      w <- amat[gen, al]
+      keep <- w > 0
+      rows[[length(rows) + 1L]] <- list(
+        name = paste0(a$name, "[", al, "]", if (by_node) paste0("@", ids[grp]) else ""),
+        index = idx[keep], weight = unname(w[keep])
+      )
+    }
+  }
+  list(
+    rows = rows,
+    info = list(
+      name = a$name, blocks = a$stage, alleles = colnames(amat), nodes = ids[nodes],
+      by_node = by_node
+    )
+  )
 }
 
 # Rows of W_x for one sg_quantity or sg_quantity_weights.

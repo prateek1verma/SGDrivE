@@ -89,10 +89,15 @@
 #' releases, so recorded states show the zeros; the flow counters stay
 #' balanced through the `removed_*` counters.
 #'
-#' @param record What the run stores: `"state"` (default: full states on
-#'   output days and all daily counters), `"totals"` (totals by stage and
-#'   genotype per node, and all counters), or an [sg_record()] object with
-#'   chosen quantities and counter sums, computed in C++ during the run.
+#' @param record What the run stores: `"totals"` (default: totals by stage
+#'   and genotype per node, host blocks, and all daily counters), `"state"`
+#'   (full states on output days and all counters), or an [sg_record()]
+#'   object with chosen quantities and counter sums, computed in C++ during
+#'   the run. The final state is always kept. Totals add mated females over
+#'   their mates and all adults over their ages: summaries that need the
+#'   mate genotype (`sg_females()$fertile_equivalent`,
+#'   `sg_totals(by = "mate")`) or sub-stages need `record = "state"`
+#'   (decision 13, D-032).
 #'
 #' @return An object of class `sg_sim`, a list with:
 #'   \describe{
@@ -104,7 +109,10 @@
 #'       genotype, and the recorded quantities (rows: output days).}
 #'     \item{`counters`}{Matrix of daily flow totals (rows: days 1 to n);
 #'       `NULL` when only counter sums are recorded.}
-#'     \item{`counter_sums`}{With `sg_counter()` terms: daily counter sums.}
+#'     \item{`counter_sums`, `counter_periods`}{With `sg_counter()` terms or
+#'       the `"cases"` set: counter sums, one row per period of
+#'       `sg_record(every = )` (daily by default), and the periods' first days
+#'       and lengths.}
 #'     \item{`final_state`}{The state at the end of the run (named), to
 #'       continue from.}
 #'     \item{`releases`}{Matrix of individuals released per day and block.}
@@ -125,12 +133,12 @@
 #'   sim
 #'   # the pure-R reference backend gives the same result, more slowly
 #'   sim_r <- simulate_ode(mod, backend = "R")
-#'   max(abs(sim_r$state - sim$state)) / max(sim$state)
+#'   max(abs(sim_r$totals - sim$totals)) / max(sim$totals)
 #' }
 simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
                          rtol = 1e-8, atol = 1e-10, output_every = 1L,
                          stiff_fallback = NULL, node_extinction = FALSE, max_memory = 1e9,
-                         record = "state") {
+                         record = "totals") {
   if (!inherits(model, "sg_model")) {
     .sg_stop("`model` must be an sg_model object; create one with sg_model().")
   }
@@ -194,8 +202,10 @@ simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
   rec <- .sg_recorder(record, model, all_counters)
   n_out <- as.numeric(length(out_days) + 1L)
   width_out <- (if (rec$state) n else 0) + length(rec$names_x)
-  width_day <- (if (rec$counters) length(all_counters) else 0) + length(rec$names_c)
-  out_bytes <- 8 * (n_out * width_out + as.numeric(n_days) * width_day + n)
+  n_periods <- as.numeric(nrow(rec$counter_periods))
+  width_day <- if (rec$counters) length(all_counters) else 0
+  sum_width <- length(rec$names_c)
+  out_bytes <- 8 * (n_out * width_out + as.numeric(n_days) * width_day + n_periods * sum_width + n)
   if (out_bytes > max_memory) {
     .sg_stop(
       "The results would take ", format(out_bytes / 1e6, digits = 3L), " MB (",
@@ -244,7 +254,9 @@ simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
     res$counters <- matrix(0, n_days, length(all_counters), dimnames = list(NULL, all_counters))
   }
   if (length(rec$names_c) > 0L) {
-    res$counter_sums <- matrix(0, n_days, length(rec$names_c), dimnames = list(NULL, rec$names_c))
+    res$counter_sums <- matrix(0, nrow(rec$counter_periods), length(rec$names_c),
+      dimnames = list(NULL, rec$names_c)
+    )
   }
   if (n_node > 1L) res$diag$limiting_node <- NA_character_
   res <- .sg_record_row(res, 1L, x0)
@@ -279,6 +291,7 @@ simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
       recorded = recorded,
       counters = res$counters,
       counter_sums = res$counter_sums,
+      counter_periods = if (!is.null(res$counter_sums)) rec$counter_periods,
       final_state = final_state,
       releases = .sg_release_matrix(model),
       diagnostics = res$diag,
@@ -289,7 +302,7 @@ simulate_ode <- function(model, init = NULL, backend = "cpp", method = NULL,
         node_extinction = node_extinction,
         record = list(
           sets = rec$record$sets, quantities = setdiff(rec$names_x, colnames(totals)),
-          counter_sums = rec$names_c
+          counter_sums = rec$names_c, every = rec$every, alleles = rec$alleles
         ),
         fallback_days = sum(res$diag$fallback), run_time = run_time,
         model_hash = model$meta$hash, info = .sg_output_info(model),
@@ -443,12 +456,15 @@ print.sg_sim <- function(x, ...) {
       .sg_dopri5_max_steps, !is.null(ctx$ext),
       if (is.null(ctx$ext)) 1 else ctx$ext$threshold,
       if (is.null(ctx$ext)) -1L else ctx$ext$ended_index,
-      res$rec[c("state", "counters", "wx", "wc")]
+      res$rec[c("state", "counters", "wx", "wc", "c_period")]
     )
     done <- seq.int(d, length.out = length(r$steps))
     if (length(done) > 0L) {
       if (!is.null(res$counters)) res$counters[done, ] <- r$counters
-      if (!is.null(res$counter_sums)) res$counter_sums[done, ] <- r$counter_sums
+      if (!is.null(res$counter_sums)) { # by period; a period may continue a chunk
+        pr <- r$sum_periods
+        res$counter_sums[pr, ] <- res$counter_sums[pr, , drop = FALSE] + r$counter_sums
+      }
       res$diag$steps[done] <- r$steps
       res$diag$rejected[done] <- r$rejected
       res$diag$evaluations[done] <- r$evaluations
@@ -605,7 +621,10 @@ print.sg_sim <- function(x, ...) {
 .sg_store_day <- function(res, d, step) {
   full <- c(step$counters, step$removed)
   if (!is.null(res$counters)) res$counters[d, ] <- full
-  if (!is.null(res$counter_sums)) res$counter_sums[d, ] <- .sg_csr_multiply(res$rec$wc, full)
+  if (!is.null(res$counter_sums)) {
+    pr <- res$rec$c_period[d] + 1L
+    res$counter_sums[pr, ] <- res$counter_sums[pr, ] + .sg_csr_multiply(res$rec$wc, full)
+  }
   res$diag$steps[d] <- step$steps
   res$diag$evaluations[d] <- step$evaluations
   res$diag$stiff[d] <- step$stiff

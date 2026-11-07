@@ -20,7 +20,7 @@ flow_error <- function(sim, r) {
 }
 
 test_that("simulate_cb() returns replicate arrays and metadata", {
-  sim <- simulate_cb(mod, init, n_rep = 3, seed = 1)
+  sim <- simulate_cb(mod, init, n_rep = 3, seed = 1, record = "state")
   expect_s3_class(sim, "sg_sim_cb")
   expect_identical(sim$day, 0:60)
   expect_identical(sim$date[c(1, 61)], as.Date(c("1971-03-31", "1971-05-30")))
@@ -40,28 +40,28 @@ test_that("simulate_cb() returns replicate arrays and metadata", {
 })
 
 test_that("each replicate is the reference chain-binomial run on its own stream", {
-  sim <- simulate_cb(mod, init, n_rep = 2, seed = 42)
+  sim <- simulate_cb(mod, init, n_rep = 2, seed = 42, record = "state")
   ref <- ns$.sg_with_stream(sim$meta$streams[, 2], ns$.sg_cb_run_r(mod, init, n_days = 20))
   expect_identical(unname(sim$state[1:21, , 2]), unname(ref$state))
   expect_identical(unname(sim$counters[1:20, , 2]), unname(ref$counters))
 })
 
 test_that("runs are reproducible and replicates independent of how they are run", {
-  a <- simulate_cb(mod, init, n_rep = 4, seed = 7)
-  b <- simulate_cb(mod, init, n_rep = 2, seed = 7)
+  a <- simulate_cb(mod, init, n_rep = 4, seed = 7, record = "state")
+  b <- simulate_cb(mod, init, n_rep = 2, seed = 7, record = "state")
   expect_identical(a$state[, , 1:2], b$state) # replicate r does not depend on n_rep
   set.seed(3)
-  c1 <- simulate_cb(mod, init, n_rep = 2)
+  c1 <- simulate_cb(mod, init, n_rep = 2, record = "state")
   set.seed(3)
-  c2 <- simulate_cb(mod, init, n_rep = 2)
+  c2 <- simulate_cb(mod, init, n_rep = 2, record = "state")
   expect_identical(c1$state, c2$state)
-  c3 <- simulate_cb(mod, init, n_rep = 2) # the session's generator moved on
+  c3 <- simulate_cb(mod, init, n_rep = 2, record = "state") # the session's generator moved on
   expect_false(identical(c2$state, c3$state))
   # an explicit seed leaves the session's generator untouched
   set.seed(1)
   u1 <- stats::runif(1)
   set.seed(1)
-  simulate_cb(mod, init, seed = 5)
+  simulate_cb(mod, init, seed = 5, record = "state")
   expect_identical(stats::runif(1), u1)
   expect_identical(RNGkind()[1], "Mersenne-Twister")
 })
@@ -70,15 +70,15 @@ test_that("parallel runs give the same replicates", {
   skip_if_not_installed("future.apply")
   old <- future::plan("sequential")
   on.exit(future::plan(old))
-  a <- simulate_cb(mod, init, n_rep = 3, seed = 9)
-  b <- simulate_cb(mod, init, n_rep = 3, seed = 9, parallel = TRUE)
+  a <- simulate_cb(mod, init, n_rep = 3, seed = 9, record = "state")
+  b <- simulate_cb(mod, init, n_rep = 3, seed = 9, parallel = TRUE, record = "state")
   expect_identical(b$state, a$state)
   expect_identical(b$counters, a$counters)
   expect_true(b$meta$parallel)
 })
 
 test_that("totals and output_every thin the output consistently", {
-  full <- simulate_cb(mod, init, n_rep = 2, seed = 11)
+  full <- simulate_cb(mod, init, n_rep = 2, seed = 11, record = "state")
   tot <- simulate_cb(mod, init, n_rep = 2, seed = 11, keep = "totals", output_every = 7)
   expect_identical(tot$day, c(0L, seq(7L, 56L, 7L), 60L))
   expect_null(tot$state)
@@ -107,14 +107,17 @@ test_that("small populations go extinct and the extinction day is reported", {
 })
 
 test_that("invalid arguments give informative errors", {
-  expect_error(simulate_cb(list()), "sg_model object")
-  expect_error(simulate_cb(mod, n_rep = 0), "whole number >= 1")
-  expect_error(simulate_cb(mod, dt = 0.3), "whole number of steps")
-  expect_error(simulate_cb(mod, output_every = 1.5), "whole number >= 1")
+  expect_error(simulate_cb(list(), record = "state"), "sg_model object")
+  expect_error(simulate_cb(mod, n_rep = 0, record = "state"), "whole number >= 1")
+  expect_error(simulate_cb(mod, dt = 0.3, record = "state"), "whole number of steps")
+  expect_error(simulate_cb(mod, output_every = 1.5, record = "state"), "whole number >= 1")
   expect_error(simulate_cb(mod, keep = "all"), "must be one of")
-  expect_error(simulate_cb(mod, seed = 1.5), "single whole number")
-  expect_error(simulate_cb(mod, parallel = NA), "TRUE or FALSE")
-  expect_error(simulate_cb(mod, max_memory = 0), "positive number")
-  expect_error(simulate_cb(mod, n_rep = 1000, max_memory = 1e6), "record = \"totals\"")
-  expect_error(simulate_cb(mod, init = numeric(3)), "length")
+  expect_error(simulate_cb(mod, seed = 1.5, record = "state"), "single whole number")
+  expect_error(simulate_cb(mod, parallel = NA, record = "state"), "TRUE or FALSE")
+  expect_error(simulate_cb(mod, max_memory = 0, record = "state"), "positive number")
+  expect_error(
+    simulate_cb(mod, n_rep = 1000, max_memory = 1e6, record = "state"),
+    "record = \"totals\""
+  )
+  expect_error(simulate_cb(mod, init = numeric(3), record = "state"), "length")
 })
