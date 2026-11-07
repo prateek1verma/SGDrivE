@@ -775,6 +775,61 @@ Phase 2 findings (implemented 2026-11-05, WP1–WP6):
   (`src/recorder.h`); `keep` defaults to `NULL` and stays a shortcut;
   `meta$keep` is replaced by `meta$record`.
 
+Phase 3 findings (dev/MOVEMENT_PHASE3_PLAN.md; WP1-WP9, 2026-11-06):
+* Constructors and checks (WP1-WP3): `sg_movement_diffusion()` (finite
+  volumes on any network, matrices or an edge table, closed or open edges),
+  `sg_movement_from_prob()` (as MGDrivE2's `movement_prob2rate()`, rows below
+  1 become losses), `sg_rate_from_fraction()`, `sg_rate_from_lifetime()` and
+  `check_movement()`. The lifetime leave probability and lifespan are exact
+  recursions over the adult chain; they reproduce the design note table of
+  5.3. The implied D of `check_movement()` equals the constructor's D at
+  interior nodes (half at closed ends, where only moves within the
+  landscape count).
+* Recorder (WP4): `every` is an argument of `sg_record()`, not of
+  `sg_counter()` as the design note sketched: one period per run keeps
+  `counter_sums` a single matrix and lets the `"cases"` set (the counters
+  `sg_cases()` reads, every node) use it. Weeks are 7-day blocks from the
+  first day, as `sg_cases(period = "week")`.
+* Decision 13 (WP5, user, 2026-11-05): totals plus all counters are the
+  default output of both solvers; totals keep mated females summed over
+  their mates, so `fertile_equivalent` and grouping by mate need
+  `record = "state"`. `sg_alleles()` records allele copies for runs without
+  totals. Changing the default exposed tests that read `sim$state` and
+  passed vacuously when it was `NULL` (`max()` of nothing is `-Inf`); the
+  suite now runs without warnings.
+* Spread (WP6): `sg_spread()` counts a node as occupied from
+  `extinction_threshold` flies of any stage; the front uses the nodes' `x`
+  coordinates, now kept in the simulation's node information.
+* Both solvers grow linearly with the nodes (bench/m6_multinode_scaling.R):
+  a 254-node SIT year takes about 36 s with the ODE (target about 30 s;
+  about 24.5 ns per state and evaluation in a run, 14 ns for the rate
+  function alone) and about 23 s per chain-binomial replicate with one
+  forcing series per node (14 s with one shared series). Sharing the ODE's
+  daily preparation across nodes would save nothing; the movement pass is
+  about 30% of an ODE evaluation. rtol = 1e-6, atol = 1e-6 halves the ODE's
+  run time with node errors near 1e-7; the defaults stay (user decision)
+  and the help recommends them for large landscapes.
+* South Texas transect (scenarios 21-22; 18 cells of 50 km, 1961-62
+  weather, D = 0.4 km^2 per day): the 1961-62 freeze empties every cell
+  north of about 400 km; in 1962 the front returns about one cell every
+  three weeks, about 30 km per generation against the 80-160 observed, as
+  the design note expected: local diffusion alone cannot explain the
+  spread, which needs long-distance movement (phase 4). With 50 km cells a
+  single arriving fly occupies a whole well-mixed cell, so this grid
+  overstates the speed of local spread rather than understating it.
+* The movement clock barely changes die-back or spring spread (front on
+  1 August 550-585 km for calendar, capped and uncapped): the clock choice
+  (decision 2) matters little for these questions. Ten times the diffusion
+  coefficient gives only 1.5 times the front speed.
+* The chain-binomial step order (newly emerged adults do not move in their
+  emergence step; phase 2 findings) leaves the front unchanged: dt = 0.05
+  and 0.1 differ by less than the spread of the replicates. No change to
+  the step order is needed.
+* Without the node extinction rule every cell keeps fractions of a fly
+  through the winter and the ODE's "front" is back at the north end by
+  August 1962 without any spread: spread questions need the rule or the
+  chain-binomial solver (design note 5.7, confirmed).
+
 ---
 
 ## Open questions

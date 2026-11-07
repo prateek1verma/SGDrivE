@@ -1,7 +1,8 @@
 # Phase 3 implementation plan: constructors, diagnostics, outputs, first transect
 
 Status: **accepted**, 2026-11-05 (choices of section 4 confirmed by the user
-the same day); not implemented. Implements phase 3 of dev/MOVEMENT_DESIGN.md (section
+the same day); implemented 2026-11-06 (WP1-WP9; findings in D-032; WP10
+optional, not done). Implements phase 3 of dev/MOVEMENT_DESIGN.md (section
 9) with the interface of sections 6 and 7 and the tests of section 8.
 Phases 1 (ODE, recorder) and 2 (chain-binomial movement, recorder) are in
 dev/MOVEMENT_PHASE1_PLAN.md and dev/MOVEMENT_PHASE2_PLAN.md; findings in
@@ -228,6 +229,17 @@ landscape: a transect from south Texas north.
   chain-binomial larval chain under crowding (D-032 phase 2 findings).
   Optimise only what the profile shows, keeping the draw-for-draw match and
   the baselines.
+* *Done (2026-11-06):* `bench/m6_grid.R` (shared grid setup),
+  `bench/m6_multinode_scaling.R`, `bench/m6_tolerance.R`,
+  `bench/m6_profiles.R`; results in `bench/README.md`. Linear growth in both
+  solvers; 254-node SIT ODE year 36 s (target about 30 s); chain-binomial
+  target set at about 23 s per replicate-year for 254 nodes. Sharing the
+  ODE's daily preparation would save nothing (not done). The movement pass
+  is about 30% of an ODE evaluation; `__restrict` on its loops gave no gain
+  above run-to-run noise (not kept). rtol = 1e-6 halves ODE run time with
+  errors near 1e-7; the defaults stay (user, 2026-11-06) and the help of
+  `simulate_ode()` recommends `rtol = 1e-6, atol = 1e-6` for large
+  landscapes.
 
 ### WP8. First landscape: the south Texas transect (L)
 
@@ -249,12 +261,29 @@ landscape: a transect from south Texas north.
   the difference matters, a specified fix for movement of emerged adults
   follows as its own change; D-032 phase 2 findings).
 * Figures in `inst/scenarios/scenario21_figures/` (heat maps, fronts).
+* *Done (2026-11-06):* `inst/scenarios/21_texas_transect.R` (about 20 s)
+  and `22_texas_transect_sensitivity.R` (about 2 min; it sources 21).
+  Cells take the station of the nearest county centroid (15 stations for
+  18 cells); the source node has Brownsville weather; every node starts on
+  1 January 1961 (1961 as burn-in). Results (`scenario21_figures/`, D-032
+  phase 3 findings): the 1961-62 freeze empties every cell north of about
+  400 km; in 1962 the front climbs back about one cell every three weeks to
+  550-600 km by 1 August, about 30 km per generation, against 80-160
+  observed; the clock barely matters; D x 10 gives 45 km per generation;
+  dt = 0.05 and 0.1 give the same front (no change to the step order
+  needed); without the extinction rule every cell keeps fractions of a fly
+  and the "front" is back at the north end by August.
 
 ### WP9. Documentation and release checks (S)
 
 * Help pages and examples for the new functions; `_pkgdown.yml`
   reference; NEWS; D-032 phase 3 findings; design note and roadmap status;
   `R CMD check` 0/0/0; sanitizers; full matrix on the pull requests.
+* *Done (2026-11-06):* D-032 phase 3 findings (WP1-WP9), design note and
+  roadmap status, NEWS ordered by topic, README landscape section, every
+  help topic in `_pkgdown.yml`. `R CMD check --as-cran` with tests: 0
+  errors, 0 warnings; the two notes are local (new submission, pandoc not
+  installed). Sanitizers: no errors.
 
 ### Optional WP10. Cross-check against MGDrivE2 (M)
 

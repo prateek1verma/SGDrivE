@@ -18,7 +18,12 @@
 #'   method, `"radau"`, `"bdf"`, `"ode45"` and others, e.g. to check that
 #'   results do not depend on the solver. Default: `"dopri5"` for the C++
 #'   backend, `"lsoda"` for the R backend.
-#' @param rtol,atol Relative and absolute error tolerances of the integrator.
+#' @param rtol,atol Relative and absolute error tolerances of the integrator
+#'   (`atol` in individuals per state). The defaults (1e-8, 1e-10) are
+#'   tight. For large landscapes `rtol = 1e-6, atol = 1e-6` about halves the
+#'   run time and keeps every node's population within about 1e-7 of its
+#'   largest value, also in nearly empty nodes (100-node benchmark,
+#'   `bench/m6_tolerance.R`).
 #' @param output_every Record the state every this many days (and always on
 #'   the last day). Counters and diagnostics are always daily.
 #' @param stiff_fallback Only for `method = "dopri5"`: if `TRUE`, a

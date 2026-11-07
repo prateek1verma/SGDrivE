@@ -14,16 +14,6 @@ Plan: `dev/MOVEMENT_PHASE3_PLAN.md`.
   `sg_females()$fertile_equivalent` and `egg_laying` are `NA`, and
   `sg_totals(by = "mate")` stops with a hint. Use `record = "state"` (or
   `keep = "state"` in `simulate_cb()`) for full states, as before.
-* `sg_alleles()` records allele copies (one quantity per allele, optionally
-  by node); `sg_allele_freq()` reads them when a run kept neither states
-  nor totals.
-* `sg_spread()` measures spread through a landscape: per node the first
-  and last output day with flies (at least `extinction_threshold`, 1 by
-  default) and the days occupied; over time the number of occupied nodes
-  and the front (the farthest occupied node by its `x` coordinate or a
-  given position); per replicate for stochastic runs. New plots:
-  `plot(sim, "nodes")` (heat map of individuals by node and day) and
-  `plot(sim, "front")`.
 * `sg_movement_diffusion()` builds a movement layer for local diffusion on
   any network from a diffusion coefficient D (km^2 per day, one value or
   one per class) and the nodes' areas, shared border lengths and centroid
@@ -55,6 +45,28 @@ Plan: `dev/MOVEMENT_PHASE3_PLAN.md`.
   node, so `sg_cases()` works without full counters (from daily sums or
   sums by the same period): weekly cases per county over decades take a few
   megabytes.
+* `sg_alleles()` records allele copies (one quantity per allele, optionally
+  by node); `sg_allele_freq()` reads them when a run kept neither states
+  nor totals.
+* `sg_spread()` measures spread through a landscape: per node the first
+  and last output day with flies (at least `extinction_threshold`, 1 by
+  default) and the days occupied; over time the number of occupied nodes
+  and the front (the farthest occupied node by its `x` coordinate or a
+  given position); per replicate for stochastic runs. New plots:
+  `plot(sim, "nodes")` (heat map of individuals by node and day) and
+  `plot(sim, "front")`.
+* Benchmarks on grids of up to 254 nodes (`bench/m6_*.R`): both solvers
+  grow linearly with the nodes; a 254-node SIT year takes about 36 s with
+  the ODE and 23 s per chain-binomial replicate. The help of
+  `simulate_ode()` recommends `rtol = 1e-6, atol = 1e-6` for large
+  landscapes (about twice as fast, node populations within about 1e-7);
+  the defaults are unchanged.
+* Scenarios 21 and 22: a south-north transect through Texas with 1961-1962
+  station weather, local diffusion at the field rate, both solvers, the
+  three movement clocks, a larger diffusion coefficient, two time steps and
+  the ODE without the node extinction rule. Local diffusion moves the front
+  about 30 km per generation, against 80-160 km observed: long-distance
+  movement is needed (phase 4).
 
 ## Several nodes and adult movement, phase 2: chain-binomial solver (D-032)
 

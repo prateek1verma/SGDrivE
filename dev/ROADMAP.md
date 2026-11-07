@@ -15,7 +15,7 @@
 
 | Version | Adds |
 |---|---|
-| v0.2 | Multiple nodes and fly movement (specified: MODEL_SPEC section 8a, D-032, dev/MOVEMENT_DESIGN.md; phase 1, ODE, and phase 2, chain-binomial, done 2026-11-05) |
+| v0.2 | Multiple nodes and fly movement (specified: MODEL_SPEC section 8a, D-032, dev/MOVEMENT_DESIGN.md; phase 1, ODE, and phase 2, chain-binomial, done 2026-11-05; phase 3, constructors, diagnostics, outputs and the Texas transect, done 2026-11-06; phase 4, several layers, next) |
 | v0.3 | Host and wound model; modelled case counts |
 | v0.4 | Host movement, larval transport, quarantine and treatment |
 | later | Explicit gonotrophic cycle; male mating capacity |
